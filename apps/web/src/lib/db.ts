@@ -36,7 +36,7 @@ export async function dbGetAllProducts(): Promise<MockProduct[]> {
         .select("data")
         .order("updated_at", { ascending: false });
       if (!error && data && data.length >= 0) {
-        return data.map((r) => r.data as MockProduct);
+        return (data as Array<{ data: unknown }>).map((r) => r.data as MockProduct);
       }
     } catch {
       // Supabase not reachable — fall through to mock
@@ -129,7 +129,8 @@ export async function dbGetSettings(): Promise<StoreSettings> {
         .select("data")
         .eq("id", 1)
         .maybeSingle();
-      if (!error && data?.data) return data.data as StoreSettings;
+      const row = data as { data: unknown } | null;
+      if (!error && row?.data) return row.data as StoreSettings;
     } catch (e) {
       console.error("[db] Supabase get settings exception:", e);
     }
