@@ -44,6 +44,16 @@ export async function dbGetAllProducts(): Promise<MockProduct[]> {
 }
 
 export async function dbGetProduct(idOrSlug: string): Promise<MockProduct | undefined> {
+  // Try direct lookup by id first (fast, single row) — avoids loading all products
+  const t = tbl("csl_products");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").eq("id", idOrSlug).maybeSingle();
+      if (!error && data?.data) return data.data as MockProduct;
+      // Not found by id — try by slug (slug is stored inside the data JSONB, so must scan)
+    } catch {}
+  }
+  // Slug-based fallback: scan all products
   const all = await dbGetAllProducts();
   return all.find((p) => p.id === idOrSlug || p.slug === idOrSlug);
 }
