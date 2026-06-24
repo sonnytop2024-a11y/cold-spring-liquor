@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Edit, Trash2, Search, Package, X, Check, ImageIcon,
-  ToggleLeft, ToggleRight, Star, ChevronDown, Upload, Download,
+  Star, ChevronDown, Upload, Download, CheckCircle2,
 } from "lucide-react";
 import { ImportModal } from "./ImportModal";
 import { API } from "@/lib/api";
@@ -58,7 +58,7 @@ interface Product {
 const EMPTY: Omit<Product, "id" | "slug"> = {
   name: "", brand: "", category: "whiskey", price: 0, salePrice: null,
   volume: "750ml", abv: 40, country: "USA", stockQty: 0,
-  inStock: true, featured: false, active: true, description: "", imageUrl: null,
+  inStock: false, featured: false, active: false, description: "", imageUrl: null,
 };
 
 async function fetchProducts(search: string, category: string, stock: string) {
@@ -92,14 +92,9 @@ async function deleteProduct(id: string) {
   await fetch(`${API}/products/${id}`, { method: "DELETE" });
 }
 
-async function toggleActive(p: Product) {
-  return updateProduct({ id: p.id, active: !p.active });
-}
-
-function StockBadge({ qty, inStock }: { qty: number; inStock: boolean }) {
-  if (!inStock || qty <= 0) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Out of Stock</span>;
-  if (qty < 5) return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Low ({qty})</span>;
-  return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">{qty} in stock</span>;
+function StatusBadge({ qty }: { qty: number }) {
+  if (qty > 0) return <span className="text-xs px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">Active</span>;
+  return <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">Inactive</span>;
 }
 
 interface ProductModalProps {
@@ -352,17 +347,6 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Brand *</label>
-              <input
-                required
-                value={form.brand}
-                onChange={(e) => set("brand", e.target.value)}
-                placeholder="e.g. Jack Daniel's"
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-
-            <div>
               <label className="block text-sm font-medium mb-1">Category *</label>
               <div className="relative">
                 <select
@@ -472,47 +456,26 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
             />
           </div>
 
-          {/* Toggles */}
-          <div className="border rounded-xl p-4 space-y-3 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Visibility &amp; Availability</p>
-
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <button
-                type="button"
-                onClick={() => set("active", !form.active)}
-                className={`transition-colors ${form.active ? "text-green-500" : "text-gray-300"}`}
-              >
-                {form.active ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-              </button>
-              <div>
-                <span className="text-sm font-medium">Product Active</span>
-                <p className="text-xs text-gray-400">{form.active ? "Visible on website" : "Hidden from website"}</p>
+          {/* Status info + featured */}
+          <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-gray-50">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Status</p>
+              <div className="flex items-center gap-1.5">
+                <StatusBadge qty={form.stockQty} />
+                <span className="text-xs text-gray-400">
+                  {form.stockQty > 0 ? "— visible on website" : "— hidden from website (stock = 0)"}
+                </span>
               </div>
-            </label>
-
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <button
-                type="button"
-                onClick={() => set("inStock", !form.inStock)}
-                className={`transition-colors ${form.inStock ? "text-blue-500" : "text-red-400"}`}
-              >
-                {form.inStock ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-              </button>
-              <div>
-                <span className="text-sm font-medium">{form.inStock ? "In Stock" : "Out of Stock"}</span>
-                <p className="text-xs text-gray-400">{form.inStock ? "Customers can add to cart" : "Hidden from website — customers cannot order"}</p>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-2.5 cursor-pointer">
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
               <button
                 type="button"
                 onClick={() => set("featured", !form.featured)}
-                className={`transition-colors ${form.featured ? "text-yellow-500" : "text-gray-300"}`}
+                className={`transition-colors ${form.featured ? "text-yellow-400" : "text-gray-300"}`}
               >
-                <Star size={20} className={form.featured ? "fill-yellow-400" : ""} />
+                <Star size={22} className={form.featured ? "fill-yellow-400" : ""} />
               </button>
-              <span className="text-sm font-medium">Featured on Homepage</span>
+              <span className="text-sm font-medium text-gray-600">Featured</span>
             </label>
           </div>
 
@@ -552,7 +515,15 @@ export default function InventoryPage() {
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qc = useQueryClient();
+
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(""), 2500);
+  }
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["admin-products", search, catFilter, stockFilter],
@@ -562,10 +533,9 @@ export default function InventoryPage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-products"] });
 
-  const createMutation = useMutation({ mutationFn: createProduct, onSuccess: () => { invalidate(); setShowModal(false); } });
-  const updateMutation = useMutation({ mutationFn: updateProduct, onSuccess: () => { invalidate(); setShowModal(false); } });
+  const createMutation = useMutation({ mutationFn: createProduct, onSuccess: () => { invalidate(); setShowModal(false); showToast("Product created successfully."); } });
+  const updateMutation = useMutation({ mutationFn: updateProduct, onSuccess: () => { invalidate(); setShowModal(false); showToast("Changes saved successfully."); } });
   const deleteMutation = useMutation({ mutationFn: deleteProduct, onSuccess: invalidate });
-  const toggleMutation = useMutation({ mutationFn: toggleActive, onSuccess: invalidate });
 
   function openAdd() { setModalProduct(null); setShowModal(true); }
   function openEdit(p: Product) { setModalProduct(p); setShowModal(true); }
@@ -580,10 +550,9 @@ export default function InventoryPage() {
 
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  const inStock = products.filter((p: Product) => p.inStock !== false && p.stockQty > 0).length;
-  const lowStock = products.filter((p: Product) => p.inStock !== false && p.stockQty > 0 && p.stockQty < 5).length;
-  const outOfStock = products.filter((p: Product) => p.inStock === false || p.stockQty <= 0).length;
-  const inactive = products.filter((p: Product) => !p.active).length;
+  const activeCount  = products.filter((p: Product) => p.stockQty > 0).length;
+  const lowStock     = products.filter((p: Product) => p.stockQty > 0 && p.stockQty < 5).length;
+  const inactiveCount = products.filter((p: Product) => p.stockQty <= 0).length;
 
   return (
     <div>
@@ -592,10 +561,9 @@ export default function InventoryPage() {
         <div>
           <h1 className="text-2xl font-bold">Product Management</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {products.length} products · {inStock} in stock
-            {outOfStock > 0 && <span className="text-red-500 ml-2">· {outOfStock} out of stock</span>}
+            {products.length} products · {activeCount} active
+            {inactiveCount > 0 && <span className="text-red-500 ml-2">· {inactiveCount} inactive</span>}
             {lowStock > 0 && <span className="text-amber-600 ml-2">· {lowStock} low stock</span>}
-            {inactive > 0 && <span className="text-gray-400 ml-2">· {inactive} inactive</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -701,7 +669,7 @@ export default function InventoryPage() {
                   </tr>
                 ) : (
                   (products as Product[]).map((p) => (
-                    <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? "opacity-50" : ""}`}>
+                    <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${p.stockQty <= 0 ? "opacity-60" : ""}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {p.imageUrl ? (
@@ -714,7 +682,7 @@ export default function InventoryPage() {
                           )}
                           <div>
                             <p className="font-medium leading-tight">{p.name}</p>
-                            <p className="text-xs text-gray-400">{p.brand} · {p.volume}</p>
+                            <p className="text-xs text-gray-400">{p.volume}</p>
                           </div>
                           {p.featured && <Star size={12} className="text-yellow-500 fill-yellow-400 shrink-0" />}
                         </div>
@@ -726,25 +694,9 @@ export default function InventoryPage() {
                           <p className="text-xs text-red-500 font-medium">${Number(p.salePrice).toFixed(2)} sale</p>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 font-medium">{p.stockQty}</td>
                       <td className="px-4 py-3">
-                        <StockBadge qty={p.stockQty} inStock={p.inStock} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          <button
-                            onClick={() => toggleMutation.mutate(p)}
-                            title={p.active ? "Disable product" : "Enable product"}
-                            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-                              p.active ? "text-green-600 hover:text-green-700" : "text-gray-400 hover:text-gray-600"
-                            }`}
-                          >
-                            {p.active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                            {p.active ? "Active" : "Inactive"}
-                          </button>
-                          {!p.inStock && (
-                            <span className="text-[10px] text-red-500 font-medium px-1">Hidden (OOS)</span>
-                          )}
-                        </div>
+                        <StatusBadge qty={p.stockQty} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
@@ -796,6 +748,14 @@ export default function InventoryPage() {
             invalidate();
           }}
         />
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <CheckCircle2 size={16} className="text-green-400 shrink-0" />
+          {toast}
+        </div>
       )}
     </div>
   );

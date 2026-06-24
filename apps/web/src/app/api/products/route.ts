@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
 
   let results = await dbGetAllProducts();
 
-  // Website-facing: hide inactive AND out-of-stock products
-  if (activeOnly) results = results.filter((p) => p.active !== false && p.inStock !== false);
+  // Website-facing: only show products with stock
+  if (activeOnly) results = results.filter((p) => p.stockQty > 0);
   if (q) results = results.filter((p) => p.name.toLowerCase().includes(q) || (p.brand ?? "").toLowerCase().includes(q));
   if (category) results = results.filter((p) => p.category === category);
   if (featured === "true") results = results.filter((p) => p.featured);
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     abv: Number(body.abv) || 0,
     country: body.country ?? "USA",
     stockQty: Number(body.stockQty) || 0,
-    inStock: body.inStock !== undefined ? Boolean(body.inStock) : (Number(body.stockQty) || 0) > 0,
+    inStock: (Number(body.stockQty) || 0) > 0,
     featured: Boolean(body.featured),
     active: body.active !== false,
     rating: 0,
