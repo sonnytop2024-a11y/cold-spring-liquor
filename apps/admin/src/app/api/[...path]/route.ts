@@ -1,56 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Server-side proxy: forwards all /api/* calls from admin to the web app.
-// This bypasses next.config.mjs rewrites entirely, which can be unreliable on Vercel.
+// Runs server-side so there is no CORS issue — browser always calls the admin domain.
 const WEB_URL = (process.env.WEB_API_URL ?? "https://coldspringliquor.com").replace(/\/$/, "");
 
-async function proxy(req: NextRequest, params: { path: string[] }): Promise<NextResponse> {
-  const path = params.path.join("/");
-  const destination = `${WEB_URL}/api/${path}${req.nextUrl.search}`;
+type Ctx = { params: { path: string[] } };
 
-  const forwardHeaders: HeadersInit = {};
-  const contentType = req.headers.get("content-type");
-  if (contentType) forwardHeaders["content-type"] = contentType;
+async function proxy(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
+  const destination = `${WEB_URL}/api/${ctx.params.path.join("/")}${req.nextUrl.search}`;
+
+  // Build headers as plain Record to avoid HeadersInit union issues
+  const forwardHeaders: Record<string, string> = {};
+  const ct = req.headers.get("content-type");
+  if (ct) forwardHeaders["content-type"] = ct;
 
   try {
-    const init: RequestInit = {
+    const hasBody = req.method !== "GET" && req.method !== "HEAD";
+    const upstream = await fetch(destination, {
       method: req.method,
       headers: forwardHeaders,
-      // body only for methods that allow it
-      ...(req.method !== "GET" && req.method !== "HEAD"
-        ? { body: await req.text() }
-        : {}),
-    };
+      body: hasBody ? await req.arrayBuffer() : undefined,
+    });
 
-    const upstream = await fetch(destination, init);
-    const body = await upstream.arrayBuffer();
+    const resHeaders: Record<string, string> = {};
+    const upCT = upstream.headers.get("content-type");
+    if (upCT) resHeaders["content-type"] = upCT;
 
-    const resHeaders = new Headers();
-    const upstreamCT = upstream.headers.get("content-type");
-    if (upstreamCT) resHeaders.set("content-type", upstreamCT);
-
-    return new NextResponse(body, { status: upstream.status, headers: resHeaders });
+    const data = await upstream.arrayBuffer();
+    return new NextResponse(data, { status: upstream.status, headers: resHeaders });
   } catch (e) {
-    console.error(`[admin proxy] ${req.method} /api/${path} → ${destination} failed:`, e);
-    return NextResponse.json(
-      { error: "Proxy error", detail: String(e), destination },
-      { status: 502 }
-    );
+    console.error(`[admin proxy] ${req.method} ${destination} failed:`, e);
+    return NextResponse.json({ error: "Proxy error", detail: String(e) }, { status: 502 });
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxy(req, params);
-}
-export async function POST(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxy(req, params);
-}
-export async function PUT(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxy(req, params);
-}
-export async function PATCH(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxy(req, params);
-}
-export async function DELETE(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxy(req, params);
-}
+export async function GET(req: NextRequest, ctx: Ctx) { return proxy(req, ctx); }
+export async function POST(req: NextRequest, ctx: Ctx) { return proxy(req, ctx); }
+export async function PUT(req: NextRequest, ctx: Ctx) { return proxy(req, ctx); }
+export async function PATCH(req: NextRequest, ctx: Ctx) { return proxy(req, ctx); }
+export async function DELETE(req: NextRequest, ctx: Ctx) { return proxy(req, ctx); }
