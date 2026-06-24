@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
 
   if (q)        products = products.filter((p) => p.name.toLowerCase().includes(q) || (p.brand ?? "").toLowerCase().includes(q));
   if (category) products = products.filter((p) => p.category === category);
-  if (stock === "in")  products = products.filter((p) => p.stockQty > 0);
-  if (stock === "out") products = products.filter((p) => p.stockQty <= 0);
+  if (stock === "in")  products = products.filter((p) => p.inStock !== false && p.stockQty > 0);
+  if (stock === "out") products = products.filter((p) => p.inStock === false || p.stockQty <= 0);
 
   return NextResponse.json({ products, total: products.length });
 }

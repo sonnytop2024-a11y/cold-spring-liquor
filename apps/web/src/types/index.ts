@@ -10,6 +10,7 @@ export interface Product {
   abv: number;
   imageUrl?: string;
   description?: string;
+  active?: boolean;
   inStock: boolean;
   stockQty: number;
   rating?: number;

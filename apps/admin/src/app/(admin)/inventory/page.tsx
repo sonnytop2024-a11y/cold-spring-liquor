@@ -55,10 +55,10 @@ interface Product {
   imageUrl: string | null;
 }
 
-const EMPTY: Omit<Product, "id" | "slug" | "inStock"> = {
+const EMPTY: Omit<Product, "id" | "slug"> = {
   name: "", brand: "", category: "whiskey", price: 0, salePrice: null,
   volume: "750ml", abv: 40, country: "USA", stockQty: 0,
-  featured: false, active: true, description: "", imageUrl: null,
+  inStock: true, featured: false, active: true, description: "", imageUrl: null,
 };
 
 async function fetchProducts(search: string, category: string, stock: string) {
@@ -96,8 +96,8 @@ async function toggleActive(p: Product) {
   return updateProduct({ id: p.id, active: !p.active });
 }
 
-function StockBadge({ qty }: { qty: number }) {
-  if (qty <= 0) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Out</span>;
+function StockBadge({ qty, inStock }: { qty: number; inStock: boolean }) {
+  if (!inStock || qty <= 0) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Out of Stock</span>;
   if (qty < 5) return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Low ({qty})</span>;
   return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">{qty} in stock</span>;
 }
@@ -111,7 +111,7 @@ interface ProductModalProps {
 
 function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
   const isNew = !product?.id;
-  const [form, setForm] = useState<Omit<Product, "id" | "slug" | "inStock">>({
+  const [form, setForm] = useState<Omit<Product, "id" | "slug">>({
     name: product?.name ?? EMPTY.name,
     brand: product?.brand ?? EMPTY.brand,
     category: product?.category ?? EMPTY.category,
@@ -121,6 +121,7 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
     abv: product?.abv ?? EMPTY.abv,
     country: product?.country ?? EMPTY.country,
     stockQty: product?.stockQty ?? EMPTY.stockQty,
+    inStock: product?.inStock ?? EMPTY.inStock,
     featured: product?.featured ?? EMPTY.featured,
     active: product?.active ?? EMPTY.active,
     description: product?.description ?? EMPTY.description,
@@ -472,7 +473,9 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
           </div>
 
           {/* Toggles */}
-          <div className="flex gap-6">
+          <div className="border rounded-xl p-4 space-y-3 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Visibility &amp; Availability</p>
+
             <label className="flex items-center gap-2.5 cursor-pointer">
               <button
                 type="button"
@@ -481,7 +484,24 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
               >
                 {form.active ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
               </button>
-              <span className="text-sm font-medium">Product Active (visible on site)</span>
+              <div>
+                <span className="text-sm font-medium">Product Active</span>
+                <p className="text-xs text-gray-400">{form.active ? "Visible on website" : "Hidden from website"}</p>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <button
+                type="button"
+                onClick={() => set("inStock", !form.inStock)}
+                className={`transition-colors ${form.inStock ? "text-blue-500" : "text-red-400"}`}
+              >
+                {form.inStock ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+              </button>
+              <div>
+                <span className="text-sm font-medium">{form.inStock ? "In Stock" : "Out of Stock"}</span>
+                <p className="text-xs text-gray-400">{form.inStock ? "Customers can add to cart" : "Hidden from website — customers cannot order"}</p>
+              </div>
             </label>
 
             <label className="flex items-center gap-2.5 cursor-pointer">
@@ -560,8 +580,9 @@ export default function InventoryPage() {
 
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  const inStock = products.filter((p: Product) => p.stockQty > 0).length;
-  const lowStock = products.filter((p: Product) => p.stockQty > 0 && p.stockQty < 5).length;
+  const inStock = products.filter((p: Product) => p.inStock !== false && p.stockQty > 0).length;
+  const lowStock = products.filter((p: Product) => p.inStock !== false && p.stockQty > 0 && p.stockQty < 5).length;
+  const outOfStock = products.filter((p: Product) => p.inStock === false || p.stockQty <= 0).length;
   const inactive = products.filter((p: Product) => !p.active).length;
 
   return (
@@ -572,6 +593,7 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-bold">Product Management</h1>
           <p className="text-gray-500 text-sm mt-0.5">
             {products.length} products · {inStock} in stock
+            {outOfStock > 0 && <span className="text-red-500 ml-2">· {outOfStock} out of stock</span>}
             {lowStock > 0 && <span className="text-amber-600 ml-2">· {lowStock} low stock</span>}
             {inactive > 0 && <span className="text-gray-400 ml-2">· {inactive} inactive</span>}
           </p>
@@ -705,19 +727,24 @@ export default function InventoryPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <StockBadge qty={p.stockQty} />
+                        <StockBadge qty={p.stockQty} inStock={p.inStock} />
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => toggleMutation.mutate(p)}
-                          title={p.active ? "Disable product" : "Enable product"}
-                          className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-                            p.active ? "text-green-600 hover:text-green-700" : "text-gray-400 hover:text-gray-600"
-                          }`}
-                        >
-                          {p.active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                          {p.active ? "Active" : "Inactive"}
-                        </button>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => toggleMutation.mutate(p)}
+                            title={p.active ? "Disable product" : "Enable product"}
+                            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                              p.active ? "text-green-600 hover:text-green-700" : "text-gray-400 hover:text-gray-600"
+                            }`}
+                          >
+                            {p.active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                            {p.active ? "Active" : "Inactive"}
+                          </button>
+                          {!p.inStock && (
+                            <span className="text-[10px] text-red-500 font-medium px-1">Hidden (OOS)</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">

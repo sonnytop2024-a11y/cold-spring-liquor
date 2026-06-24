@@ -15,6 +15,14 @@ export async function PUT(req: NextRequest, { params }: { params: { slug: string
   const existing = await dbGetProduct(params.slug);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await req.json();
+  const newQty = Number(body.stockQty ?? existing.stockQty);
+  // inStock: explicit body value wins; if stockQty is explicitly set to 0, force OOS
+  const inStock =
+    body.inStock !== undefined
+      ? Boolean(body.inStock)
+      : body.stockQty !== undefined
+      ? newQty > 0
+      : existing.inStock;
   const updated = {
     ...existing,
     ...body,
@@ -22,8 +30,8 @@ export async function PUT(req: NextRequest, { params }: { params: { slug: string
     slug: existing.slug,
     price: Number(body.price ?? existing.price),
     salePrice: body.salePrice !== undefined ? (body.salePrice ? Number(body.salePrice) : null) : existing.salePrice,
-    stockQty: Number(body.stockQty ?? existing.stockQty),
-    inStock: (Number(body.stockQty ?? existing.stockQty)) > 0,
+    stockQty: newQty,
+    inStock,
   };
   await dbSaveProduct(updated);
   return NextResponse.json(updated);
