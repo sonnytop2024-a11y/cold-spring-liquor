@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
-const webUrl = process.env.WEB_API_URL ?? "http://localhost:3000";
+
+// WEB_API_URL must be set in Vercel env vars for the admin project.
+// Default to the production web domain so it works even if env var is missing.
+const webUrl =
+  process.env.WEB_API_URL ??
+  process.env.NEXT_PUBLIC_WEB_URL ??
+  "https://coldspringliquor.com";
 
 const nextConfig = {
   async rewrites() {

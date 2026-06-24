@@ -21,11 +21,13 @@ export async function dbGetAllProducts(): Promise<MockProduct[]> {
   if (t) {
     try {
       const { data, error } = await t.select("data").order("updated_at", { ascending: false });
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         return data.map((r: any) => r.data as MockProduct);
       }
-    } catch {
-      // fall through
+      // If Supabase returns empty array → fall through to mock store defaults
+      if (error) console.error("[db] getAllProducts error:", error.message);
+    } catch (e) {
+      console.error("[db] getAllProducts exception:", e);
     }
   }
   return store.getAllProducts();
