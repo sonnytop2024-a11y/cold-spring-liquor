@@ -61,11 +61,13 @@ const EMPTY: Omit<Product, "id" | "slug" | "inStock"> = {
   featured: false, active: true, description: "", imageUrl: null,
 };
 
-async function fetchProducts(search: string, category: string) {
-  const params = new URLSearchParams({ activeOnly: "false" });
-  if (search) params.set("search", search);
+async function fetchProducts(search: string, category: string, stock: string) {
+  // Use /api/admin/products — returns ALL products (no limit, no activeOnly filter)
+  const params = new URLSearchParams();
+  if (search)   params.set("q", search);
   if (category) params.set("category", category);
-  const res = await fetch(`${API}/products?${params}`);
+  if (stock)    params.set("stock", stock); // "in" | "out" | "" = all
+  const res = await fetch(`${API}/admin/products?${params}`);
   const data = await res.json();
   return (data.products ?? data.data ?? data) as Product[];
 }
@@ -525,6 +527,7 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
 export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState("");
   const [modalProduct, setModalProduct] = useState<Partial<Product> | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -532,8 +535,8 @@ export default function InventoryPage() {
   const qc = useQueryClient();
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ["admin-products", search, catFilter],
-    queryFn: () => fetchProducts(search, catFilter),
+    queryKey: ["admin-products", search, catFilter, stockFilter],
+    queryFn: () => fetchProducts(search, catFilter, stockFilter),
     refetchInterval: 30_000,
   });
 
@@ -629,6 +632,18 @@ export default function InventoryPage() {
             {CATEGORIES.map((c) => (
               <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>
             ))}
+          </select>
+          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none pr-8"
+          >
+            <option value="">All Stock</option>
+            <option value="in">In Stock</option>
+            <option value="out">Out of Stock</option>
           </select>
           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>

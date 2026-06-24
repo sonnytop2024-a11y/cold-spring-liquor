@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
 
   let results = await dbGetAllProducts();
 
-  if (activeOnly) results = results.filter((p) => p.active !== false);
+  // Website-facing: hide inactive AND out-of-stock products
+  if (activeOnly) results = results.filter((p) => p.active !== false && p.stockQty > 0);
   if (q) results = results.filter((p) => p.name.toLowerCase().includes(q) || (p.brand ?? "").toLowerCase().includes(q));
   if (category) results = results.filter((p) => p.category === category);
   if (featured === "true") results = results.filter((p) => p.featured);
