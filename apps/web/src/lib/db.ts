@@ -1,45 +1,31 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Persistent DB layer for products + settings.
  * Tries Supabase first; falls back to mock store if not configured or on error.
- *
- * SUPABASE SETUP — run once in Supabase SQL Editor:
- * ─────────────────────────────────────────────────
- * create table if not exists csl_products (
- *   id text primary key,
- *   data jsonb not null,
- *   updated_at timestamptz default now()
- * );
- * alter table csl_products enable row level security;
- * create policy "allow_all" on csl_products for all using (true) with check (true);
- *
- * create table if not exists csl_settings (
- *   id integer primary key default 1,
- *   data jsonb not null default '{}',
- *   updated_at timestamptz default now()
- * );
- * alter table csl_settings enable row level security;
- * create policy "allow_all" on csl_settings for all using (true) with check (true);
- * ─────────────────────────────────────────────────
  */
 
 import { supabaseServer } from "./supabase.server";
 import { store, type MockProduct, type StoreSettings } from "../app/api/_mock/store";
 
+// Helper: get Supabase table as `any` to bypass missing generated types
+function tbl(table: string) {
+  const sb = supabaseServer();
+  if (!sb) return null;
+  return (sb as any).from(table);
+}
+
 // ── Products ──────────────────────────────────────────────────────────────────
 
 export async function dbGetAllProducts(): Promise<MockProduct[]> {
-  const sb = supabaseServer();
-  if (sb) {
+  const t = tbl("csl_products");
+  if (t) {
     try {
-      const { data, error } = await sb
-        .from("csl_products")
-        .select("data")
-        .order("updated_at", { ascending: false });
-      if (!error && data && data.length >= 0) {
-        return (data as Array<{ data: unknown }>).map((r) => r.data as MockProduct);
+      const { data, error } = await t.select("data").order("updated_at", { ascending: false });
+      if (!error && Array.isArray(data)) {
+        return data.map((r: any) => r.data as MockProduct);
       }
     } catch {
-      // Supabase not reachable — fall through to mock
+      // fall through
     }
   }
   return store.getAllProducts();
@@ -51,66 +37,63 @@ export async function dbGetProduct(idOrSlug: string): Promise<MockProduct | unde
 }
 
 export async function dbSaveProduct(product: MockProduct): Promise<void> {
-  const sb = supabaseServer();
-  if (sb) {
+  const t = tbl("csl_products");
+  if (t) {
     try {
-      const { error } = await sb.from("csl_products").upsert(
+      const { error } = await t.upsert(
         { id: product.id, data: product, updated_at: new Date().toISOString() },
         { onConflict: "id" }
       );
       if (!error) return;
-      console.error("[db] Supabase upsert product error:", error.message);
+      console.error("[db] upsert product error:", error.message);
     } catch (e) {
-      console.error("[db] Supabase save product exception:", e);
+      console.error("[db] save product exception:", e);
     }
   }
   store.saveProduct(product);
 }
 
 export async function dbDeleteProduct(id: string): Promise<boolean> {
-  const sb = supabaseServer();
-  if (sb) {
+  const t = tbl("csl_products");
+  if (t) {
     try {
-      const { error } = await sb.from("csl_products").delete().eq("id", id);
+      const { error } = await t.delete().eq("id", id);
       if (!error) return true;
-      console.error("[db] Supabase delete product error:", error.message);
+      console.error("[db] delete product error:", error.message);
     } catch (e) {
-      console.error("[db] Supabase delete product exception:", e);
+      console.error("[db] delete product exception:", e);
     }
   }
   return store.deleteProduct(id);
 }
 
 export async function dbSaveManyProducts(products: MockProduct[]): Promise<{ saved: number; errors: string[] }> {
-  const sb = supabaseServer();
+  const t = tbl("csl_products");
   const errors: string[] = [];
 
-  if (sb) {
+  if (t) {
     try {
       const rows = products.map((p) => ({
         id: p.id,
         data: p,
         updated_at: new Date().toISOString(),
       }));
-      // Batch upsert in chunks of 200 to avoid payload limits
       for (let i = 0; i < rows.length; i += 200) {
         const chunk = rows.slice(i, i + 200);
-        const { error } = await sb
-          .from("csl_products")
-          .upsert(chunk, { onConflict: "id" });
+        const { error } = await t.upsert(chunk, { onConflict: "id" });
         if (error) {
-          console.error("[db] Supabase batch upsert error:", error.message);
+          console.error("[db] batch upsert error:", error.message);
           errors.push(error.message);
         }
       }
       if (errors.length === 0) return { saved: products.length, errors: [] };
     } catch (e) {
-      console.error("[db] Supabase batch save exception:", e);
+      console.error("[db] batch save exception:", e);
       errors.push(String(e));
     }
   }
 
-  // Fallback: save one by one to mock store
+  // Fallback: mock store
   let saved = 0;
   for (const p of products) {
     try { store.saveProduct(p); saved++; } catch (e) { errors.push(String(e)); }
@@ -121,18 +104,13 @@ export async function dbSaveManyProducts(products: MockProduct[]): Promise<{ sav
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export async function dbGetSettings(): Promise<StoreSettings> {
-  const sb = supabaseServer();
-  if (sb) {
+  const t = tbl("csl_settings");
+  if (t) {
     try {
-      const { data, error } = await sb
-        .from("csl_settings")
-        .select("data")
-        .eq("id", 1)
-        .maybeSingle();
-      const row = data as { data: unknown } | null;
-      if (!error && row?.data) return row.data as StoreSettings;
+      const { data, error } = await t.select("data").eq("id", 1).maybeSingle();
+      if (!error && data?.data) return data.data as StoreSettings;
     } catch (e) {
-      console.error("[db] Supabase get settings exception:", e);
+      console.error("[db] get settings exception:", e);
     }
   }
   return store.getSettings();
@@ -142,28 +120,26 @@ export async function dbSaveSettings(fields: Partial<StoreSettings>): Promise<St
   const current = await dbGetSettings();
   const updated: StoreSettings = { ...current, ...fields, updatedAt: new Date().toISOString() };
 
-  const sb = supabaseServer();
-  if (sb) {
+  const t = tbl("csl_settings");
+  if (t) {
     try {
-      const { error } = await sb.from("csl_settings").upsert(
+      const { error } = await t.upsert(
         { id: 1, data: updated, updated_at: new Date().toISOString() },
         { onConflict: "id" }
       );
       if (!error) return updated;
-      console.error("[db] Supabase save settings error:", error.message);
+      console.error("[db] save settings error:", error.message);
     } catch (e) {
-      console.error("[db] Supabase save settings exception:", e);
+      console.error("[db] save settings exception:", e);
     }
   }
   return store.saveSettings(fields);
 }
 
 export async function dbResetSettings(): Promise<StoreSettings> {
-  const sb = supabaseServer();
-  if (sb) {
-    try {
-      await sb.from("csl_settings").delete().eq("id", 1);
-    } catch {}
+  const t = tbl("csl_settings");
+  if (t) {
+    try { await t.delete().eq("id", 1); } catch {}
   }
   return store.resetSettings();
 }
