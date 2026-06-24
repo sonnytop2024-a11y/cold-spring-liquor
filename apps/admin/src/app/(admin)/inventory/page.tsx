@@ -81,10 +81,13 @@ async function createProduct(body: Partial<Product>) {
 }
 
 async function updateProduct({ id, ...body }: Partial<Product> & { id: string }) {
-  const res = await fetch(`${API}/products/${id}`, {
+  const res = await fetch(`${API}/admin/products/${id}`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Update failed");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as Record<string, string>).error ?? `Save failed (${res.status})`);
+  }
   return res.json();
 }
 
@@ -515,14 +518,14 @@ export default function InventoryPage() {
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qc = useQueryClient();
 
-  function showToast(msg: string) {
+  function showToast(msg: string, ok = true) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(msg);
-    toastTimer.current = setTimeout(() => setToast(""), 2500);
+    setToast({ msg, ok });
+    toastTimer.current = setTimeout(() => setToast(null), ok ? 2500 : 5000);
   }
 
   const { data: products = [], isLoading } = useQuery({
@@ -533,8 +536,16 @@ export default function InventoryPage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-products"] });
 
-  const createMutation = useMutation({ mutationFn: createProduct, onSuccess: () => { invalidate(); setShowModal(false); showToast("Product created successfully."); } });
-  const updateMutation = useMutation({ mutationFn: updateProduct, onSuccess: () => { invalidate(); setShowModal(false); showToast("Changes saved successfully."); } });
+  const createMutation = useMutation({
+    mutationFn: createProduct,
+    onSuccess: () => { invalidate(); setShowModal(false); showToast("Product created successfully."); },
+    onError: (e: Error) => showToast(e.message, false),
+  });
+  const updateMutation = useMutation({
+    mutationFn: updateProduct,
+    onSuccess: () => { invalidate(); setShowModal(false); showToast("Changes saved successfully."); },
+    onError: (e: Error) => showToast(e.message, false),
+  });
   const deleteMutation = useMutation({ mutationFn: deleteProduct, onSuccess: invalidate });
 
   function openAdd() { setModalProduct(null); setShowModal(true); }
@@ -752,9 +763,9 @@ export default function InventoryPage() {
 
       {/* Toast notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <CheckCircle2 size={16} className="text-green-400 shrink-0" />
-          {toast}
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg max-w-xs ${toast.ok ? "bg-gray-900" : "bg-red-600"}`}>
+          <CheckCircle2 size={16} className={`shrink-0 ${toast.ok ? "text-green-400" : "text-white"}`} />
+          {toast.msg}
         </div>
       )}
     </div>

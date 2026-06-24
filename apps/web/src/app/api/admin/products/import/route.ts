@@ -66,7 +66,14 @@ export async function POST(req: NextRequest) {
     const volume      = pick(raw, "volume", "size", "ml", "oz", "pack size") ?? "750ml";
     const rawPrice    = pick(raw, "price", "regular price", "retail price", "cost", "msrp", "unit price");
     const rawSale     = pick(raw, "sale price", "saleprice", "promo price", "promotion", "discount price", "special price");
-    const rawStock    = pick(raw, "stock", "stock qty", "quantity", "qty", "inventory", "on hand", "units");
+    const rawStock    = pick(raw,
+      "stock", "stock qty", "stockqty", "stock quantity", "stock_qty",
+      "quantity", "qty", "qty on hand", "quantity on hand", "on hand qty",
+      "inventory", "on hand", "onhand", "units", "unit count",
+      "available", "available qty", "available quantity",
+      "count", "total", "amount", "current stock", "current qty",
+      "retail qty", "retail quantity", "in stock qty", "total qty",
+    );
     const description = pick(raw, "description", "desc", "notes", "details", "product description") ?? "";
     const imageUrl    = pick(raw, "image url", "image", "photo", "img", "picture", "imageurl", "image_url") ?? null;
     const rawAbv      = pick(raw, "abv", "alcohol", "alcohol content", "proof", "alcohol%");
@@ -130,6 +137,7 @@ export async function POST(req: NextRequest) {
         salePrice,
         stockQty,
         inStock: stockQty > 0,
+        active: stockQty > 0,
         volume,
         imageUrl: imageUrl ?? match.imageUrl,
         description: description || match.description,
@@ -157,7 +165,7 @@ export async function POST(req: NextRequest) {
         stockQty,
         inStock: stockQty > 0,
         featured: false,
-        active: true,
+        active: stockQty > 0,
         rating: 0,
         reviewCount: 0,
         description,

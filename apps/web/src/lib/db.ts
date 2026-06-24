@@ -41,17 +41,15 @@ export async function dbGetProduct(idOrSlug: string): Promise<MockProduct | unde
 export async function dbSaveProduct(product: MockProduct): Promise<void> {
   const t = tbl("csl_products");
   if (t) {
-    try {
-      const { error } = await t.upsert(
-        { id: product.id, data: product, updated_at: new Date().toISOString() },
-        { onConflict: "id" }
-      );
-      if (!error) return;
-      console.error("[db] upsert product error:", error.message);
-    } catch (e) {
-      console.error("[db] save product exception:", e);
-    }
+    const { error } = await t.upsert(
+      { id: product.id, data: product, updated_at: new Date().toISOString() },
+      { onConflict: "id" }
+    );
+    if (!error) return;
+    // Propagate Supabase error so callers can surface it to the user
+    throw new Error(`Supabase save failed: ${error.message}`);
   }
+  // No Supabase configured — fall back to in-memory store
   store.saveProduct(product);
 }
 
