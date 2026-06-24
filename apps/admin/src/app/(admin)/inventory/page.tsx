@@ -76,10 +76,13 @@ async function fetchProducts(search: string, category: string, stock: string) {
 }
 
 async function createProduct(body: Partial<Product>) {
-  const res = await fetch(`${API}/products`, {
+  const res = await fetch(`${API}/admin/products`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Create failed");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as Record<string, string>).error ?? `Create failed (${res.status})`);
+  }
   return res.json();
 }
 
@@ -545,7 +548,16 @@ export default function InventoryPage() {
 
   const createMutation = useMutation({
     mutationFn: createProduct,
-    onSuccess: () => { invalidate(); setShowModal(false); showToast("Product created successfully."); },
+    onSuccess: (newProduct: Product) => {
+      // Optimistically prepend the new product to all cached queries
+      qc.setQueriesData(
+        { queryKey: ["admin-products"] },
+        (old: unknown) => Array.isArray(old) ? [newProduct, ...old] : [newProduct],
+      );
+      invalidate();
+      setShowModal(false);
+      showToast("Product created successfully.");
+    },
     onError: (e: Error) => showToast(e.message, false),
   });
   const updateMutation = useMutation({
