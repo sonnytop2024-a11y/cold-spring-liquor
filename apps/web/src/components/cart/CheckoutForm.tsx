@@ -8,6 +8,10 @@ import { useRouter } from "next/navigation";
 import { formatCurrency, MIN_ORDER } from "@/lib/utils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import Link from "next/link";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const QUICK_CODES = ["WELCOME10", "SUMMER15", "CSL5"];
 const TAX = 0.0825;
@@ -79,6 +83,8 @@ export function CheckoutForm() {
   const [showSummary, setShowSummary] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [orderPayload, setOrderPayload] = useState<object | null>(null);
 
   // ── Auto-fill from saved profile ──────────────────────────────────────────
   useEffect(() => {
@@ -151,13 +157,17 @@ export function CheckoutForm() {
         couponCode: promoCode,
         couponDiscount: promoDiscount,
       };
-      const res = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const order = await res.json();
-      clearCart();
-      router.push(`/track/${order.id}`);
+      const res = await fetch("/api/stripe/payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: total }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setOrderPayload(payload);
+      setClientSecret(data.clientSecret);
     } catch {
       alert("Something went wrong. Please try again.");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -300,11 +310,22 @@ export function CheckoutForm() {
         <h2 className="font-bold text-base mb-5 flex items-center gap-2">
           <CreditCard size={18} className="text-brand-500" /> Payment
         </h2>
-        <div className="bg-gray-50 border border-dashed rounded-xl p-6 text-center text-gray-500">
-          <p className="font-medium mb-1">Stripe Payment Form</p>
-          <p className="text-sm">Stripe Elements will be integrated here.</p>
-          <p className="text-xs text-gray-400 mt-2">Credit Card · Debit Card · Apple Pay · Google Pay</p>
-        </div>
+        {clientSecret ? (
+          <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
+            <StripePaymentForm
+              clientSecret={clientSecret}
+              orderPayload={orderPayload!}
+              total={total}
+              onSuccess={(orderId) => { clearCart(); router.push(`/track/${orderId}`); }}
+              onCancel={() => { setClientSecret(null); setOrderPayload(null); setSubmitting(false); }}
+            />
+          </Elements>
+        ) : (
+          <div className="bg-gray-50 border border-dashed rounded-xl p-6 text-center text-gray-400 text-sm">
+            Fill in your details above and click &ldquo;Place Order&rdquo; to enter payment.
+            <p className="text-xs mt-2">Credit Card · Debit Card · Apple Pay · Google Pay</p>
+          </div>
+        )}
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
           ⚠️ Must be 21+. Valid ID checked at delivery.
         </div>
@@ -353,10 +374,72 @@ export function CheckoutForm() {
         </div>
       )}
 
-      <button type="submit" disabled={submitting || items.length === 0 || !meetsMinimum}
-        className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-lg transition-colors shadow-lg shadow-brand-500/30">
-        {submitting ? <><Loader2 size={20} className="animate-spin" />Placing Order...</> : `Place Order · ${formatCurrency(total)}`}
-      </button>
+      {!clientSecret && (
+        <button type="submit" disabled={submitting || items.length === 0 || !meetsMinimum}
+          className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-lg transition-colors shadow-lg shadow-brand-500/30">
+          {submitting ? <><Loader2 size={20} className="animate-spin" />Processing...</> : `Place Order · ${formatCurrency(total)}`}
+        </button>
+      )}
+    </form>
+  );
+}
+
+function StripePaymentForm({ clientSecret, orderPayload, total, onSuccess, onCancel }: {
+  clientSecret: string;
+  orderPayload: object;
+  total: number;
+  onSuccess: (orderId: string) => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+
+  async function handlePay(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setPaying(true);
+    setPayError("");
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        redirect: "if_required",
+      });
+      if (error) {
+        setPayError(error.message ?? "Payment failed.");
+        setPaying(false);
+        return;
+      }
+      if (paymentIntent?.status === "succeeded") {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...orderPayload, stripePaymentIntentId: paymentIntent.id }),
+        });
+        const order = await res.json();
+        onSuccess(order.id);
+      }
+    } catch {
+      setPayError("Something went wrong. Please try again.");
+      setPaying(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handlePay} className="space-y-4">
+      <PaymentElement />
+      {payError && <p className="text-red-500 text-sm">{payError}</p>}
+      <div className="flex gap-3 pt-2">
+        <button type="button" onClick={onCancel} disabled={paying}
+          className="flex-1 border border-gray-300 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+          Back
+        </button>
+        <button type="submit" disabled={paying || !stripe}
+          className="flex-[2] flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-brand-500/30">
+          {paying ? <><Loader2 size={18} className="animate-spin" />Processing...</> : `Pay ${formatCurrency(total)}`}
+        </button>
+      </div>
     </form>
   );
 }
