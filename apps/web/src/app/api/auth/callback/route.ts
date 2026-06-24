@@ -3,25 +3,19 @@ import { store } from "../../_mock/store";
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
-
-function getBaseUrl(req: NextRequest) {
-  const host = req.headers.get("host") ?? "localhost:3000";
-  const proto = host.startsWith("localhost") ? "http" : "https";
-  return `${proto}://${host}`;
-}
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
 
 // GET /api/auth/callback?code=xxx — Google OAuth callback
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
-  const base = getBaseUrl(req);
 
   if (error || !code) {
-    return NextResponse.redirect(`${base}/auth/login?error=google_cancelled`);
+    return NextResponse.redirect(`${WEB_URL}/auth/login?error=google_cancelled`);
   }
 
-  const redirectUri = `${base}/api/auth/callback`;
+  const redirectUri = `${WEB_URL}/api/auth/callback`;
 
   // Exchange code for tokens
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -38,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   const tokens = await tokenRes.json();
   if (!tokenRes.ok) {
-    return NextResponse.redirect(`${base}/auth/login?error=google_failed`);
+    return NextResponse.redirect(`${WEB_URL}/auth/login?error=google_failed`);
   }
 
   // Fetch Google user info
@@ -48,7 +42,7 @@ export async function GET(req: NextRequest) {
 
   const googleUser = await userRes.json();
   if (!userRes.ok || !googleUser.id) {
-    return NextResponse.redirect(`${base}/auth/login?error=google_failed`);
+    return NextResponse.redirect(`${WEB_URL}/auth/login?error=google_failed`);
   }
 
   // Find or create user
@@ -59,7 +53,7 @@ export async function GET(req: NextRequest) {
   });
 
   const token = store.createSession(user.id);
-  const res = NextResponse.redirect(`${base}/`);
+  const res = NextResponse.redirect(`${WEB_URL}/`);
   res.cookies.set("csl-session", token, {
     httpOnly: true,
     sameSite: "lax",

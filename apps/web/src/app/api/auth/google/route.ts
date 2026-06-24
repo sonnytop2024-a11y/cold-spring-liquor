@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-
-function getRedirectUri(req: NextRequest) {
-  const host = req.headers.get("host") ?? "localhost:3000";
-  const proto = host.startsWith("localhost") ? "http" : "https";
-  return `${proto}://${host}/api/auth/callback`;
-}
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
 
 // GET /api/auth/google — redirect to Google OAuth consent screen
-export async function GET(req: NextRequest) {
-  const redirectUri = getRedirectUri(req);
+export async function GET(_req: NextRequest) {
+  const redirectUri = `${WEB_URL}/api/auth/callback`;
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", CLIENT_ID);
   url.searchParams.set("redirect_uri", redirectUri);
