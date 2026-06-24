@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Edit, Trash2, Search, Package, X, Check, ImageIcon,
@@ -126,6 +126,48 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
     imageUrl: product?.imageUrl ?? EMPTY.imageUrl,
   });
 
+  // ── Image upload state ─────────────────────────────────────────────────────
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(product?.imageUrl ?? null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
+  }, []);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setUploadError("Only JPG, PNG, or WEBP files are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File too large. Maximum size is 5 MB.");
+      return;
+    }
+    setUploadError("");
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    const url = URL.createObjectURL(file);
+    blobUrlRef.current = url;
+    setPendingFile(file);
+    setPreviewUrl(url);
+  }
+
+  function handleRemoveImage() {
+    if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null; }
+    setPendingFile(null);
+    setPreviewUrl(null);
+    set("imageUrl", null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setUploadError("");
+  }
+
   // String states for price inputs to allow free typing (e.g., "12." while typing "12.99")
   const [priceText, setPriceText] = useState(
     product?.price != null && product.price > 0 ? String(product.price) : ""
@@ -189,9 +231,8 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
     setSalePriceText(String(n));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Re-validate price before submitting
     const parsedPrice = parsePriceText(priceText);
     if (!parsedPrice || parsedPrice <= 0) {
       setPriceError("Price is required and must be a valid amount greater than $0.00");
@@ -202,7 +243,32 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
       setSalePriceError("Enter a valid sale price, e.g. 9.99");
       return;
     }
-    const finalForm = { ...form, price: parsedPrice, salePrice: parsedSalePrice };
+
+    // If a new file is pending, upload it first
+    let imageUrl: string | null = pendingFile ? null : previewUrl;
+    if (pendingFile) {
+      setUploading(true);
+      setUploadError("");
+      try {
+        const fd = new FormData();
+        fd.append("image", pendingFile);
+        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) {
+          setUploadError(data.error ?? "Upload failed. Please try again.");
+          setUploading(false);
+          return;
+        }
+        imageUrl = data.url;
+      } catch {
+        setUploadError("Network error during upload. Please try again.");
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
+    const finalForm = { ...form, price: parsedPrice, salePrice: parsedSalePrice, imageUrl };
     onSave(product?.id ? { id: product.id, ...finalForm } : finalForm);
   }
 
@@ -217,26 +283,55 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Image */}
+          {/* Image Upload */}
           <div>
-            <label className="block text-sm font-medium mb-2">Product Image URL</label>
-            <div className="flex gap-3 items-start">
-              <div className="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border">
-                {form.imageUrl ? (
+            <label className="block text-sm font-medium mb-2">Product Image</label>
+            <div className="flex gap-4 items-start">
+              {/* Preview box */}
+              <div className="w-24 h-24 shrink-0 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
+                {previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.imageUrl} alt="" className="w-full h-full object-contain p-1" />
+                  <img src={previewUrl} alt="Preview" className="w-full h-full object-contain p-1" />
                 ) : (
                   <ImageIcon size={28} className="text-gray-300" />
                 )}
               </div>
-              <div className="flex-1">
+
+              {/* Controls */}
+              <div className="flex-1 space-y-2">
                 <input
-                  value={form.imageUrl ?? ""}
-                  onChange={(e) => set("imageUrl", e.target.value || null)}
-                  placeholder="https://example.com/product.jpg"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleFileChange}
                 />
-                <p className="text-xs text-gray-400 mt-1">Paste a direct image URL. Supports CDN, Cloudfront, S3, etc.</p>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 w-full border rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Upload size={14} />
+                  {previewUrl ? "Change Image" : "Upload Image"}
+                </button>
+                {previewUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="flex items-center justify-center gap-2 w-full border border-red-200 rounded-lg py-2 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <X size={13} /> Remove Image
+                  </button>
+                )}
+                <p className="text-xs text-gray-400">JPG, PNG, WEBP · Max 5 MB</p>
+                {pendingFile && !uploadError && (
+                  <p className="text-xs text-blue-600 font-medium truncate">
+                    📎 {pendingFile.name} ({(pendingFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+                {uploadError && (
+                  <p className="text-xs text-red-600 font-medium">{uploadError}</p>
+                )}
               </div>
             </div>
           </div>
@@ -410,10 +505,12 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || uploading}
               className="flex-1 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors"
             >
-              {saving ? (
+              {uploading ? (
+                <><span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4" /> Uploading…</>
+              ) : saving ? (
                 <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4" />
               ) : (
                 <><Check size={16} /> {isNew ? "Add Product" : "Save Changes"}</>

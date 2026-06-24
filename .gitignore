@@ -1,8 +1,43 @@
-node_modules
-.next
-dist
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+
+# Environment variables — NEVER commit these
 .env
 .env.local
-.turbo
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Mock store (local dev data)
+/tmp/csl-mock-store.json
+csl-mock-store.json
+
+# Uploaded product images (use Supabase Storage in production)
+apps/web/public/uploads/products/*
+!apps/web/public/uploads/products/.gitkeep
+
+# Logs
 *.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Turbo cache
+.turbo/
+
+# Vercel
+.vercel/
