@@ -32,34 +32,36 @@ export async function POST(req: NextRequest) {
 
   if (action === "send") {
     if (!phone) return NextResponse.json({ error: "Phone required" }, { status: 400 });
-    const otp = generateOtp(phone, currentWindow());
+    const normalizedPhone = phone.startsWith("+") ? phone : `+1${phone.replace(/\D/g, "")}`;
+    const otp = generateOtp(normalizedPhone, currentWindow());
 
     if (process.env.TWILIO_ACCOUNT_SID) {
       try {
-        await sendSms(phone, `Your Cold Spring Liquor verification code is: ${otp}`);
-        return NextResponse.json({ ok: true, message: `OTP sent to ${phone}` });
+        await sendSms(normalizedPhone, `Your Cold Spring Liquor verification code is: ${otp}`);
+        return NextResponse.json({ ok: true, message: `OTP sent to ${normalizedPhone}` });
       } catch {
-        return NextResponse.json({ error: "Failed to send SMS. Use format +1xxxxxxxxxx." }, { status: 500 });
+        return NextResponse.json({ error: "Failed to send SMS. Check your phone number." }, { status: 500 });
       }
     }
 
     // Demo fallback
-    return NextResponse.json({ ok: true, mockOtp: otp, message: `OTP sent to ${phone}` });
+    return NextResponse.json({ ok: true, mockOtp: otp, message: `OTP sent to ${normalizedPhone}` });
   }
 
   if (action === "verify") {
     if (!phone || !code) return NextResponse.json({ error: "Phone and code required" }, { status: 400 });
+    const normalizedPhone = phone.startsWith("+") ? phone : `+1${phone.replace(/\D/g, "")}`;
 
     const win = currentWindow();
-    const valid = code === generateOtp(phone, win) || code === generateOtp(phone, win - 1);
+    const valid = code === generateOtp(normalizedPhone, win) || code === generateOtp(normalizedPhone, win - 1);
     if (!valid) return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 401 });
 
-    let user = store.getUserByPhone(phone);
+    let user = store.getUserByPhone(normalizedPhone);
     if (!user) {
       user = store.createUser({
-        name: name ?? `User ${phone.slice(-4)}`,
+        name: name ?? `User ${normalizedPhone.slice(-4)}`,
         email: "",
-        phone,
+        phone: normalizedPhone,
         dob: "",
         password: `otp-${Date.now()}`,
       });
