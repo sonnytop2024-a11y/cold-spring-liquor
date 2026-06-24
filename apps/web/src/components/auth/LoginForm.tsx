@@ -127,7 +127,10 @@ function PhoneTab({ onSuccess }: { onSuccess: (user: any) => void }) {
         <>
           <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
             <p className="font-semibold">OTP sent to {phone}</p>
-            <p className="mt-1 text-xs">Demo OTP (no SMS): <code className="font-mono font-bold text-lg tracking-widest">{mockOtp}</code></p>
+            {mockOtp
+              ? <p className="mt-1 text-xs">Demo OTP (no SMS): <code className="font-mono font-bold text-lg tracking-widest">{mockOtp}</code></p>
+              : <p className="mt-1 text-xs">Check your SMS for the 6-digit code.</p>
+            }
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">Enter 6-Digit Code</label>
