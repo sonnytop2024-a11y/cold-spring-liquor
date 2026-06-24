@@ -5,8 +5,25 @@ export function HeroSection() {
   return (
     <section
       className="relative overflow-hidden text-white"
-      style={{ background: "linear-gradient(135deg, #0d0d0d 0%, #1a1008 40%, #0f0a00 100%)" }}
+      style={{ background: "#0d0d0d" }}
     >
+      {/* Background photo */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: "url('https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=1200&q=80')",
+          backgroundSize: "cover",
+          backgroundPosition: "center 30%",
+          filter: "brightness(0.52) saturate(1.1)",
+        }}
+      />
+      {/* Dark overlay — text readability */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "linear-gradient(to top, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.6) 35%, rgba(0,0,0,0.2) 65%, rgba(0,0,0,0.05) 100%)",
+        }}
+      />
       {/* Ambient glow */}
       <div
         className="absolute inset-0 pointer-events-none"
