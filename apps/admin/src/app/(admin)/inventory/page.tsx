@@ -555,8 +555,17 @@ export default function InventoryPage() {
   });
   const deleteMutation = useMutation({
     mutationFn: deleteProduct,
+    onMutate: async (id: string) => {
+      // Cancel in-flight fetches so they don't overwrite our optimistic update
+      await qc.cancelQueries({ queryKey: ["admin-products"] });
+      // Immediately remove the product from all cached queries
+      qc.setQueriesData(
+        { queryKey: ["admin-products"] },
+        (old: unknown) => Array.isArray(old) ? old.filter((p: Product) => p.id !== id) : old,
+      );
+    },
     onSuccess: () => { invalidate(); showToast("Product deleted."); },
-    onError: (e: Error) => showToast(e.message, false),
+    onError: (e: Error) => { invalidate(); showToast(e.message, false); },
   });
 
   function openAdd() { setModalProduct(null); setShowModal(true); }

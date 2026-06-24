@@ -76,9 +76,13 @@ export async function dbSaveProduct(product: MockProduct): Promise<void> {
 export async function dbDeleteProduct(id: string): Promise<boolean> {
   const t = tbl("csl_products");
   if (t) {
-    const { error } = await t.delete().eq("id", id);
+    // Use .select("id") so Supabase returns the deleted rows — lets us verify count
+    const { data, error } = await t.delete().eq("id", id).select("id");
     if (!error) {
-      console.log(`[db] deleted product ${id}`);
+      const count = Array.isArray(data) ? data.length : 0;
+      console.log(`[db] delete id=${id}: removed ${count} row(s) from Supabase`);
+      // Also purge from in-memory store in case this instance cached it
+      store.deleteProduct(id);
       return true;
     }
     console.error("[db] delete error:", error.message);
