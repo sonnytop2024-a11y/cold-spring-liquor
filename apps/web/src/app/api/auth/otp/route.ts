@@ -16,6 +16,16 @@ function currentWindow(): number {
   return Math.floor(Date.now() / WINDOW);
 }
 
+async function sendSms(to: string, body: string): Promise<void> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!sid || !token || !from) throw new Error("Twilio not configured");
+  const twilio = (await import("twilio")).default;
+  const client = twilio(sid, token);
+  await client.messages.create({ body, from, to });
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action, phone, code, name } = body;
@@ -23,14 +33,23 @@ export async function POST(req: NextRequest) {
   if (action === "send") {
     if (!phone) return NextResponse.json({ error: "Phone required" }, { status: 400 });
     const otp = generateOtp(phone, currentWindow());
-    // In production: send via Twilio. In demo: return code to show in UI.
+
+    if (process.env.TWILIO_ACCOUNT_SID) {
+      try {
+        await sendSms(phone, `Your Cold Spring Liquor verification code is: ${otp}`);
+        return NextResponse.json({ ok: true, message: `OTP sent to ${phone}` });
+      } catch {
+        return NextResponse.json({ error: "Failed to send SMS. Use format +1xxxxxxxxxx." }, { status: 500 });
+      }
+    }
+
+    // Demo fallback
     return NextResponse.json({ ok: true, mockOtp: otp, message: `OTP sent to ${phone}` });
   }
 
   if (action === "verify") {
     if (!phone || !code) return NextResponse.json({ error: "Phone and code required" }, { status: 400 });
 
-    // Accept current window and previous window (in case of clock drift)
     const win = currentWindow();
     const valid = code === generateOtp(phone, win) || code === generateOtp(phone, win - 1);
     if (!valid) return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 401 });
