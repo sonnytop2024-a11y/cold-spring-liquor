@@ -3,14 +3,16 @@
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { useState } from "react";
-import { ShoppingCart, Zap, Star, Package, Minus, Plus } from "lucide-react";
+import { ShoppingCart, Zap, Star, Gift, Minus, Plus } from "lucide-react";
 import { fetchProductBySlug } from "@/lib/api/products";
 import { useCartStore } from "@/store/cartStore";
+import { useAuthStore } from "@/store/authStore";
 import { formatCurrency } from "@/lib/utils";
 
 export function ProductDetail({ slug }: { slug: string }) {
   const [qty, setQty] = useState(1);
   const addItem = useCartStore((s) => s.addItem);
+  const { user, isLoggedIn } = useAuthStore();
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ["product", slug],
@@ -37,6 +39,12 @@ export function ProductDetail({ slug }: { slug: string }) {
   const discountPct = product.salePrice
     ? Math.round(((product.price - product.salePrice) / product.price) * 100)
     : 0;
+
+  // Reward / promo info for the bottom badge
+  const hasPoints = isLoggedIn && user && user.points > 0;
+  const rewardLine = hasPoints
+    ? `You have ${user!.points.toLocaleString()} reward points · Use at checkout`
+    : "Promo codes & rewards available at checkout";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -101,23 +109,20 @@ export function ProductDetail({ slug }: { slug: string }) {
           )}
         </div>
 
+        {/* Pills: volume, abv, country only — no stock qty */}
         <div className="flex flex-wrap gap-3 text-sm text-gray-600 mb-6">
           <span className="bg-gray-100 px-3 py-1 rounded-full">{product.volume}</span>
-          <span className="bg-gray-100 px-3 py-1 rounded-full">{product.abv}% ABV</span>
+          {product.abv > 0 && (
+            <span className="bg-gray-100 px-3 py-1 rounded-full">{product.abv}% ABV</span>
+          )}
           {product.country && (
             <span className="bg-gray-100 px-3 py-1 rounded-full">{product.country}</span>
           )}
-          <span
-            className={`px-3 py-1 rounded-full font-medium ${
-              product.inStock
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-600"
-            }`}
-          >
-            {product.inStock
-              ? `In Stock (${product.stockQty} left)`
-              : "Out of Stock"}
-          </span>
+          {!product.inStock && (
+            <span className="px-3 py-1 rounded-full font-medium bg-red-100 text-red-600">
+              Out of Stock
+            </span>
+          )}
         </div>
 
         {product.description && (
@@ -140,7 +145,7 @@ export function ProductDetail({ slug }: { slug: string }) {
                   {qty}
                 </span>
                 <button
-                  onClick={() => setQty((q) => Math.min(product.stockQty, q + 1))}
+                  onClick={() => setQty((q) => q + 1)}
                   className="px-3 py-2 hover:bg-gray-50 transition-colors"
                 >
                   <Plus size={16} />
@@ -171,14 +176,12 @@ export function ProductDetail({ slug }: { slug: string }) {
           </>
         )}
 
-        {/* Delivery badge */}
+        {/* Reward / promo badge — replaces old delivery info */}
         <div className="mt-6 flex items-center gap-3 bg-brand-50 rounded-xl p-4">
-          <Package size={20} className="text-brand-600 shrink-0" />
+          <Gift size={20} className="text-brand-600 shrink-0" />
           <div className="text-sm">
             <p className="font-semibold text-brand-700">10–30 Minute Delivery</p>
-            <p className="text-brand-600">
-              Free delivery on orders over $50 · 5-mile radius · ID required
-            </p>
+            <p className="text-brand-600">{rewardLine}</p>
           </div>
         </div>
       </div>

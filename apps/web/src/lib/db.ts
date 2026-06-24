@@ -66,13 +66,13 @@ export async function dbSaveProduct(product: MockProduct): Promise<void> {
 export async function dbDeleteProduct(id: string): Promise<boolean> {
   const t = tbl("csl_products");
   if (t) {
-    try {
-      const { error } = await t.delete().eq("id", id);
-      if (!error) return true;
-      console.error("[db] delete error:", error.message);
-    } catch (e) {
-      console.error("[db] delete exception:", e);
+    const { error } = await t.delete().eq("id", id);
+    if (!error) {
+      console.log(`[db] deleted product ${id}`);
+      return true;
     }
+    console.error("[db] delete error:", error.message);
+    throw new Error(`DB delete failed: ${error.message}`);
   }
   return store.deleteProduct(id);
 }
