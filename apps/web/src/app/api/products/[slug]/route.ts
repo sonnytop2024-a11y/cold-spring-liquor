@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetAllProducts, dbGetProduct, dbSaveProduct, dbDeleteProduct } from "@/lib/db";
 
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
-  const product = store.getProduct(params.slug);
+  const product = await dbGetProduct(params.slug);
   if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const related = store.getAllProducts()
-    .filter(p => p.category === product.category && p.id !== product.id && p.active !== false)
+  const all = await dbGetAllProducts();
+  const related = all
+    .filter((p) => p.category === product.category && p.id !== product.id && p.active !== false)
     .slice(0, 4);
   return NextResponse.json({ ...product, related });
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { slug: string } }) {
-  const existing = store.getProduct(params.slug);
+  const existing = await dbGetProduct(params.slug);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await req.json();
   const updated = {
@@ -24,7 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: { slug: string
     stockQty: Number(body.stockQty ?? existing.stockQty),
     inStock: (Number(body.stockQty ?? existing.stockQty)) > 0,
   };
-  store.saveProduct(updated);
+  await dbSaveProduct(updated);
   return NextResponse.json(updated);
 }
 
@@ -33,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { slug: string } }) {
-  const deleted = store.deleteProduct(params.slug);
+  const deleted = await dbDeleteProduct(params.slug);
   if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

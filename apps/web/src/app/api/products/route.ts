@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../_mock/store";
+import { dbGetAllProducts, dbSaveProduct } from "@/lib/db";
 import type { MockProduct } from "../_mock/store";
 
 export async function GET(req: NextRequest) {
@@ -13,13 +13,13 @@ export async function GET(req: NextRequest) {
   const featured = searchParams.get("featured");
   const activeOnly = searchParams.get("activeOnly") !== "false";
 
-  let results = store.getAllProducts();
+  let results = await dbGetAllProducts();
 
-  if (activeOnly) results = results.filter(p => p.active !== false);
-  if (q) results = results.filter(p => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q));
-  if (category) results = results.filter(p => p.category === category);
-  if (featured === "true") results = results.filter(p => p.featured);
-  results = results.filter(p => p.price >= minPrice && p.price <= maxPrice);
+  if (activeOnly) results = results.filter((p) => p.active !== false);
+  if (q) results = results.filter((p) => p.name.toLowerCase().includes(q) || (p.brand ?? "").toLowerCase().includes(q));
+  if (category) results = results.filter((p) => p.category === category);
+  if (featured === "true") results = results.filter((p) => p.featured);
+  results = results.filter((p) => p.price >= minPrice && p.price <= maxPrice);
 
   const total = results.length;
   const data = results.slice((page - 1) * limit, page * limit);
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const id = `p${Date.now()}`;
-  const slug = body.name
+  const slug = (body.name as string)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
@@ -56,6 +56,6 @@ export async function POST(req: NextRequest) {
     imageUrl: body.imageUrl ?? null,
   };
 
-  store.saveProduct(product);
+  await dbSaveProduct(product);
   return NextResponse.json(product, { status: 201 });
 }

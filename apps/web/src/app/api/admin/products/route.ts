@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetAllProducts } from "@/lib/db";
 
-// Admin: get all products (no activeOnly filter)
 export async function GET() {
-  const products = store.getAllProducts();
+  const products = await dbGetAllProducts();
   return NextResponse.json(products);
 }
