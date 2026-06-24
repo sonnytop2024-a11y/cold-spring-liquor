@@ -1,0 +1,60 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gA" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7A5800"/>
+      <stop offset="25%" stop-color="#C8A020"/>
+      <stop offset="55%" stop-color="#EDD050"/>
+      <stop offset="80%" stop-color="#C09018"/>
+      <stop offset="100%" stop-color="#8B6600"/>
+    </linearGradient>
+    <linearGradient id="gB" x1="90" y1="0" x2="10" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#EDD050"/>
+      <stop offset="40%" stop-color="#C8A020"/>
+      <stop offset="100%" stop-color="#7A5800"/>
+    </linearGradient>
+    <linearGradient id="gRing" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C8A020"/>
+      <stop offset="50%" stop-color="#F0D060"/>
+      <stop offset="100%" stop-color="#9A7800"/>
+    </linearGradient>
+  </defs>
+
+  <!-- TOP blade — sweeps upward, splits toward tip -->
+  <path d="M47,40 C44,30 40,18 43,6 C45,1 50,0 50,0 C50,0 55,1 57,6 C60,18 56,30 53,40 Z"
+    fill="url(#gA)" opacity="0.95"/>
+  <!-- inner ridge lines top blade -->
+  <path d="M49,38 C47,28 45,16 47,5" stroke="#F5E090" stroke-width="0.8" stroke-linecap="round" opacity="0.55"/>
+  <path d="M51,38 C51,28 53,16 53,5" stroke="#F5E090" stroke-width="0.6" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- BOTTOM-LEFT blade — sweeps lower-left -->
+  <path d="M41,58 C32,61 18,70 6,80 C3,82 2,86 4,88 C6,90 9,88 13,85 C25,75 36,65 44,62 Z"
+    fill="url(#gA)" opacity="0.95"/>
+  <!-- inner ridge lines bottom-left blade -->
+  <path d="M43,60 C34,63 20,72 8,82" stroke="#F5E090" stroke-width="0.8" stroke-linecap="round" opacity="0.55"/>
+  <path d="M44,63 C36,66 23,74 11,84" stroke="#F5E090" stroke-width="0.6" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- BOTTOM-RIGHT blade — sweeps lower-right -->
+  <path d="M59,58 C68,61 82,70 94,80 C97,82 98,86 96,88 C94,90 91,88 87,85 C75,75 64,65 56,62 Z"
+    fill="url(#gB)" opacity="0.95"/>
+  <!-- inner ridge lines bottom-right blade -->
+  <path d="M57,60 C66,63 80,72 92,82" stroke="#F5E090" stroke-width="0.8" stroke-linecap="round" opacity="0.55"/>
+  <path d="M56,63 C64,66 77,74 89,84" stroke="#F5E090" stroke-width="0.6" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Center ring outer -->
+  <circle cx="50" cy="50" r="23" fill="none" stroke="url(#gRing)" stroke-width="4"/>
+
+  <!-- Center ring inner dark fill -->
+  <circle cx="50" cy="50" r="19" fill="#100d00"/>
+
+  <!-- Second inner ring highlight -->
+  <circle cx="50" cy="50" r="19" fill="none" stroke="#C8A020" stroke-width="0.8" opacity="0.5"/>
+
+  <!-- CS text -->
+  <text x="50" y="58"
+    text-anchor="middle"
+    fill="url(#gRing)"
+    font-size="21"
+    font-weight="700"
+    font-family="Georgia, 'Times New Roman', serif"
+    letter-spacing="2">CS</text>
+</svg>

@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from "next/server";
+import { store } from "../../_mock/store";
+
+export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
+  const product = store.getProduct(params.slug);
+  if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const related = store.getAllProducts()
+    .filter(p => p.category === product.category && p.id !== product.id && p.active !== false)
+    .slice(0, 4);
+  return NextResponse.json({ ...product, related });
+}
+
+export async function PUT(req: NextRequest, { params }: { params: { slug: string } }) {
+  const existing = store.getProduct(params.slug);
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const body = await req.json();
+  const updated = {
+    ...existing,
+    ...body,
+    id: existing.id,
+    slug: existing.slug,
+    price: Number(body.price ?? existing.price),
+    salePrice: body.salePrice !== undefined ? (body.salePrice ? Number(body.salePrice) : null) : existing.salePrice,
+    stockQty: Number(body.stockQty ?? existing.stockQty),
+    inStock: (Number(body.stockQty ?? existing.stockQty)) > 0,
+  };
+  store.saveProduct(updated);
+  return NextResponse.json(updated);
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: { slug: string } }) {
+  return PUT(req, { params });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { slug: string } }) {
+  const deleted = store.deleteProduct(params.slug);
+  if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
