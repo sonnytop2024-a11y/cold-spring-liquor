@@ -7,8 +7,7 @@ import {
   ToggleLeft, ToggleRight, Star, ChevronDown, Upload, Download,
 } from "lucide-react";
 import { ImportModal } from "./ImportModal";
-
-const API = "/api";
+import { API } from "@/lib/api";
 
 // ── Export helper (CSV generated in browser) ──────────────────────────────────
 async function exportProductsCSV() {

@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Tag, Edit2, Trash2, Loader2, X, Check, ToggleLeft, ToggleRight, AlertTriangle } from "lucide-react";
-
-const API = "/api";
+import { API } from "@/lib/api";
 
 interface Coupon {
   id: string; code: string; type: "fixed" | "percentage" | "free_delivery";

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, X, Package, MapPin, Clock } from "lucide-react";
+import { API } from "@/lib/api";
 
-const API = "/api";
 const STORAGE_KEY = "csl-admin-seen-orders";
 
 interface Order {

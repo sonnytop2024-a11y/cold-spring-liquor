@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Clock, MapPin, User, ChevronRight, Package, X, Edit2, XCircle, RefreshCw, Loader2, Plus, Minus } from "lucide-react";
-
-const API = "/api";
+import { API } from "@/lib/api";
 
 const STATUS_COLORS: Record<string, string> = {
   pending:           "bg-yellow-100 text-yellow-700",

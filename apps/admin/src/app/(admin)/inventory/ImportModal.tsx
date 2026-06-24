@@ -5,8 +5,7 @@ import {
   X, Upload, FileSpreadsheet, AlertTriangle, CheckCircle2,
   RefreshCw, ChevronRight, Download, Loader2,
 } from "lucide-react";
-
-const API = "/api";
+import { API } from "@/lib/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ import {
   Clock, Globe, Phone, Mail, MapPin,
 } from "lucide-react";
 
-const API = "/api";
+import { API } from "@/lib/api";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 type Settings = {

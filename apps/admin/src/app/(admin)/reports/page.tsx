@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DollarSign, ShoppingBag, Users, TrendingUp, Package, Star, BarChart2, RefreshCw } from "lucide-react";
-
-const API = "/api";
+import { API } from "@/lib/api";
 
 const PERIOD_LABELS = { today: "Today", week: "This Week", month: "This Month", year: "This Year" } as const;
 type Period = keyof typeof PERIOD_LABELS;

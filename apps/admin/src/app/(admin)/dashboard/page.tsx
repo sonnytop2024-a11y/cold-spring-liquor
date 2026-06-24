@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { API } from "@/lib/api";
 import {
   DollarSign, ShoppingBag, CheckCircle, Clock, Truck, XCircle,
   TrendingUp, Users, Star, Car, RefreshCw, Calendar, AlertCircle,
@@ -123,8 +124,8 @@ export default function DashboardPage() {
   const [to, setTo] = useState("");
 
   const apiUrl = period === "custom" && from && to
-    ? `/api/admin/reports?period=custom&from=${from}&to=${to}`
-    : `/api/admin/reports?period=${period}`;
+    ? `${API}/admin/reports?period=custom&from=${from}&to=${to}`
+    : `${API}/admin/reports?period=${period}`;
 
   const { data: d = {}, isLoading, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["admin-dashboard", period, from, to],

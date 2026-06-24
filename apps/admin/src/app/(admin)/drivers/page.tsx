@@ -7,8 +7,7 @@ import {
   ToggleLeft, ToggleRight, Package, Clock, Eye, Loader2, Shield, Star,
   ChevronRight, AlertCircle,
 } from "lucide-react";
-
-const API = "/api";
+import { API } from "@/lib/api";
 
 interface DriverOrder {
   id: string; orderNumber: string; status: string;
