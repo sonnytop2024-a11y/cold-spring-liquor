@@ -34,7 +34,10 @@ async function exportProductsCSV() {
   URL.revokeObjectURL(url);
 }
 
-const CATEGORIES = ["whiskey", "tequila", "vodka", "rum", "gin", "wine", "beer", "liqueur", "other"];
+const CATEGORIES = [
+  "whiskey", "tequila", "vodka", "rum", "gin", "wine", "beer",
+  "champagne", "cognac", "rtd", "liqueur", "other",
+];
 
 interface Product {
   id: string;
@@ -92,7 +95,11 @@ async function updateProduct({ id, ...body }: Partial<Product> & { id: string })
 }
 
 async function deleteProduct(id: string) {
-  await fetch(`${API}/products/${id}`, { method: "DELETE" });
+  const res = await fetch(`${API}/admin/products/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as Record<string, string>).error ?? `Delete failed (${res.status})`);
+  }
 }
 
 function StatusBadge({ qty }: { qty: number }) {
@@ -546,7 +553,11 @@ export default function InventoryPage() {
     onSuccess: () => { invalidate(); setShowModal(false); showToast("Changes saved successfully."); },
     onError: (e: Error) => showToast(e.message, false),
   });
-  const deleteMutation = useMutation({ mutationFn: deleteProduct, onSuccess: invalidate });
+  const deleteMutation = useMutation({
+    mutationFn: deleteProduct,
+    onSuccess: () => { invalidate(); showToast("Product deleted."); },
+    onError: (e: Error) => showToast(e.message, false),
+  });
 
   function openAdd() { setModalProduct(null); setShowModal(true); }
   function openEdit(p: Product) { setModalProduct(p); setShowModal(true); }

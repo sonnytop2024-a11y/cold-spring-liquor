@@ -192,7 +192,8 @@ export function Header() {
               <ShoppingCart size={18} />
               {itemCount > 0 && (
                 <span
-                  className="absolute -top-0.5 -right-0.5 text-white text-[10px] font-black rounded-full w-4.5 h-4.5 flex items-center justify-center min-w-[18px] min-h-[18px] px-1"
+                  key={itemCount}
+                  className="absolute -top-0.5 -right-0.5 text-white text-[10px] font-black rounded-full flex items-center justify-center min-w-[18px] min-h-[18px] px-1 animate-cart-pop"
                   style={{ background: "#f97316", fontSize: "10px" }}
                 >
                   {itemCount}

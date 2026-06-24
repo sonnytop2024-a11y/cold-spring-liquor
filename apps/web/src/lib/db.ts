@@ -20,12 +20,22 @@ export async function dbGetAllProducts(): Promise<MockProduct[]> {
   const t = tbl("csl_products");
   if (t) {
     try {
-      // Select without ordering — works with minimal schema (id + data only)
-      const { data, error } = await t.select("data");
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return data.map((r: any) => r.data as MockProduct);
+      // Paginate in 1000-row chunks — Supabase caps at 1000 rows per request
+      const PAGE = 1000;
+      const all: MockProduct[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await t.select("data").range(from, from + PAGE - 1);
+        if (error) { console.error("[db] getAllProducts error:", error.message); break; }
+        if (!data || data.length === 0) break;
+        all.push(...data.map((r: any) => r.data as MockProduct));
+        if (data.length < PAGE) break; // last page
+        from += PAGE;
       }
-      if (error) console.error("[db] getAllProducts error:", error.message);
+      if (all.length > 0) {
+        console.log(`[db] loaded ${all.length} products from Supabase`);
+        return all;
+      }
     } catch (e) {
       console.error("[db] getAllProducts exception:", e);
     }

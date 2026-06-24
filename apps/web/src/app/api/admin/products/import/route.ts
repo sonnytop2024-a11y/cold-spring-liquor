@@ -7,6 +7,51 @@ const VALID_CATEGORIES = [
   "champagne", "cognac", "rtd", "liqueur", "other",
 ];
 
+// Maps common CSV category names → canonical category
+const CATEGORY_ALIAS: Record<string, string> = {
+  // Whiskey variants
+  "whisky": "whiskey", "bourbon": "whiskey", "scotch": "whiskey",
+  "irish whiskey": "whiskey", "irish whisky": "whiskey", "rye": "whiskey",
+  "tennessee whiskey": "whiskey", "tennessee whisky": "whiskey",
+  "blended whiskey": "whiskey", "single malt": "whiskey",
+  "canadian whisky": "whiskey", "japanese whisky": "whiskey",
+  // Wine variants
+  "red wine": "wine", "white wine": "wine", "rosé": "wine", "rose": "wine",
+  "sparkling wine": "wine", "dessert wine": "wine", "port": "wine",
+  "merlot": "wine", "cabernet": "wine", "chardonnay": "wine",
+  "pinot": "wine", "sauvignon": "wine", "prosecco": "wine",
+  // Beer variants
+  "craft beer": "beer", "ipa": "beer", "lager": "beer", "ale": "beer",
+  "stout": "beer", "porter": "beer", "hard seltzer": "beer", "seltzer": "beer",
+  "cider": "beer", "malt beverage": "beer",
+  // RTD / Ready-to-drink
+  "ready to drink": "rtd", "ready-to-drink": "rtd", "cocktail": "rtd",
+  "premixed": "rtd", "hard lemonade": "rtd", "hard tea": "rtd",
+  "cooler": "rtd",
+  // Champagne
+  "sparkling": "champagne",
+  // Cognac
+  "brandy": "cognac", "armagnac": "cognac",
+  // Liqueur
+  "cordial": "liqueur", "schnapps": "liqueur", "amaretto": "liqueur",
+  "triple sec": "liqueur", "kahlua": "liqueur", "baileys": "liqueur",
+  "cream liqueur": "liqueur",
+  // Spirits (generic → other)
+  "spirits": "other", "spirit": "other", "misc": "other", "miscellaneous": "other",
+};
+
+function normalizeCategory(raw: string | undefined): string {
+  if (!raw) return "other";
+  const lower = raw.toLowerCase().trim();
+  if (VALID_CATEGORIES.includes(lower)) return lower;
+  if (CATEGORY_ALIAS[lower]) return CATEGORY_ALIAS[lower];
+  // Partial match: if raw contains a known category keyword
+  for (const cat of VALID_CATEGORIES) {
+    if (lower.includes(cat)) return cat;
+  }
+  return "other";
+}
+
 function colKey(s: string) {
   return s.toLowerCase().replace(/[\s_\-().]/g, "");
 }
@@ -62,7 +107,11 @@ export async function POST(req: NextRequest) {
     const sku         = pick(raw, "sku", "id", "productid", "product_id", "item_id");
     const name        = pick(raw, "name", "productname", "product name", "title", "item", "product");
     const brand       = pick(raw, "brand", "manufacturer", "maker", "distillery", "brewery") ?? "";
-    const rawCat      = pick(raw, "category", "type", "spirit", "spirit type", "subcategory");
+    const rawCat      = pick(raw,
+      "category", "type", "spirit", "spirit type", "subcategory",
+      "product type", "product category", "item type", "class",
+      "liquor type", "beverage type", "alcohol type",
+    );
     const volume      = pick(raw, "volume", "size", "ml", "oz", "pack size") ?? "750ml";
     const rawPrice    = pick(raw, "price", "regular price", "retail price", "cost", "msrp", "unit price");
     const rawSale     = pick(raw, "sale price", "saleprice", "promo price", "promotion", "discount price", "special price");
@@ -107,10 +156,8 @@ export async function POST(req: NextRequest) {
     // ── Optional: Stock — default 0 ──
     const stockQty = rawStock ? (parseInt(String(rawStock).replace(/,/g, "")) || 0) : 0;
 
-    // ── Optional: Category — default "other" ──
-    const category = rawCat && VALID_CATEGORIES.includes(rawCat.toLowerCase())
-      ? rawCat.toLowerCase()
-      : "other";
+    // ── Optional: Category — normalize with alias map ──
+    const category = normalizeCategory(rawCat);
 
     const abv = rawAbv ? (parseFloat(String(rawAbv).replace(/[%\s]/g, "")) || 0) : 0;
 

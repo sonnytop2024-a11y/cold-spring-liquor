@@ -2,22 +2,46 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Check, Minus } from "lucide-react";
+import { useState } from "react";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
-import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
   product: Product;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const addItem = useCartStore((s) => s.addItem);
+  const { items, addItem, updateQuantity, removeItem } = useCartStore();
+  const [justAdded, setJustAdded] = useState(false);
 
-  const discountPct =
-    product.salePrice
-      ? Math.round(((product.price - product.salePrice) / product.price) * 100)
-      : 0;
+  const cartItem = items.find((i) => i.product.id === product.id);
+  const qty = cartItem?.quantity ?? 0;
+
+  const discountPct = product.salePrice
+    ? Math.round(((product.price - product.salePrice) / product.price) * 100)
+    : 0;
+
+  function handleAdd(e: React.MouseEvent) {
+    e.preventDefault();
+    addItem(product);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1500);
+  }
+
+  function handleIncrease(e: React.MouseEvent) {
+    e.preventDefault();
+    addItem(product);
+  }
+
+  function handleDecrease(e: React.MouseEvent) {
+    e.preventDefault();
+    if (qty <= 1) {
+      removeItem(product.id);
+    } else {
+      updateQuantity(product.id, qty - 1);
+    }
+  }
 
   return (
     <div className="group bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
@@ -80,19 +104,55 @@ export function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          <button
-            onClick={(e) => { e.preventDefault(); addItem(product); }}
-            disabled={!product.inStock}
-            aria-label="Add to cart"
-            className={cn(
-              "shrink-0 w-7 h-7 flex items-center justify-center rounded-lg transition-colors",
-              product.inStock
-                ? "bg-brand-500 hover:bg-brand-600 text-white"
-                : "bg-gray-100 text-gray-300 cursor-not-allowed"
-            )}
-          >
-            <Plus size={14} strokeWidth={2.5} />
-          </button>
+          {/* Cart control */}
+          {!product.inStock ? (
+            <button
+              disabled
+              aria-label="Out of stock"
+              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-300 cursor-not-allowed"
+            >
+              <Plus size={14} strokeWidth={2.5} />
+            </button>
+          ) : qty > 0 ? (
+            // Already in cart — show qty control
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={handleDecrease}
+                aria-label="Decrease quantity"
+                className="w-6 h-6 flex items-center justify-center rounded-md bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors"
+              >
+                <Minus size={10} strokeWidth={2.5} />
+              </button>
+              <span className="text-xs font-bold w-5 text-center text-gray-900 tabular-nums">
+                {qty}
+              </span>
+              <button
+                onClick={handleIncrease}
+                aria-label="Increase quantity"
+                className="w-6 h-6 flex items-center justify-center rounded-md bg-brand-500 hover:bg-brand-600 text-white transition-colors"
+              >
+                <Plus size={10} strokeWidth={2.5} />
+              </button>
+            </div>
+          ) : justAdded ? (
+            // Just added — show ✓ briefly
+            <button
+              disabled
+              aria-label="Added to cart"
+              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 text-white"
+            >
+              <Check size={14} strokeWidth={2.5} />
+            </button>
+          ) : (
+            // Not in cart
+            <button
+              onClick={handleAdd}
+              aria-label="Add to cart"
+              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-brand-500 hover:bg-brand-600 text-white transition-colors active:scale-90"
+            >
+              <Plus size={14} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
       </div>
     </div>
