@@ -149,47 +149,27 @@ function PhoneTab({ onSuccess }: { onSuccess: (user: any) => void }) {
 }
 
 // ── Google tab ────────────────────────────────────────────────────────────────
-function GoogleTab({ onSuccess }: { onSuccess: (user: any) => void }) {
+function GoogleTab({ onSuccess: _onSuccess }: { onSuccess: (user: any) => void }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  // Mock Google accounts for demo
-  const mockAccounts = [
-    { googleId: "g1", name: "Alex Johnson", email: "alex.johnson@gmail.com" },
-    { googleId: "g2", name: "Maria Garcia", email: "maria.garcia@gmail.com" },
-    { googleId: "g3", name: "David Kim", email: "david.kim@gmail.com" },
-  ];
 
-  async function loginWithGoogle(account: typeof mockAccounts[0]) {
-    setError(""); setLoading(true);
-    try {
-      const res = await fetch("/api/auth/google", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(account) });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Google login failed"); return; }
-      onSuccess(data.user);
-    } catch { setError("Network error"); }
-    finally { setLoading(false); }
+  function handleGoogleLogin() {
+    setLoading(true);
+    window.location.href = "/api/auth/google";
   }
 
   return (
-    <div className="space-y-3">
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>}
-      <p className="text-xs text-gray-500 text-center">Select a demo Google account:</p>
-      {mockAccounts.map(acc => (
-        <button key={acc.googleId} onClick={() => loginWithGoogle(acc)} disabled={loading}
-          className="w-full flex items-center gap-3 border rounded-xl px-4 py-3 hover:bg-gray-50 transition-colors text-left disabled:opacity-60">
-          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-            {acc.name.charAt(0)}
-          </div>
-          <div>
-            <p className="text-sm font-medium">{acc.name}</p>
-            <p className="text-xs text-gray-400">{acc.email}</p>
-          </div>
-          {loading && <Loader2 size={14} className="ml-auto animate-spin text-gray-400" />}
-        </button>
-      ))}
-      <p className="text-xs text-center text-gray-400 mt-2">
-        In production, this uses real Google OAuth
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500 text-center">
+        Sign in with your Google account
       </p>
+      <button
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-3 border-2 rounded-xl px-4 py-3 hover:bg-gray-50 transition-colors font-medium disabled:opacity-60"
+      >
+        {loading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
+        {loading ? "Redirecting..." : "Continue with Google"}
+      </button>
     </div>
   );
 }
