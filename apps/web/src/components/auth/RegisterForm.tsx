@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { User, Mail, Phone, Lock, Calendar, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
@@ -17,8 +17,17 @@ function calcAge(dob: string): number {
 }
 
 export function RegisterForm() {
+  const params = useSearchParams();
+  const googleId = params.get("googleId") ?? "";
+  const isGoogleSignup = !!googleId;
+
   const [form, setForm] = useState({
-    name: "", email: "", phone: "", dob: "", password: "", confirm: "",
+    name: params.get("name") ?? "",
+    email: params.get("email") ?? "",
+    phone: "",
+    dob: "",
+    password: "",
+    confirm: "",
   });
   const [showPw, setShowPw] = useState(false);
   const [ageConfirm, setAgeConfirm] = useState(false);
@@ -39,7 +48,7 @@ export function RegisterForm() {
     setError("");
 
     if (age < 21) { setError("You must be 21 or older to create an account."); return; }
-    if (form.password !== form.confirm) { setError("Passwords do not match."); return; }
+    if (!isGoogleSignup && form.password !== form.confirm) { setError("Passwords do not match."); return; }
     if (!ageConfirm) { setError("Please confirm that you are 21 or older."); return; }
 
     setLoading(true);
@@ -52,7 +61,7 @@ export function RegisterForm() {
           email: form.email,
           phone: form.phone,
           dob: form.dob,
-          password: form.password,
+          ...(isGoogleSignup ? { googleId } : { password: form.password }),
         }),
       });
       const data = await res.json();
@@ -157,8 +166,8 @@ export function RegisterForm() {
             </div>
           </div>
 
-          {/* Password */}
-          <div>
+          {/* Password — hidden for Google signup */}
+          {!isGoogleSignup && <div>
             <label className="block text-sm font-medium mb-1.5">Password *</label>
             <div className="relative">
               <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -175,10 +184,10 @@ export function RegisterForm() {
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
-          </div>
+          </div>}
 
-          {/* Confirm Password */}
-          <div>
+          {/* Confirm Password — hidden for Google signup */}
+          {!isGoogleSignup && <div>
             <label className="block text-sm font-medium mb-1.5">Confirm Password *</label>
             <input
               required
@@ -193,7 +202,7 @@ export function RegisterForm() {
             {form.confirm && form.password !== form.confirm && (
               <p className="text-red-500 text-xs mt-1">Passwords do not match</p>
             )}
-          </div>
+          </div>}
 
           {/* Age Confirmation */}
           <label className="flex items-start gap-3 cursor-pointer mt-2">

@@ -9,8 +9,11 @@ export async function POST(req: NextRequest) {
   }
 
   const user = store.getUserByEmail(email);
-  if (!user || !store.validatePassword(user, password)) {
-    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+  if (!user) {
+    return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
+  }
+  if (!store.validatePassword(user, password)) {
+    return NextResponse.json({ error: "Invalid password." }, { status: 401 });
   }
 
   const token = store.createSession(user.id);

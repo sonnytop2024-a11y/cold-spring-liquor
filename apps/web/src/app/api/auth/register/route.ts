@@ -11,37 +11,52 @@ function calcAge(dob: string): number {
 }
 
 export async function POST(req: NextRequest) {
-  const { name, email, phone, dob, password } = await req.json();
+  const { name, email, phone, dob, password, googleId } = await req.json();
 
-  if (!name || !email || !phone || !dob || !password) {
+  if (!name || !email || !dob) {
+    return NextResponse.json({ error: "Name, email, and date of birth are required." }, { status: 400 });
+  }
+
+  // Phone required for non-Google signups
+  if (!googleId && !phone) {
     return NextResponse.json({ error: "All fields are required." }, { status: 400 });
   }
 
-  // Age verification — must be 21+
+  // Password required for non-Google signups
+  if (!googleId && !password) {
+    return NextResponse.json({ error: "All fields are required." }, { status: 400 });
+  }
+
+  if (!googleId && password.length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+  }
+
   const age = calcAge(dob);
   if (age < 21) {
     return NextResponse.json({ error: `You must be 21 or older to create an account. Your age: ${age}.` }, { status: 403 });
   }
 
-  // Check duplicate
   if (store.getUserByEmail(email)) {
     return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
   }
 
-  if (password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
-  }
+  const user = store.createUser({
+    name,
+    email,
+    phone: phone ?? "",
+    dob,
+    password: password ?? `google-${Date.now()}`,
+    ...(googleId ? { googleId } : {}),
+  });
 
-  const user = store.createUser({ name, email, phone, dob, password });
   const token = store.createSession(user.id);
-
   const { passwordHash: _ph, ...safeUser } = user;
 
   const res = NextResponse.json({ user: safeUser, message: "Account created successfully!" }, { status: 201 });
   res.cookies.set("csl-session", token, {
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: 60 * 60 * 24 * 30,
     path: "/",
   });
   return res;

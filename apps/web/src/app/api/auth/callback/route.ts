@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
 
   const redirectUri = `${WEB_URL}/api/auth/callback`;
 
-  // Exchange code for tokens
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -35,7 +34,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${WEB_URL}/auth/login?error=google_failed`);
   }
 
-  // Fetch Google user info
   const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
@@ -45,14 +43,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${WEB_URL}/auth/login?error=google_failed`);
   }
 
-  // Find or create user
-  const user = store.createOrUpdateGoogleUser({
+  // Only allow existing users — no auto-create
+  const existingUser =
+    store.getUserByGoogleId(googleUser.id) ??
+    store.getUserByEmail(googleUser.email);
+
+  if (!existingUser) {
+    const params = new URLSearchParams({
+      googleId: googleUser.id,
+      name: googleUser.name ?? "",
+      email: googleUser.email ?? "",
+    });
+    return NextResponse.redirect(`${WEB_URL}/auth/register?${params.toString()}`);
+  }
+
+  // Link googleId if not already linked
+  store.createOrUpdateGoogleUser({
     googleId: googleUser.id,
-    name: googleUser.name ?? googleUser.email.split("@")[0],
-    email: googleUser.email,
+    name: existingUser.name,
+    email: existingUser.email,
   });
 
-  const token = store.createSession(user.id);
+  const token = store.createSession(existingUser.id);
   const res = NextResponse.redirect(`${WEB_URL}/`);
   res.cookies.set("csl-session", token, {
     httpOnly: true,

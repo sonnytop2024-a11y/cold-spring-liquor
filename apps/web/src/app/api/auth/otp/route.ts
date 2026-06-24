@@ -56,15 +56,9 @@ export async function POST(req: NextRequest) {
     const valid = code === generateOtp(normalizedPhone, win) || code === generateOtp(normalizedPhone, win - 1);
     if (!valid) return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 401 });
 
-    let user = store.getUserByPhone(normalizedPhone);
+    const user = store.getUserByPhone(normalizedPhone);
     if (!user) {
-      user = store.createUser({
-        name: name ?? `User ${normalizedPhone.slice(-4)}`,
-        email: "",
-        phone: normalizedPhone,
-        dob: "",
-        password: `otp-${Date.now()}`,
-      });
+      return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
     }
 
     const token = store.createSession(user.id);
