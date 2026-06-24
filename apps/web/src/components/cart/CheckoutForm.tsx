@@ -172,6 +172,20 @@ export function CheckoutForm() {
     }
   }
 
+  if (clientSecret) {
+    return (
+      <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
+        <StripePaymentForm
+          clientSecret={clientSecret}
+          orderPayload={orderPayload!}
+          total={total}
+          onSuccess={(orderId) => { clearCart(); router.push(`/track/${orderId}`); }}
+          onCancel={() => { setClientSecret(null); setOrderPayload(null); setSubmitting(false); }}
+        />
+      </Elements>
+    );
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-5">
 
@@ -310,22 +324,10 @@ export function CheckoutForm() {
         <h2 className="font-bold text-base mb-5 flex items-center gap-2">
           <CreditCard size={18} className="text-brand-500" /> Payment
         </h2>
-        {clientSecret ? (
-          <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
-            <StripePaymentForm
-              clientSecret={clientSecret}
-              orderPayload={orderPayload!}
-              total={total}
-              onSuccess={(orderId) => { clearCart(); router.push(`/track/${orderId}`); }}
-              onCancel={() => { setClientSecret(null); setOrderPayload(null); setSubmitting(false); }}
-            />
-          </Elements>
-        ) : (
-          <div className="bg-gray-50 border border-dashed rounded-xl p-6 text-center text-gray-400 text-sm">
-            Fill in your details above and click &ldquo;Place Order&rdquo; to enter payment.
-            <p className="text-xs mt-2">Credit Card · Debit Card · Apple Pay · Google Pay</p>
-          </div>
-        )}
+        <div className="bg-gray-50 border border-dashed rounded-xl p-6 text-center text-gray-400 text-sm">
+          Fill in your details above and click &ldquo;Place Order&rdquo; to enter payment.
+          <p className="text-xs mt-2">Credit Card · Debit Card · Apple Pay · Google Pay</p>
+        </div>
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
           ⚠️ Must be 21+. Valid ID checked at delivery.
         </div>
