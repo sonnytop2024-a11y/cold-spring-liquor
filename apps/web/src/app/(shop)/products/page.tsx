@@ -9,7 +9,14 @@ type SearchParams = Record<string, string | undefined>;
 export default function ProductsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <div className="container-main py-6">
-      <h1 className="text-2xl font-heading font-bold mb-4">Our Selection</h1>
+      <div className="mb-5">
+        <h1 className="text-2xl sm:text-4xl font-heading font-bold text-gray-900 leading-tight">
+          You Pick and We Deliver to You
+        </h1>
+        <p className="mt-1.5 text-sm sm:text-base font-bold text-orange-500 tracking-wide">
+          🚚 FREE DELIVERY • NO TIP REQUIRED
+        </p>
+      </div>
 
       {/* Search bar */}
       <Suspense>
