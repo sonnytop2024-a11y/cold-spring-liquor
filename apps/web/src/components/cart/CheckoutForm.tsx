@@ -156,105 +156,87 @@ function ThankYouPopup({
   orderNumber,
   total,
   customerName,
-  etaMinutes,
   onTrack,
 }: {
   orderNumber: string;
   total: number;
   customerName: string;
-  etaMinutes?: number;
   onTrack: () => void;
 }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Fade in after mount
     const t = setTimeout(() => setVisible(true), 30);
     return () => clearTimeout(t);
   }, []);
 
   const firstName = customerName.split(" ")[0] || customerName;
-  const eta = etaMinutes ? `~${etaMinutes} min` : "~30 min";
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-center justify-center p-4 transition-all duration-500 ${
+      className={`fixed inset-0 z-[200] flex items-center justify-center p-4 transition-opacity duration-500 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
-      style={{ background: "linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #0a0a0a 100%)" }}
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
     >
-      {/* Decorative glow */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full opacity-20 blur-3xl"
-          style={{ background: "radial-gradient(circle, #f97316 0%, transparent 70%)" }} />
-      </div>
-
       {/* Card */}
       <div className={`relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-500 ${
         visible ? "translate-y-0 scale-100" : "translate-y-8 scale-95"
       }`}>
 
-        {/* Header gradient */}
-        <div className="relative px-8 pt-8 pb-6 text-center"
-          style={{ background: "linear-gradient(135deg, #1c1c1c 0%, #2d2d2d 100%)" }}>
-          {/* Floating icons */}
+        {/* Orange header */}
+        <div className="px-8 pt-8 pb-7 text-center bg-brand-500">
           <div className="flex justify-center gap-3 mb-4">
             {["🎉", "🥃", "✨"].map((e, i) => (
               <span key={i} className="text-2xl animate-bounce" style={{ animationDelay: `${i * 0.15}s` }}>{e}</span>
             ))}
           </div>
-          <h2 className="text-2xl font-black text-white tracking-tight">
+          <h2 className="text-[1.75rem] font-black text-white tracking-tight leading-tight">
             Thank You, {firstName}!
           </h2>
-          <p className="text-gray-400 text-sm mt-1">Your order has been received</p>
+          <p className="text-white/80 text-sm mt-1.5">Your order has been received</p>
 
           {/* Order badge */}
-          <div className="mt-4 inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5">
-            <span className="text-xs text-gray-300 font-mono">#{orderNumber}</span>
-            <span className="text-gray-500">·</span>
-            <span className="text-sm font-bold text-white">${total.toFixed(2)}</span>
+          <div className="mt-5 inline-flex items-center gap-2 bg-white/15 border border-white/25 rounded-full px-5 py-2">
+            <span className="text-xs text-white/70 font-mono tracking-wider">#{orderNumber}</span>
+            <span className="text-white/40">·</span>
+            <span className="text-sm font-black text-white">${total.toFixed(2)}</span>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="px-8 py-6 space-y-5">
+        {/* White body */}
+        <div className="px-8 py-7 space-y-5">
           {/* Message */}
-          <div className="text-center">
-            <p className="text-gray-700 text-sm leading-relaxed">
-              Sit back, relax and enjoy your day —<br />
-              <strong className="text-gray-900">we'll take care of everything from here.</strong>
-            </p>
-          </div>
+          <p className="text-center text-gray-600 text-sm leading-relaxed">
+            Sit back, relax and enjoy your day —<br />
+            <strong className="text-gray-900">we'll take care of everything from here.</strong>
+          </p>
 
-          {/* Perks row */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { icon: <Truck size={16} />, label: "FREE Delivery", color: "text-green-600 bg-green-50 border-green-100" },
-              { icon: <Star size={16} />, label: "No Tip\nRequired", color: "text-blue-600 bg-blue-50 border-blue-100" },
-              { icon: <Clock size={16} />, label: eta, color: "text-orange-600 bg-orange-50 border-orange-100" },
-            ].map(({ icon, label, color }) => (
-              <div key={label} className={`flex flex-col items-center gap-1.5 border rounded-2xl py-3 px-2 ${color}`}>
-                {icon}
-                <span className="text-[11px] font-bold text-center leading-tight whitespace-pre-line">{label}</span>
-              </div>
-            ))}
+          {/* 2 perks */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col items-center gap-2 border border-green-100 bg-green-50 rounded-2xl py-4 px-3">
+              <Truck size={18} className="text-green-600" />
+              <span className="text-xs font-bold text-green-700 text-center leading-tight">FREE Delivery</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 border border-blue-100 bg-blue-50 rounded-2xl py-4 px-3">
+              <Star size={18} className="text-blue-600" />
+              <span className="text-xs font-bold text-blue-700 text-center leading-tight">No Tip Required</span>
+            </div>
           </div>
 
           {/* Preparing indicator */}
           <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3">
-            <div className="relative flex-shrink-0">
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping absolute" />
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 relative" />
+            <div className="relative flex-shrink-0 w-2.5 h-2.5">
+              <div className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
+              <div className="relative w-full h-full rounded-full bg-green-500" />
             </div>
-            <p className="text-sm text-gray-700 font-medium">
-              Our team is preparing your order now
-            </p>
+            <p className="text-sm text-gray-700 font-medium">Our team is preparing your order now</p>
           </div>
 
           {/* CTA */}
           <button
             onClick={onTrack}
-            className="w-full flex items-center justify-center gap-2.5 bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white font-black py-4 rounded-2xl text-base transition-all shadow-lg shadow-orange-500/30"
+            className="w-full flex items-center justify-center gap-2.5 bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white font-black py-4 rounded-2xl text-base transition-all shadow-lg shadow-orange-500/25"
           >
             <MapPin size={18} />
             Track My Order
@@ -299,7 +281,7 @@ export function CheckoutForm() {
   const [zoneError, setZoneError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
-  const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; etaMinutes?: number } | null>(null);
+  const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number } | null>(null);
 
   // ── Read reorder prefill from localStorage (runs once on mount) ───────────
   const [reorderPrefill, setReorderPrefill] = useState<Record<string, any> | null>(null);
@@ -432,9 +414,8 @@ export function CheckoutForm() {
     return (
       <ThankYouPopup
         orderNumber={thankYouOrder.orderNumber}
-        total={total}
+        total={thankYouOrder.total}
         customerName={name}
-        etaMinutes={thankYouOrder.etaMinutes}
         onTrack={() => router.push(`/track/${thankYouOrder.orderId}`)}
       />
     );
@@ -452,7 +433,7 @@ export function CheckoutForm() {
             setThankYouOrder({
               orderId: order.id,
               orderNumber: order.orderNumber,
-              etaMinutes: order.etaMinutes,
+              total: order.total,
             });
           }}
           onCancel={() => { setClientSecret(null); setOrderPayload(null); setSubmitting(false); }}
@@ -679,7 +660,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, onSuccess, onCan
   clientSecret: string;
   orderPayload: object;
   total: number;
-  onSuccess: (order: { id: string; orderNumber: string; etaMinutes?: number }) => void;
+  onSuccess: (order: { id: string; orderNumber: string; total: number }) => void;
   onCancel: () => void;
 }) {
   const stripe = useStripe();
