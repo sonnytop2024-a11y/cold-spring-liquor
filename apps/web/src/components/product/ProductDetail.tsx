@@ -57,7 +57,7 @@ export function ProductDetail({ slug }: { slug: string }) {
               alt={product.name}
               width={480}
               height={480}
-              className="object-contain p-8 w-full h-full"
+              className="object-cover rounded-2xl w-full h-full"
             />
           ) : (
             <span className="text-9xl">🍾</span>
@@ -75,9 +75,9 @@ export function ProductDetail({ slug }: { slug: string }) {
         <p className="text-sm font-medium text-brand-600 uppercase tracking-wide mb-1">
           {product.category} · {product.brand}
         </p>
-        <h1 className="font-heading text-3xl font-bold mb-3">{product.name}</h1>
+        <h1 className="font-display text-3xl font-bold mb-3">{product.name}</h1>
 
-        {product.rating && (
+        {product.rating && product.rating > 0 && (
           <div className="flex items-center gap-2 mb-4">
             <div className="flex">
               {Array.from({ length: 5 }).map((_, i) => (
