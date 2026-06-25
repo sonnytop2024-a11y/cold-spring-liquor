@@ -34,9 +34,20 @@ async function exportProductsCSV() {
   URL.revokeObjectURL(url);
 }
 
-const CATEGORIES = [
-  "whiskey", "tequila", "vodka", "rum", "gin", "wine", "beer",
-  "champagne", "cognac", "rtd", "liqueur", "other",
+const CATEGORIES: { value: string; label: string }[] = [
+  { value: "whiskey",   label: "Whiskey" },
+  { value: "tequila",   label: "Tequila" },
+  { value: "vodka",     label: "Vodka" },
+  { value: "rum",       label: "Rum" },
+  { value: "gin",       label: "Gin" },
+  { value: "wine",      label: "Wine" },
+  { value: "beer",      label: "Beer" },
+  { value: "champagne", label: "Champagne" },
+  { value: "cognac",    label: "Cognac" },
+  { value: "rtd",       label: "RTD" },
+  { value: "liqueur",   label: "Liqueur" },
+  { value: "rare",      label: "💎 Hard to Find" },
+  { value: "other",     label: "Other" },
 ];
 
 interface Product {
@@ -368,7 +379,7 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none capitalize"
                 >
                   {CATEGORIES.map((c) => (
-                    <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                    <option key={c.value} value={c.value}>{c.label}</option>
                   ))}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -488,7 +499,7 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
               >
                 <Star size={22} className={form.featured ? "fill-yellow-400" : ""} />
               </button>
-              <span className="text-sm font-medium text-gray-600">Featured</span>
+              <span className="text-sm font-medium text-gray-600">⭐ New Products</span>
             </label>
           </div>
 
@@ -717,7 +728,7 @@ export default function InventoryPage() {
           >
             <option value="">All Categories</option>
             {CATEGORIES.map((c) => (
-              <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+              <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -803,7 +814,7 @@ export default function InventoryPage() {
                             }`}
                           >
                             {CATEGORIES.map((c) => (
-                              <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                              <option key={c.value} value={c.value}>{c.label}</option>
                             ))}
                           </select>
                           <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
