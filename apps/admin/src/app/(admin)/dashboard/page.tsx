@@ -156,10 +156,10 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto max-w-full">
             {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
               <button key={p} onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${period === p ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${period === p ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
                 {PERIOD_LABELS[p]}
               </button>
             ))}

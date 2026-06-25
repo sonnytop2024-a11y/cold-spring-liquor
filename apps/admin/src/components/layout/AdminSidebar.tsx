@@ -30,7 +30,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 bg-gray-900 text-white flex flex-col shrink-0">
+    <aside className="hidden md:flex w-60 bg-gray-900 text-white flex-col shrink-0">
       <div className="px-6 py-5 border-b border-white/10">
         <p className="font-bold text-brand-500">Cold Spring Liquor</p>
         <p className="text-xs text-gray-400 mt-0.5">Admin Panel</p>
