@@ -86,6 +86,7 @@ export function CheckoutForm() {
   const [showSummary, setShowSummary] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [zoneError, setZoneError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
 
@@ -168,6 +169,25 @@ export function CheckoutForm() {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
+    setZoneError(null);
+
+    // Validate delivery zone BEFORE creating Stripe PaymentIntent
+    try {
+      const zoneRes = await fetch("/api/orders/validate-address", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(delivery),
+      });
+      const zoneData = await zoneRes.json();
+      if (!zoneData.inRange) {
+        setZoneError(zoneData.error ?? "Address is outside our delivery area.");
+        setSubmitting(false);
+        return;
+      }
+    } catch {
+      // If validation API fails, let the order proceed (don't block on API error)
+    }
+
     try {
       const payload = {
         items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity })),
@@ -252,9 +272,15 @@ export function CheckoutForm() {
         <h2 className="font-bold text-lg mb-5 flex items-center gap-2">
           <MapPin size={18} className="text-brand-500" /> Delivery Address
         </h2>
-        <AddressFields addr={delivery} onChange={setDelivery} prefix="delivery" />
+        <AddressFields addr={delivery} onChange={(a) => { setDelivery(a); setZoneError(null); }} prefix="delivery" />
         {errors.street && <p className="text-red-500 text-xs mt-1">{errors.street}</p>}
         {errors.zip && <p className="text-red-500 text-xs mt-1">{errors.zip}</p>}
+        {zoneError && (
+          <div className="mt-3 bg-red-50 border border-red-300 rounded-xl px-4 py-3 flex items-start gap-2.5 text-sm text-red-700">
+            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+            <span>{zoneError}</span>
+          </div>
+        )}
         <p className="text-xs text-gray-400 mt-3">Service area: Leander · Cedar Park · Liberty Hill, TX (within 5 miles of store)</p>
       </div>
 

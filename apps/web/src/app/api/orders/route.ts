@@ -40,6 +40,13 @@ export async function POST(req: NextRequest) {
   const timing = getDeliveryTiming(nowDate);
   const { distanceMiles, etaMinutes } = await estimateDeliveryFromStoreAsync(deliveryAddress ?? {});
 
+  if (distanceMiles > 5) {
+    return NextResponse.json(
+      { error: `Sorry, we only deliver within 5 miles of our store. Your address is ${distanceMiles} miles away.` },
+      { status: 422 }
+    );
+  }
+
   const order: MockOrder = {
     id, orderNumber: createOrderNumber(), status: "pending",
     items, subtotal, bundleDiscount, couponDiscount, couponCode, tax, total,
