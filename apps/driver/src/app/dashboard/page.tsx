@@ -1369,6 +1369,13 @@ function DashboardContent() {
 
   if (gpsStatus === "denied") return <GPSRequiredScreen onRetry={requestGPS} />;
 
+  if (gpsStatus === "checking" || gpsStatus === "idle") return (
+    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center gap-4">
+      <Loader2 size={36} className="text-brand-500 animate-spin" />
+      <p className="text-gray-600 font-semibold">Getting your location…</p>
+    </div>
+  );
+
   const TABS: { key: "available" | "active" | "today" | "history"; label: string; count: number }[] = [
     { key: "available", label: "Available", count: online ? newOrders.length : 0 },
     { key: "active",    label: "Active",    count: myActive.length },

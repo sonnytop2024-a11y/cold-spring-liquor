@@ -25,23 +25,25 @@ function minutesFromMidnight(h: number, m: number) {
   return h * 60 + m;
 }
 
-// Returns the Date for the next open-day 10 AM at or after `from`
+// Returns the Date for the next open-day 10 AM (Central Time) at or after `from`
 function nextOpenMorning(from: Date): Date {
-  const d = new Date(from);
-  // Move to tomorrow if we're past cutoff or it's already next-morning logic
-  d.setDate(d.getDate() + 1);
-  d.setHours(OPEN_HOUR, 0, 0, 0);
-
-  // Skip Sunday (0) — advance to Monday
-  while (!isOpenDay(d.getDay())) {
-    d.setDate(d.getDate() + 1);
+  // Work in Central Time
+  const central = new Date(from.toLocaleString("en-US", { timeZone: "America/Chicago" }));
+  central.setDate(central.getDate() + 1);
+  central.setHours(OPEN_HOUR, 0, 0, 0);
+  while (!isOpenDay(central.getDay())) {
+    central.setDate(central.getDate() + 1);
   }
-  return d;
+  // Convert back to UTC for storage/display
+  const offset = central.getTime() - new Date(central.toLocaleString("en-US", { timeZone: "America/Chicago" })).getTime();
+  return new Date(central.getTime() + offset);
 }
 
 export function getDeliveryTiming(now: Date = new Date()): DeliveryTiming {
-  const day  = now.getDay(); // 0–6
-  const mins = minutesFromMidnight(now.getHours(), now.getMinutes());
+  // Always compute in Central Time — Vercel servers run UTC
+  const central = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
+  const day  = central.getDay();
+  const mins = minutesFromMidnight(central.getHours(), central.getMinutes());
   const openMins   = minutesFromMidnight(OPEN_HOUR, 0);
   const closeMins  = minutesFromMidnight(CLOSE_HOUR, 0);
   const cutoffMins = minutesFromMidnight(CUTOFF_HOUR, CUTOFF_MIN);
