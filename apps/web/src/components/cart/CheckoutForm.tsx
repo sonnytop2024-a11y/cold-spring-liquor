@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle } from "lucide-react";
+import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
@@ -72,6 +72,9 @@ export function CheckoutForm() {
   const [sameBilling, setSameBilling] = useState(true);
   const [billing, setBilling] = useState<AddrForm>(BLANK_ADDR);
 
+  // Reorder prefill banner
+  const [reorderFromOrder, setReorderFromOrder] = useState<string | null>(null);
+
   // Promo
   const [promoInput, setPromoInput] = useState("");
   const [promoCode, setPromoCode] = useState<string | null>(null);
@@ -86,16 +89,36 @@ export function CheckoutForm() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
 
-  // ── Auto-fill from saved profile ──────────────────────────────────────────
+  // ── Read reorder prefill from localStorage (runs once on mount) ───────────
+  const [reorderPrefill, setReorderPrefill] = useState<Record<string, any> | null>(null);
   useEffect(() => {
-    if (!user) return;
-    if (user.name) setName(user.name);
-    if (user.email) setEmail(user.email);
-    if (user.phone) setPhone(user.phone);
-    if (user.deliveryAddress) setDelivery(user.deliveryAddress);
-    if (user.billingAddress) setBilling(user.billingAddress);
-    if (user.billingAddressSameAsDelivery !== undefined) setSameBilling(user.billingAddressSameAsDelivery);
-  }, [user]);
+    const raw = localStorage.getItem("csl-reorder-prefill");
+    if (!raw) return;
+    try {
+      const prefill = JSON.parse(raw);
+      localStorage.removeItem("csl-reorder-prefill");
+      setReorderPrefill(prefill);
+      if (prefill.fromOrderNumber) setReorderFromOrder(prefill.fromOrderNumber);
+    } catch { /* ignore */ }
+  }, []);
+
+  // ── Auto-fill from reorder prefill (priority) or saved user profile ───────
+  useEffect(() => {
+    const rp = reorderPrefill;
+    const u = user;
+    const finalName = rp?.customerName ?? u?.name ?? "";
+    const finalEmail = rp?.customerEmail ?? u?.email ?? "";
+    const finalPhone = rp?.customerPhone ?? u?.phone ?? "";
+    const finalDelivery = rp?.deliveryAddress ?? u?.deliveryAddress;
+    const finalBilling = rp?.billingAddress ?? u?.billingAddress;
+    const finalSameBilling = rp?.billingAddressSameAsDelivery ?? u?.billingAddressSameAsDelivery;
+    if (finalName) setName(finalName);
+    if (finalEmail) setEmail(finalEmail);
+    if (finalPhone) setPhone(finalPhone);
+    if (finalDelivery?.street) setDelivery(finalDelivery);
+    if (finalBilling?.street) setBilling(finalBilling);
+    if (finalSameBilling !== undefined) setSameBilling(finalSameBilling);
+  }, [user, reorderPrefill]);
 
   // Delivery timing — computed once per render (updates each page load)
   const timing = useMemo(() => getDeliveryTiming(), []);
@@ -189,8 +212,16 @@ export function CheckoutForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
 
+      {/* Reorder prefill notice */}
+      {reorderFromOrder && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-blue-800">
+          <RefreshCw size={16} className="shrink-0 text-blue-600" />
+          <span>Reordering from <strong>#{reorderFromOrder}</strong> — your previous delivery info has been pre-filled.</span>
+        </div>
+      )}
+
       {/* Auto-fill notice */}
-      {isLoggedIn && user?.deliveryAddress?.street && (
+      {!reorderFromOrder && isLoggedIn && user?.deliveryAddress?.street && (
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-green-800">
           <CheckCircle size={16} className="shrink-0 text-green-600" />
           <span>Your saved info has been auto-filled. <button type="button" onClick={() => { setDelivery(BLANK_ADDR); setName(""); setEmail(""); setPhone(""); }} className="underline font-medium">Clear</button></span>

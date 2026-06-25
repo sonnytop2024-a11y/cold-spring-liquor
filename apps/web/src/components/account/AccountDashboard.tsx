@@ -95,6 +95,11 @@ interface ReorderDraft {
   }[];
   removedItems: { name: string; quantity: number; reason: string }[];
   deliveryAddress: any;
+  billingAddress: any;
+  billingAddressSameAsDelivery: boolean;
+  customerName: string | null;
+  customerEmail: string | null;
+  customerPhone: string | null;
   originalOrderNumber: string;
   hasWarnings: boolean;
 }
@@ -257,6 +262,15 @@ function OrderHistoryCard({ order }: { order: any }) {
     for (const { product, quantity } of draft.validItems) {
       addItem(product, quantity);
     }
+    localStorage.setItem("csl-reorder-prefill", JSON.stringify({
+      customerName: draft.customerName,
+      customerEmail: draft.customerEmail,
+      customerPhone: draft.customerPhone,
+      deliveryAddress: draft.deliveryAddress,
+      billingAddress: draft.billingAddress,
+      billingAddressSameAsDelivery: draft.billingAddressSameAsDelivery,
+      fromOrderNumber: draft.originalOrderNumber,
+    }));
     setDraft(null);
     router.push("/checkout");
   }

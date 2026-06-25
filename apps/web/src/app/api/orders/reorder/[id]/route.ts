@@ -41,6 +41,11 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     validItems,
     removedItems,
     deliveryAddress: order.deliveryAddress ?? null,
+    billingAddress: order.billingAddress ?? null,
+    billingAddressSameAsDelivery: order.billingAddressSameAsDelivery ?? true,
+    customerName: order.customerName ?? null,
+    customerEmail: order.customerEmail ?? null,
+    customerPhone: order.customerPhone ?? null,
     originalOrderNumber: order.orderNumber,
     hasWarnings: removedItems.length > 0 || validItems.some(i => i.priceChanged),
   });
