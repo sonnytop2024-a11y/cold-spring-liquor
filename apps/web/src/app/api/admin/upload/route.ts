@@ -1,67 +1,76 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, unlink, mkdir } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+import { supabaseServer } from "@/lib/supabase.server";
 
-const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const BUCKET = "csl-images";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("image");
+    const rawFolder = req.nextUrl.searchParams.get("folder") ?? "products";
+    const folder = /^[a-z]+$/.test(rawFolder) ? rawFolder : "products";
 
     if (!file || typeof file === "string") {
       return NextResponse.json({ error: "No image file provided." }, { status: 400 });
     }
-
-    if (!ALLOWED.includes((file as File).type)) {
-      return NextResponse.json(
-        { error: "Only JPG, PNG, and WEBP files are allowed." },
-        { status: 400 },
-      );
-    }
-
-    if ((file as File).size > MAX_SIZE) {
-      return NextResponse.json(
-        { error: "File is too large. Maximum size is 5 MB." },
-        { status: 400 },
-      );
-    }
-
     const f = file as File;
-    const rawExt = f.name.split(".").pop()?.toLowerCase() ?? "jpg";
-    const ext = rawExt === "jpg" ? "jpg" : rawExt === "png" ? "png" : "webp";
-    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    if (!ALLOWED.includes(f.type)) {
+      return NextResponse.json({ error: "Only JPG, PNG, and WEBP files are allowed." }, { status: 400 });
+    }
+    if (f.size > MAX_SIZE) {
+      return NextResponse.json({ error: "File is too large. Maximum size is 5 MB." }, { status: 400 });
+    }
 
-    const uploadDir = join(process.cwd(), "public", "uploads", "products");
-    await mkdir(uploadDir, { recursive: true });
+    const sb = supabaseServer();
+    if (!sb) {
+      return NextResponse.json(
+        { error: "Storage not configured. Missing Supabase environment variables." },
+        { status: 500 },
+      );
+    }
+
+    const rawExt = f.name.split(".").pop()?.toLowerCase() ?? "jpg";
+    const ext = ["jpg", "jpeg", "png", "webp"].includes(rawExt) ? rawExt : "jpg";
+    const safeName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     const bytes = await f.arrayBuffer();
-    await writeFile(join(uploadDir, safeName), Buffer.from(bytes));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (sb as any).storage
+      .from(BUCKET)
+      .upload(safeName, bytes, { contentType: f.type, upsert: false });
 
-    return NextResponse.json({ url: `/uploads/products/${safeName}` });
+    if (error) {
+      console.error("[upload] Supabase storage error:", error.message);
+      const hint =
+        error.message.toLowerCase().includes("not found") ||
+        error.message.toLowerCase().includes("does not exist")
+          ? ` Make sure the '${BUCKET}' storage bucket exists and is public in Supabase.`
+          : "";
+      return NextResponse.json({ error: `Upload failed: ${error.message}.${hint}` }, { status: 500 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: { publicUrl } } = (sb as any).storage.from(BUCKET).getPublicUrl(safeName);
+    console.log(`[upload] saved ${safeName} → ${publicUrl}`);
+    return NextResponse.json({ url: publicUrl });
   } catch (err) {
     console.error("[upload] error:", err);
     return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
   }
 }
 
-// Optional: delete an uploaded image by URL
 export async function DELETE(req: NextRequest) {
   try {
     const { url } = await req.json();
-    if (!url || !url.startsWith("/uploads/products/")) {
-      return NextResponse.json({ error: "Invalid URL." }, { status: 400 });
-    }
-    const filename = url.split("/uploads/products/")[1];
-    if (!filename || filename.includes("..")) {
-      return NextResponse.json({ error: "Invalid filename." }, { status: 400 });
-    }
-    const filePath = join(process.cwd(), "public", "uploads", "products", filename);
-    if (existsSync(filePath)) {
-      await unlink(filePath);
-    }
+    if (!url || typeof url !== "string") return NextResponse.json({ ok: true });
+    const sb = supabaseServer();
+    if (!sb) return NextResponse.json({ ok: true });
+    const match = url.match(new RegExp(`${BUCKET}/(.+)$`));
+    if (!match) return NextResponse.json({ ok: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (sb as any).storage.from(BUCKET).remove([match[1]]);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Delete failed." }, { status: 500 });

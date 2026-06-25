@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Store, Truck, ShoppingCart, Bell, Car, CreditCard, Star, Users, Settings,
   Save, RotateCcw, CheckCircle, AlertCircle, Volume2, VolumeX, ChevronRight,
-  Clock, Globe, Phone, Mail, MapPin,
+  Clock, Globe, Phone, Mail, MapPin, Upload,
 } from "lucide-react";
 
 import { API } from "@/lib/api";
@@ -13,7 +13,7 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 
 type Settings = {
   storeName: string; storeAddress: string; storePhone: string; storeEmail: string;
-  websiteDomain: string;
+  websiteDomain: string; logoUrl?: string;
   businessHours: Record<string, { open: string; close: string; closed: boolean }>;
   deliveryRadius: number; deliveryTimeMin: number; deliveryTimeMax: number;
   freeDeliveryEnabled: boolean; noTipRequired: boolean; minOrderAmount: number;
@@ -133,6 +133,43 @@ export default function SettingsPage() {
   const [form, setForm] = useState<Settings | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [resetConfirm, setResetConfirm] = useState(false);
+
+  // Store logo upload
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setLogoError("Only JPG, PNG, or WEBP files are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError("File too large. Maximum 5 MB.");
+      return;
+    }
+    setLogoError("");
+    setLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`${API}/admin/upload?folder=logos`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setLogoError(data.error ?? "Upload failed. Please try again.");
+        return;
+      }
+      setForm(prev => prev ? { ...prev, logoUrl: data.url } : prev);
+    } catch {
+      setLogoError("Network error. Please try again.");
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  }
 
   const { data, isLoading } = useQuery<Settings>({
     queryKey: ["admin-settings"],
@@ -325,15 +362,48 @@ export default function SettingsPage() {
 
               <SectionCard title="Store Logo" icon={Store}>
                 <div className="py-4 flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 text-gray-400">
-                    <Store size={24} />
+                  <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
+                    {form?.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={form.logoUrl} alt="Store Logo" className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <Store size={24} className="text-gray-400" />
+                    )}
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Upload Store Logo</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Recommended: 256×256px PNG or SVG</p>
-                    <button className="mt-2 text-xs px-3 py-1.5 border rounded-lg text-gray-600 hover:bg-gray-50">
-                      Choose File
-                    </button>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-700">Store Logo</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Recommended: 256×256px PNG · Max 5 MB</p>
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={logoUploading}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 border rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      >
+                        <Upload size={12} />
+                        {logoUploading ? "Uploading…" : form?.logoUrl ? "Change Logo" : "Upload Logo"}
+                      </button>
+                      {form?.logoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setForm(prev => prev ? { ...prev, logoUrl: "" } : prev)}
+                          className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {logoError && <p className="text-xs text-red-500 mt-1.5">{logoError}</p>}
+                    {form?.logoUrl && !logoError && (
+                      <p className="text-xs text-green-600 mt-1.5">✓ Logo uploaded — save settings to apply</p>
+                    )}
                   </div>
                 </div>
               </SectionCard>

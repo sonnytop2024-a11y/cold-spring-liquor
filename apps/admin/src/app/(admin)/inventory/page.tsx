@@ -531,6 +531,8 @@ export default function InventoryPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qc = useQueryClient();
+  // Inline category edits: { productId → newCategory }
+  const [pendingCats, setPendingCats] = useState<Record<string, string>>({});
 
   function showToast(msg: string, ok = true) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -580,6 +582,21 @@ export default function InventoryPage() {
     onError: (e: Error) => { invalidate(); showToast(e.message, false); },
   });
 
+  // Batch save all pending category changes
+  const saveCatsMutation = useMutation({
+    mutationFn: async (cats: Record<string, string>) => {
+      const entries = Object.entries(cats);
+      await Promise.all(entries.map(([id, category]) => updateProduct({ id, category })));
+      return entries.length;
+    },
+    onSuccess: (count) => {
+      setPendingCats({});
+      invalidate();
+      showToast(`${count} categor${count === 1 ? "y" : "ies"} updated successfully.`);
+    },
+    onError: (e: Error) => showToast(e.message, false),
+  });
+
   function openAdd() { setModalProduct(null); setShowModal(true); }
   function openEdit(p: Product) { setModalProduct(p); setShowModal(true); }
 
@@ -610,6 +627,20 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Save pending category changes */}
+          {Object.keys(pendingCats).length > 0 && (
+            <button
+              onClick={() => saveCatsMutation.mutate(pendingCats)}
+              disabled={saveCatsMutation.isPending}
+              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm"
+            >
+              <Check size={15} />
+              {saveCatsMutation.isPending
+                ? "Saving…"
+                : `Save ${Object.keys(pendingCats).length} Change${Object.keys(pendingCats).length > 1 ? "s" : ""}`}
+            </button>
+          )}
+
           {/* Export */}
           <button
             onClick={async () => {
@@ -730,7 +761,31 @@ export default function InventoryPage() {
                           {p.featured && <Star size={12} className="text-yellow-500 fill-yellow-400 shrink-0" />}
                         </div>
                       </td>
-                      <td className="px-4 py-3 capitalize text-gray-600">{p.category}</td>
+                      <td className="px-4 py-3">
+                        <div className="relative">
+                          <select
+                            value={pendingCats[p.id] ?? p.category}
+                            onChange={(e) => {
+                              const newCat = e.target.value;
+                              if (newCat === p.category) {
+                                setPendingCats(prev => { const n = { ...prev }; delete n[p.id]; return n; });
+                              } else {
+                                setPendingCats(prev => ({ ...prev, [p.id]: newCat }));
+                              }
+                            }}
+                            className={`text-sm rounded-lg px-2 py-1 pr-6 appearance-none capitalize focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer transition-colors ${
+                              pendingCats[p.id]
+                                ? "border border-amber-400 bg-amber-50 text-amber-800 font-medium"
+                                : "border border-transparent bg-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                          >
+                            {CATEGORIES.map((c) => (
+                              <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        </div>
+                      </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold">${Number(p.price).toFixed(2)}</p>
                         {p.salePrice && (
