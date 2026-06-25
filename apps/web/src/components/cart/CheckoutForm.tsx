@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
@@ -39,12 +39,108 @@ function Field({ label, value, onChange, placeholder, error, type = "text", read
   );
 }
 
+// Load Google Maps Places script once
+let gmScriptPromise: Promise<void> | null = null;
+function loadGoogleMaps(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if ((window as any).google?.maps?.places) return Promise.resolve();
+  if (gmScriptPromise) return gmScriptPromise;
+  gmScriptPromise = new Promise(resolve => {
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!key) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
+    script.async = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+  return gmScriptPromise;
+}
+
+function AddressAutocomplete({
+  value,
+  onChange,
+  onPlaceSelect,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onPlaceSelect: (addr: AddrForm) => void;
+  placeholder?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const acRef = useRef<any>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    loadGoogleMaps().then(() => setReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !inputRef.current || acRef.current) return;
+    const g = (window as any).google;
+    if (!g?.maps?.places) return;
+
+    acRef.current = new g.maps.places.Autocomplete(inputRef.current, {
+      types: ["address"],
+      componentRestrictions: { country: "us" },
+      fields: ["address_components"],
+      // Bias toward Leander / Cedar Park / Liberty Hill TX area
+      bounds: new g.maps.LatLngBounds(
+        { lat: 30.35, lng: -98.10 },
+        { lat: 30.80, lng: -97.50 }
+      ),
+    });
+
+    acRef.current.addListener("place_changed", () => {
+      const place = acRef.current.getPlace();
+      if (!place?.address_components) return;
+
+      let streetNumber = "", route = "", city = "", state = "", zip = "";
+      for (const c of place.address_components) {
+        const t = c.types[0];
+        if (t === "street_number") streetNumber = c.long_name;
+        else if (t === "route") route = c.long_name;
+        else if (t === "locality") city = c.long_name;
+        else if (t === "sublocality_level_1" && !city) city = c.long_name;
+        else if (t === "administrative_area_level_1") state = c.short_name;
+        else if (t === "postal_code") zip = c.long_name;
+      }
+      onPlaceSelect({
+        street: [streetNumber, route].filter(Boolean).join(" "),
+        city,
+        state,
+        zip,
+      });
+    });
+  }, [ready, onPlaceSelect]);
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder ?? "123 Main St, Apt 4B"}
+      autoComplete="off"
+      className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+    />
+  );
+}
+
 function AddressFields({ addr, onChange, prefix }: { addr: AddrForm; onChange: (a: AddrForm) => void; prefix: string }) {
   const set = (k: keyof AddrForm, v: string) => onChange({ ...addr, [k]: v });
+  const handlePlace = useCallback((selected: AddrForm) => onChange(selected), [onChange]);
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div className="sm:col-span-2">
-        <Field label="Street Address" value={addr.street} onChange={v => set("street", v)} placeholder="123 Main St, Apt 4B" />
+        <label className="block text-sm font-medium mb-1">Street Address</label>
+        <AddressAutocomplete
+          value={addr.street}
+          onChange={v => set("street", v)}
+          onPlaceSelect={handlePlace}
+          placeholder="123 Main St, Apt 4B"
+        />
       </div>
       <Field label="City" value={addr.city} onChange={v => set("city", v)} />
       <div className="grid grid-cols-2 gap-3">
