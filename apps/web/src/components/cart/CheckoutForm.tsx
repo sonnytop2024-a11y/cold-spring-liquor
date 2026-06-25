@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Package, Truck, Star } from "lucide-react";
+import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
