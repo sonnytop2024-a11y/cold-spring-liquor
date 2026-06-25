@@ -224,7 +224,7 @@ export function OrderTracker({ orderId }: { orderId: string }) {
                 <Clock size={13} />
                 {order.deliveryType === "next-morning"
                   ? `Ready: ${new Date(order.estimatedDelivery).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} at ${new Date(order.estimatedDelivery).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                  : `ETA: ${new Date(order.estimatedDelivery).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                  : `ETA: ${new Date(order.estimatedDelivery).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} or sooner`
                 }
               </span>
             )}
