@@ -124,8 +124,9 @@ function useDriverDistance(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12_000);
 
+    // /distance lives outside /api/ so it bypasses the rewrite to the web app
     fetch(
-      `/api/driver/distance?olat=${driverLoc.lat}&olng=${driverLoc.lng}` +
+      `/distance?olat=${driverLoc.lat}&olng=${driverLoc.lng}` +
       `&address=${encodeURIComponent(addressStr)}`,
       { signal: controller.signal }
     )
