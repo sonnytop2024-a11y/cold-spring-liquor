@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase.server";
+import sharp from "sharp";
 
-const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB raw input limit
 const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const BUCKET = "csl-images";
+
+// Output: 800×800 WebP, quality 85, white background, bottle centered
+async function processImage(buffer: ArrayBuffer): Promise<Buffer> {
+  const input = Buffer.from(buffer);
+  return sharp(input)
+    .trim({ background: "#FFFFFF", threshold: 15 }) // strip excess whitespace
+    .resize(800, 800, {
+      fit: "contain",
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+      position: "centre",
+    })
+    .flatten({ background: { r: 255, g: 255, b: 255 } }) // remove transparency → white
+    .toFormat("webp", { quality: 85, effort: 4 })
+    .toBuffer();
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Only JPG, PNG, and WEBP files are allowed." }, { status: 400 });
     }
     if (f.size > MAX_SIZE) {
-      return NextResponse.json({ error: "File is too large. Maximum size is 5 MB." }, { status: 400 });
+      return NextResponse.json({ error: "File too large. Maximum 10 MB." }, { status: 400 });
     }
 
     const sb = supabaseServer();
@@ -31,15 +47,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const rawExt = f.name.split(".").pop()?.toLowerCase() ?? "jpg";
-    const ext = ["jpg", "jpeg", "png", "webp"].includes(rawExt) ? rawExt : "jpg";
-    const safeName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const rawBytes = await f.arrayBuffer();
+    const processed = await processImage(rawBytes);
 
-    const bytes = await f.arrayBuffer();
+    const safeName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (sb as any).storage
       .from(BUCKET)
-      .upload(safeName, bytes, { contentType: f.type, upsert: false });
+      .upload(safeName, processed, { contentType: "image/webp", upsert: false });
 
     if (error) {
       console.error("[upload] Supabase storage error:", error.message);
@@ -53,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: { publicUrl } } = (sb as any).storage.from(BUCKET).getPublicUrl(safeName);
-    console.log(`[upload] saved ${safeName} → ${publicUrl}`);
+    console.log(`[upload] processed & saved ${safeName} → ${publicUrl}`);
     return NextResponse.json({ url: publicUrl });
   } catch (err) {
     console.error("[upload] error:", err);
