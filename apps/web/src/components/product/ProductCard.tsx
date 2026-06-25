@@ -43,11 +43,11 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <div className="group bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
 
-      {/* ── Image (fixed 1:1, always same size) ─────────────────── */}
+      {/* ── Image (fixed 1:1, rounded corners) ──────────────────── */}
       <Link
         href={`/products/${product.slug}`}
-        className="relative block w-full bg-white overflow-hidden"
-        style={{ paddingBottom: "100%" }} /* enforces 1:1 ratio cross-browser */
+        className="relative block mx-2 mt-2 rounded-xl overflow-hidden bg-gray-50"
+        style={{ paddingBottom: "calc(100% - 16px)" }}
       >
         <div className="absolute inset-0">
           {product.imageUrl ? (
