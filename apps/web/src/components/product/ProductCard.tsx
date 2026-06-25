@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Plus, Check, Minus } from "lucide-react";
-import { useState } from "react";
+import { Plus, Check, Minus, Heart } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
 
@@ -14,6 +14,24 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { items, addItem, updateQuantity, removeItem } = useCartStore();
   const [justAdded, setJustAdded] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("csl_favorites") ?? "[]");
+      setFavorited(saved.includes(product.id));
+    } catch {}
+  }, [product.id]);
+
+  function toggleFavorite(e: React.MouseEvent) {
+    e.preventDefault();
+    try {
+      const saved: string[] = JSON.parse(localStorage.getItem("csl_favorites") ?? "[]");
+      const next = favorited ? saved.filter((id) => id !== product.id) : [...saved, product.id];
+      localStorage.setItem("csl_favorites", JSON.stringify(next));
+      setFavorited(!favorited);
+    } catch {}
+  }
 
   const cartItem = items.find((i) => i.product.id === product.id);
   const qty = cartItem?.quantity ?? 0;
@@ -41,15 +59,11 @@ export function ProductCard({ product }: ProductCardProps) {
   }
 
   return (
-    <div className="group bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
+    <div className="group bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 flex flex-col">
 
-      {/* ── Image (fixed 1:1, rounded corners) ──────────────────── */}
-      <Link
-        href={`/products/${product.slug}`}
-        className="relative block mx-2 mt-2 rounded-xl overflow-hidden bg-gray-50"
-        style={{ paddingBottom: "calc(100% - 16px)" }}
-      >
-        <div className="absolute inset-0">
+      {/* ── Image ────────────────────────────────────────────────── */}
+      <div className="relative mx-2 mt-2 rounded-xl overflow-hidden aspect-square bg-gray-50">
+        <Link href={`/products/${product.slug}`} className="absolute inset-0">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
@@ -64,36 +78,47 @@ export function ProductCard({ product }: ProductCardProps) {
               <span className="text-5xl opacity-20">🍾</span>
             </div>
           )}
-        </div>
+        </Link>
 
-        {/* Badges */}
+        {/* Heart / Favorite */}
+        <button
+          onClick={toggleFavorite}
+          className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm shadow-sm transition-transform active:scale-90"
+        >
+          <Heart
+            size={14}
+            strokeWidth={2}
+            className={favorited ? "fill-red-500 text-red-500" : "text-gray-400"}
+          />
+        </button>
+
+        {/* Discount badge */}
         {discountPct > 0 && (
           <span className="absolute top-2 left-2 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
             -{discountPct}%
           </span>
         )}
+
+        {/* Out of stock overlay */}
         {!product.inStock && (
           <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center">
             <span className="text-xs font-semibold text-gray-400 tracking-wide">Out of Stock</span>
           </div>
         )}
-      </Link>
+      </div>
 
-      {/* ── Info (fixed structure, never causes height variance) ── */}
+      {/* ── Info ─────────────────────────────────────────────────── */}
       <div className="p-3 flex flex-col flex-1">
-        {/* Brand — always 1 line, truncated */}
         <p className="text-[10px] text-gray-400 uppercase tracking-widest truncate mb-0.5 h-3.5">
-          {product.brand ?? " "}
+          {product.brand ?? " "}
         </p>
 
-        {/* Name — always exactly 2 lines */}
         <Link href={`/products/${product.slug}`} className="flex-1">
           <h3 className="text-xs font-semibold text-gray-900 leading-snug hover:text-brand-600 transition-colors line-clamp-2 mb-2" style={{ minHeight: "2.5rem" }}>
             {product.name}
           </h3>
         </Link>
 
-        {/* Price + Cart button */}
         <div className="flex items-center justify-between gap-2 mt-auto">
           <div className="flex items-baseline gap-1 min-w-0">
             <span className="text-sm font-bold text-gray-900 truncate">
