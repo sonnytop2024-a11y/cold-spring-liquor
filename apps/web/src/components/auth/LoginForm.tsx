@@ -397,11 +397,11 @@ export function LoginForm() {
         <div className="text-center mb-7">
           <div className="flex justify-center mb-4">
             <Image
-              src="/logo-transparent.png"
+              src="/logo-full-transparent.png"
               alt="Cold Spring Liquor"
-              width={120}
-              height={120}
-              className="w-20 h-20 sm:w-[120px] sm:h-[120px] object-contain"
+              width={144}
+              height={156}
+              className="w-[110px] sm:w-[144px] object-contain"
               priority
             />
           </div>
