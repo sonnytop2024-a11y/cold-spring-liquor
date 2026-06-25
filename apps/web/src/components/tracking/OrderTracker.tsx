@@ -246,14 +246,35 @@ export function OrderTracker({ orderId }: { orderId: string }) {
 
       {/* Failed state */}
       {isFailed && (
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 space-y-3">
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
             <p className="text-2xl mb-2">😔</p>
             <p className="font-bold text-red-700">
               {order.status === "cancelled" ? "Order Cancelled" : "Delivery Could Not Be Completed"}
             </p>
             {order.failReason && <p className="text-sm text-red-600 mt-1">{order.failReason}</p>}
-            <p className="text-xs text-gray-500 mt-2">Please contact us for assistance.</p>
+          </div>
+
+          {/* No-refund notice */}
+          {order.status === "failed_delivery" && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800">
+              <p className="font-bold mb-0.5">⚠️ No Refund for Failed Delivery</p>
+              <p className="text-xs">Per our policy, failed deliveries due to customer unavailability or ID verification failure are non-refundable.</p>
+            </div>
+          )}
+
+          {/* Store contact */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-4 space-y-2.5">
+            <p className="text-sm font-bold text-gray-800">Contact Us for Assistance</p>
+            <a href="tel:+15125550100"
+              className="flex items-center gap-2.5 text-sm text-brand-600 font-semibold hover:underline">
+              <span className="text-base">📞</span> (512) 555-0100
+            </a>
+            <div className="flex items-start gap-2.5 text-sm text-gray-600">
+              <span className="text-base shrink-0">📍</span>
+              <span>15609 Ronald Reagan Blvd Ste B100,<br />Leander, TX 78641</span>
+            </div>
+            <p className="text-xs text-gray-400">Store hours: Mon–Sun 10 AM – 10 PM</p>
           </div>
         </div>
       )}
