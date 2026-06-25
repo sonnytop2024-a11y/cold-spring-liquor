@@ -366,10 +366,12 @@ export function CheckoutForm() {
     if (!email.includes("@")) e.email = "Valid email required";
     if (phone.replace(/\D/g, "").length < 10) e.phone = "Phone number required";
     if (!delivery.street.trim()) e.street = "Street address required";
+    else if (!/^\d+\s/.test(delivery.street.trim())) e.street = "Please include your house/building number (e.g. 1221 Sonny Dr)";
     if (!delivery.city.trim()) e.city = "City required";
     if (!/^\d{5}$/.test(delivery.zip)) e.zip = "Valid ZIP code required";
     if (!sameBilling) {
       if (!billing.street.trim()) e.billStreet = "Billing street required";
+      else if (!/^\d+\s/.test(billing.street.trim())) e.billStreet = "Please include your house/building number";
       if (!/^\d{5}$/.test(billing.zip)) e.billZip = "Billing ZIP required";
     }
     setErrors(e);

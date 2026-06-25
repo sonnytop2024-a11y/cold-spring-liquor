@@ -11,6 +11,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Address required" }, { status: 400 });
   }
 
+  if (!street || !/^\d+\s/.test(street.trim())) {
+    return NextResponse.json({
+      inRange: false,
+      error: "Please provide a complete street address including your house or building number (e.g. 1221 Sonny Dr).",
+    });
+  }
+
   const { distanceMiles } = await estimateDeliveryFromStoreAsync({ street, city, state, zip });
 
   if (distanceMiles > MAX_DELIVERY_MILES) {
