@@ -14,7 +14,7 @@ interface Cat {
 
 const CATS: Cat[] = [
   { label: "All",          value: "",          emoji: "✨", type: "all" },
-  { label: "New Products", value: "featured",  emoji: "⭐", type: "featured", badge: "NEW" },
+  { label: "New Products", value: "featured",  emoji: "⭐", type: "featured" },
   { label: "Hard to Find", value: "rare",      emoji: "💎", type: "category" },
   { label: "Whiskey",      value: "whiskey",   emoji: "🥃", type: "category" },
   { label: "Vodka",        value: "vodka",     emoji: "🍸", type: "category" },
