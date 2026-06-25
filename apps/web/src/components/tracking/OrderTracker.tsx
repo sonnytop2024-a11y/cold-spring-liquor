@@ -125,7 +125,12 @@ function WaitTimer({ waitTimerStart }: { waitTimerStart: string }) {
   );
 }
 
-export function OrderTracker({ orderId }: { orderId: string }) {
+export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress }: {
+  orderId: string;
+  storePhone?: string;
+  storeTextPhone?: string;
+  storeAddress?: string;
+}) {
   const [notifDismissed, setNotifDismissed] = useState(false);
 
   const { data: order, isLoading } = useQuery({
@@ -255,26 +260,27 @@ export function OrderTracker({ orderId }: { orderId: string }) {
             {order.failReason && <p className="text-sm text-red-600 mt-1">{order.failReason}</p>}
           </div>
 
-          {/* No-refund notice */}
-          {order.status === "failed_delivery" && (
-            <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800">
-              <p className="font-bold mb-0.5">⚠️ No Refund for Failed Delivery</p>
-              <p className="text-xs">Per our policy, failed deliveries due to customer unavailability or ID verification failure are non-refundable.</p>
-            </div>
-          )}
-
           {/* Store contact */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-4 space-y-2.5">
             <p className="text-sm font-bold text-gray-800">Contact Us for Assistance</p>
-            <a href="tel:+15125550100"
-              className="flex items-center gap-2.5 text-sm text-brand-600 font-semibold hover:underline">
-              <span className="text-base">📞</span> (512) 555-0100
-            </a>
-            <div className="flex items-start gap-2.5 text-sm text-gray-600">
-              <span className="text-base shrink-0">📍</span>
-              <span>15609 Ronald Reagan Blvd Ste B100,<br />Leander, TX 78641</span>
-            </div>
-            <p className="text-xs text-gray-400">Store hours: Mon–Sun 10 AM – 10 PM</p>
+            {storePhone && (
+              <a href={`tel:${storePhone.replace(/\D/g,"")}`}
+                className="flex items-center gap-2.5 text-sm text-brand-600 font-semibold hover:underline">
+                <span className="text-base">📞</span> {storePhone}
+              </a>
+            )}
+            {storeTextPhone && (
+              <a href={`sms:${storeTextPhone.replace(/\D/g,"")}`}
+                className="flex items-center gap-2.5 text-sm text-gray-600 hover:underline">
+                <span className="text-base">💬</span> Text: {storeTextPhone}
+              </a>
+            )}
+            {storeAddress && (
+              <div className="flex items-start gap-2.5 text-sm text-gray-600">
+                <span className="text-base shrink-0">📍</span>
+                <span>{storeAddress}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,7 +1,21 @@
 import Link from "next/link";
 import { MapPin, Phone, Clock, Truck } from "lucide-react";
+import { dbGetSettings } from "@/lib/db";
 
-export function Footer() {
+export async function Footer() {
+  const settings = await dbGetSettings();
+  const { storeName, storeAddress, storePhone, storeTextPhone } = settings;
+
+  // Build hours summary from businessHours
+  const bh = settings.businessHours ?? {};
+  const weekdays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const openDays = weekdays.filter(d => !bh[d]?.closed);
+  const sundayClosed = bh["Sunday"]?.closed !== false;
+  const firstOpen = bh[openDays[0]];
+  const hoursLine = openDays.length > 0 && firstOpen
+    ? `${openDays[0].slice(0,3)}–${openDays[openDays.length-1].slice(0,3)} ${fmtTime(firstOpen.open)}–${fmtTime(firstOpen.close)}`
+    : "Mon–Sat 10am–9pm";
+
   return (
     <footer className="bg-dark-900 text-gray-400 pt-14 pb-6 mt-16">
       {/* FREE delivery strip */}
@@ -28,20 +42,28 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           {/* Brand */}
           <div>
-            <h3 className="font-heading text-white text-lg font-bold mb-1">Cold Spring Liquor</h3>
+            <h3 className="font-heading text-white text-lg font-bold mb-1">{storeName}</h3>
             <p className="text-brand-400 text-xs font-semibold mb-4">FREE Delivery · NO Tip Required</p>
             <div className="space-y-2 text-sm">
               <div className="flex items-start gap-2">
                 <MapPin size={14} className="mt-0.5 text-brand-400 shrink-0" />
-                <span>15609 Ronald Reagan Blvd Ste B100, Leander, TX 78641</span>
+                <span>{storeAddress}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone size={14} className="text-brand-400 shrink-0" />
-                <span>(512) 555-0100</span>
+                <a href={`tel:${storePhone.replace(/\D/g,"")}`} className="hover:text-white transition-colors">
+                  {storePhone}
+                </a>
               </div>
+              {storeTextPhone && (
+                <div className="flex items-center gap-2">
+                  <Phone size={14} className="text-brand-400 shrink-0 opacity-60" />
+                  <span className="text-xs">Text: <a href={`sms:${storeTextPhone.replace(/\D/g,"")}`} className="hover:text-white transition-colors">{storeTextPhone}</a></span>
+                </div>
+              )}
               <div className="flex items-start gap-2">
                 <Clock size={14} className="mt-0.5 text-brand-400 shrink-0" />
-                <span>Mon–Sat 10am–9pm<br />Sunday: Closed</span>
+                <span>{hoursLine}<br />{sundayClosed ? "Sunday: Closed" : `Sunday: ${fmtTime(bh["Sunday"]?.open ?? "10:00")}–${fmtTime(bh["Sunday"]?.close ?? "22:00")}`}</span>
               </div>
             </div>
           </div>
@@ -104,7 +126,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
-          <p>© 2026 Cold Spring Liquor. All rights reserved. Must be 21+ to purchase alcohol. Licensed by TABC.</p>
+          <p>© 2026 {storeName}. All rights reserved. Must be 21+ to purchase alcohol. Licensed by TABC.</p>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
@@ -114,4 +136,11 @@ export function Footer() {
       </div>
     </footer>
   );
+}
+
+function fmtTime(t: string): string {
+  const [h, m] = t.split(":").map(Number);
+  const suffix = h >= 12 ? "pm" : "am";
+  const hour = h % 12 || 12;
+  return m === 0 ? `${hour}${suffix}` : `${hour}:${String(m).padStart(2,"0")}${suffix}`;
 }

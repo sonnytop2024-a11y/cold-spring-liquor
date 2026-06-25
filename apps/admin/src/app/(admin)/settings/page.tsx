@@ -12,7 +12,7 @@ import { API } from "@/lib/api";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 type Settings = {
-  storeName: string; storeAddress: string; storePhone: string; storeEmail: string;
+  storeName: string; storeAddress: string; storePhone: string; storeTextPhone?: string; storeEmail: string;
   websiteDomain: string; logoUrl?: string;
   businessHours: Record<string, { open: string; close: string; closed: boolean }>;
   deliveryRadius: number; deliveryTimeMin: number; deliveryTimeMax: number;
@@ -316,8 +316,11 @@ export default function SettingsPage() {
                 <Field label="Store Address" description="Full street address">
                   <Input value={form.storeAddress} onChange={v => set("storeAddress", v)} placeholder="15609 Ronald Reagan Blvd…" />
                 </Field>
-                <Field label="Phone Number">
-                  <Input value={form.storePhone} onChange={v => set("storePhone", v)} placeholder="(512) 444-1000" />
+                <Field label="Phone Number" description="Main call number">
+                  <Input value={form.storePhone} onChange={v => set("storePhone", v)} placeholder="(512) 337-7051" />
+                </Field>
+                <Field label="Text Number" description="SMS / text number (optional)">
+                  <Input value={form.storeTextPhone ?? ""} onChange={v => set("storeTextPhone", v)} placeholder="(512) 720-2489" />
                 </Field>
                 <Field label="Email Address">
                   <Input value={form.storeEmail} onChange={v => set("storeEmail", v)} type="email" placeholder="info@coldspringliquor.com" />

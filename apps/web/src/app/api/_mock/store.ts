@@ -132,6 +132,7 @@ export interface StoreSettings {
   storeName: string;
   storeAddress: string;
   storePhone: string;
+  storeTextPhone?: string;
   storeEmail: string;
   websiteDomain: string;
   businessHours: Record<string, { open: string; close: string; closed: boolean }>;
@@ -211,7 +212,8 @@ function getDefaultSettings(): StoreSettings {
   return {
     storeName: "Cold Spring Liquor",
     storeAddress: "15609 Ronald Reagan Blvd Ste B100, Leander, Texas 78641",
-    storePhone: "(512) 444-1000",
+    storePhone: "(512) 337-7051",
+    storeTextPhone: "(512) 720-2489",
     storeEmail: "info@coldspringliquor.com",
     websiteDomain: "coldspringliquor.com",
     businessHours: {
