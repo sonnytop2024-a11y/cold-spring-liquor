@@ -179,15 +179,58 @@ async function updateStatus(orderId: string, status: string, extra?: Record<stri
   return r.json();
 }
 
+// ─── Real distance via Google Maps Distance Matrix API ───────────────────────
+function useDriverDistance(
+  driverLoc: { lat: number; lng: number } | null,
+  deliveryAddress: any
+) {
+  const [miles, setMiles] = useState<string | null>(null);
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!driverLoc || !deliveryAddress || fetchedRef.current) return;
+    const addressStr = [
+      deliveryAddress.street,
+      deliveryAddress.city,
+      deliveryAddress.state,
+      deliveryAddress.zip,
+    ].filter(Boolean).join(", ");
+    if (!addressStr.trim()) return;
+
+    fetchedRef.current = true;
+    setLoading(true);
+    setUnavailable(false);
+
+    fetch(
+      `/api/driver/distance?olat=${driverLoc.lat}&olng=${driverLoc.lng}` +
+      `&address=${encodeURIComponent(addressStr)}`
+    )
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          setUnavailable(true);
+        } else {
+          setMiles(data.miles);
+          setMinutes(data.minutes);
+        }
+      })
+      .catch(() => setUnavailable(true))
+      .finally(() => setLoading(false));
+  }, [driverLoc?.lat, driverLoc?.lng, deliveryAddress]);
+
+  return { miles, minutes, loading, unavailable };
+}
+
 // ─── New Order Alert Modal ────────────────────────────────────────────────────
 function NewOrderAlert({
   order, driverId, driverLoc, onAccept, onDecline,
 }: { order: any; driverId: string; driverLoc: { lat: number; lng: number } | null; onAccept: () => void; onDecline: () => void }) {
-  const est = driverLoc ? calcDistanceFromDriver(driverLoc.lat, driverLoc.lng, order.deliveryAddress) : null;
-  const miles = est?.miles ?? "—";
-  const minutes = est?.minutes ?? "—";
   const itemCount = order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0;
   const [accepting, setAccepting] = useState(false);
+  const { miles, minutes, loading, unavailable } = useDriverDistance(driverLoc, order.deliveryAddress);
 
   async function handleAccept() {
     setAccepting(true);
@@ -221,18 +264,33 @@ function NewOrderAlert({
         </div>
 
         {/* Key metrics */}
-        <div className="grid grid-cols-2 gap-3 p-4 pb-2">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-            <MapPin size={14} className="text-blue-600 mx-auto mb-0.5" />
-            <p className="font-black text-blue-700 text-xl">{est ? `${miles}mi` : "…"}</p>
-            <p className="text-[10px] text-blue-600 font-bold uppercase">From You</p>
+        {unavailable ? (
+          <div className="mx-4 mt-4 mb-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2 text-red-700 text-sm font-semibold">
+            <MapPin size={15} className="shrink-0" />
+            Unable to calculate distance
           </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
-            <Clock size={14} className="text-orange-600 mx-auto mb-0.5" />
-            <p className="font-black text-orange-700 text-xl">{est ? `${minutes}m` : "…"}</p>
-            <p className="text-[10px] text-orange-600 font-bold uppercase">Drive Time</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 p-4 pb-2">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+              <MapPin size={14} className="text-blue-600 mx-auto mb-0.5" />
+              {loading || !driverLoc ? (
+                <Loader2 size={18} className="text-blue-400 animate-spin mx-auto my-0.5" />
+              ) : (
+                <p className="font-black text-blue-700 text-xl">{miles}mi</p>
+              )}
+              <p className="text-[10px] text-blue-600 font-bold uppercase">From You</p>
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
+              <Clock size={14} className="text-orange-600 mx-auto mb-0.5" />
+              {loading || !driverLoc ? (
+                <Loader2 size={18} className="text-orange-400 animate-spin mx-auto my-0.5" />
+              ) : (
+                <p className="font-black text-orange-700 text-xl">{minutes}m</p>
+              )}
+              <p className="text-[10px] text-orange-600 font-bold uppercase">Drive Time</p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Order summary */}
         <div className="px-4 pb-2 space-y-2">
@@ -827,9 +885,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
     ? `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
     : "Address unavailable";
   const itemCount = order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0;
-  const est = driverLoc ? calcDistanceFromDriver(driverLoc.lat, driverLoc.lng, order.deliveryAddress) : null;
-  const miles = est?.miles ?? null;
-  const minutes = est?.minutes ?? null;
+  const { miles, minutes, loading: distLoading, unavailable: distUnavailable } = useDriverDistance(driverLoc, order.deliveryAddress);
   const isAssigned = ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(order.status);
   const isArrived = order.status === "driver_arrived";
 
@@ -929,9 +985,15 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
 
         {/* Metrics */}
         <div className="px-4 pb-2 flex items-center gap-2.5 text-xs text-gray-500">
-          {miles !== null ? (
+          {distUnavailable ? (
+            <span className="text-red-500 font-medium">Unable to calculate distance</span>
+          ) : distLoading || !driverLoc ? (
+            <span className="text-gray-400 italic flex items-center gap-1">
+              <Loader2 size={11} className="animate-spin" /> Calculating…
+            </span>
+          ) : miles !== null ? (
             <>
-              <span>{miles} mi from you</span>
+              <span className="font-medium text-gray-700">{miles} mi from you</span>
               <span className="text-gray-300">·</span>
               <span>~{minutes} min</span>
             </>
