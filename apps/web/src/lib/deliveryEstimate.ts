@@ -137,8 +137,8 @@ export async function estimateDeliveryFromStoreAsync(address: {
 
     const distanceMiles = Math.round((element.distance.value / 1609.344) * 10) / 10;
     const drivingMinutes = Math.ceil(element.duration.value / 60);
-    // 15 min store prep + actual driving time, round to nearest 5, minimum 20
-    const etaMinutes = Math.max(20, Math.round((15 + drivingMinutes) / 5) * 5);
+    // 10 min store prep + actual driving time, round to nearest 5, minimum 20
+    const etaMinutes = Math.max(20, Math.round((10 + drivingMinutes) / 5) * 5);
 
     return { distanceMiles, etaMinutes };
   } catch {
