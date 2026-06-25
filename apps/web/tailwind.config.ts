@@ -29,6 +29,7 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-inter)", "sans-serif"],
         heading: ["var(--font-playfair)", "serif"],
+        display: ["var(--font-montserrat)", "sans-serif"],
       },
     },
   },

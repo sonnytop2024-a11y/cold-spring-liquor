@@ -114,7 +114,7 @@ export function ProductCard({ product }: ProductCardProps) {
         </p>
 
         <Link href={`/products/${product.slug}`} className="flex-1">
-          <h3 className="text-xs font-semibold text-gray-900 leading-snug hover:text-brand-600 transition-colors line-clamp-2 mb-2" style={{ minHeight: "2.5rem" }}>
+          <h3 className="font-display text-[13px] font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors line-clamp-2 mb-2" style={{ minHeight: "2.5rem" }}>
             {product.name}
           </h3>
         </Link>
