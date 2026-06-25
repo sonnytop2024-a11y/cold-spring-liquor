@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { store, createOrderNumber } from "../_mock/store";
 import { TAX_RATE } from "../_mock/data";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
+import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetAllOrders } from "@/lib/db";
+import { verifySessionToken } from "@/lib/session";
+import { estimateDeliveryFromStore } from "@/lib/deliveryEstimate";
 import type { MockOrder } from "../_mock/store";
 
 function calcBundleDiscount(totalQty: number, subtotal: number): number {
@@ -20,7 +23,8 @@ export async function POST(req: NextRequest) {
   } = body;
 
   const sessionToken = req.cookies.get("csl-session")?.value;
-  const sessionUser = sessionToken ? store.getUserBySession(sessionToken) : null;
+  const userId = sessionToken ? verifySessionToken(sessionToken) : null;
+  const sessionUser = userId ? await dbGetUserById(userId) : null;
   const customerId = sessionUser?.id ?? body.customerId ?? null;
 
   const subtotal = Math.round(items.reduce((acc: number, i: any) => acc + i.price * i.quantity, 0) * 100) / 100;
@@ -34,6 +38,7 @@ export async function POST(req: NextRequest) {
   const nowDate = new Date();
   const nowStr = nowDate.toISOString();
   const timing = getDeliveryTiming(nowDate);
+  const { distanceMiles, etaMinutes } = estimateDeliveryFromStore(deliveryAddress ?? {});
 
   const order: MockOrder = {
     id, orderNumber: createOrderNumber(), status: "pending",
@@ -48,30 +53,44 @@ export async function POST(req: NextRequest) {
     customerPhone: sessionUser?.phone ?? customerPhone ?? "",
     customerId,
     driverId: null,
+    distanceMiles,
+    etaMinutes,
     createdAt: nowStr, updatedAt: nowStr,
     estimatedDelivery: timing.estimatedDelivery.toISOString(),
   };
 
-  store.saveOrder(order);
+  await dbCreateOrder(order);
 
   if (couponCode) store.incrementCouponUsage(couponCode);
 
-  if (customerId && deliveryAddress?.street) {
-    store.updateUserProfile(customerId, {
+  // Save delivery address to user profile
+  if (sessionUser && deliveryAddress?.street) {
+    const updated = {
+      ...sessionUser,
       deliveryAddress,
       billingAddress: billingAddressSameAsDelivery ? deliveryAddress : (billingAddress ?? undefined),
       billingAddressSameAsDelivery: billingAddressSameAsDelivery ?? true,
-    });
+    };
+    await dbSaveUser(updated);
   }
 
   // Award CS Reward points: 10 pts per $1
-  if (customerId) {
-    store.updateUserPoints(customerId, Math.floor(total * 10));
+  if (sessionUser) {
+    const pts = Math.floor(total * 10);
+    const updated = {
+      ...sessionUser,
+      points: Math.max(0, sessionUser.points + pts),
+    };
+    if (updated.points >= 3000) updated.tier = "Platinum";
+    else if (updated.points >= 1500) updated.tier = "Gold";
+    else if (updated.points >= 500) updated.tier = "Silver";
+    else updated.tier = "Bronze";
+    await dbSaveUser(updated);
   }
 
   return NextResponse.json(order, { status: 201 });
 }
 
 export async function GET() {
-  return NextResponse.json(store.getAllOrders());
+  return NextResponse.json(await dbGetAllOrders());
 }

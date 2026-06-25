@@ -51,6 +51,8 @@ export interface MockOrder {
   cancelReason?: string;
   refundType?: string;
   refundAmount?: number;
+  distanceMiles?: number;
+  etaMinutes?: number;
   createdAt: string;
   updatedAt: string;
   estimatedDelivery: string;
@@ -585,6 +587,11 @@ export const store = {
   },
 };
 
+const ORDER_NUM_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
 export function createOrderNumber(): string {
-  return `CSL-${Date.now()}-${store.nextCounter()}`;
+  return Array.from(
+    { length: 6 },
+    () => ORDER_NUM_CHARS[Math.floor(Math.random() * ORDER_NUM_CHARS.length)]
+  ).join("");
 }
