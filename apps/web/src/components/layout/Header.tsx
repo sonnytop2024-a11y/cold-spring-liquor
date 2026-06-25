@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ShoppingCart, User, Search, Menu, X, Gift, LogOut, ChevronDown, Star, Package } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useCartStore } from "@/store/cartStore";
@@ -128,7 +129,16 @@ export function Header() {
       >
         <div className="container-main flex items-center justify-between h-[76px]">
           {/* Logo */}
-          <Link href="/" className="flex flex-col shrink-0 group">
+          <Link href="/" className="flex flex-row items-center gap-2 shrink-0 group">
+            <Image
+              src="/logo-transparent.png"
+              alt="Cold Spring Liquor"
+              width={68}
+              height={68}
+              className="w-12 h-12 sm:w-14 sm:h-14 md:w-[68px] md:h-[68px] object-contain"
+              priority
+            />
+            <div className="flex flex-col">
             <span className="font-heading text-xl font-black text-white tracking-tight group-hover:text-brand-400 transition-colors">
               Cold Spring Liquor
             </span>
@@ -141,6 +151,7 @@ export function Header() {
             >
               15609 Ronald Reagan Blvd Ste B100 · Leander, TX 78641
             </span>
+            </div>
           </Link>
 
           {/* Desktop nav */}

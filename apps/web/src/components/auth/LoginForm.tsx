@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Mail, Lock, Loader2, Eye, EyeOff, Phone, MessageSquare,
@@ -394,6 +395,16 @@ export function LoginForm() {
     <div className="max-w-md mx-auto py-12 px-4">
       <div className="bg-white rounded-2xl border shadow-sm p-8">
         <div className="text-center mb-7">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/logo-transparent.png"
+              alt="Cold Spring Liquor"
+              width={120}
+              height={120}
+              className="w-20 h-20 sm:w-[120px] sm:h-[120px] object-contain"
+              priority
+            />
+          </div>
           <h1 className="font-heading text-2xl font-bold">Sign In / Sign Up</h1>
           <p className="text-gray-500 text-sm mt-1">Welcome to Cold Spring Liquor</p>
         </div>
