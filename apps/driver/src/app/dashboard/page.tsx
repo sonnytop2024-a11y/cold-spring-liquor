@@ -65,13 +65,87 @@ function calcAge(dob: string): number {
   return age;
 }
 
-// Deterministic distance/time estimate from order ID
-function estimateDelivery(orderId: string) {
-  let h = 0;
-  for (const c of orderId) h = ((h << 5) - h + c.charCodeAt(0)) | 0;
-  const miles = 0.8 + (Math.abs(h) % 42) / 10;
-  const minutes = Math.round(miles * 4 + 3);
-  return { miles: miles.toFixed(1), minutes };
+// ─── Driver → Customer Distance (Haversine) ──────────────────────────────────
+function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const DRIVER_ZIP_COORDS: Record<string, { lat: number; lng: number }> = {
+  "78641": { lat: 30.5788, lng: -97.8531 }, // Leander
+  "78642": { lat: 30.6588, lng: -97.9231 }, // Liberty Hill
+  "78613": { lat: 30.5203, lng: -97.8202 }, // Cedar Park
+  "78664": { lat: 30.5083, lng: -97.6789 }, // Round Rock
+  "78665": { lat: 30.5297, lng: -97.6489 },
+  "78681": { lat: 30.5297, lng: -97.7489 },
+  "78626": { lat: 30.6332, lng: -97.6779 }, // Georgetown
+  "78627": { lat: 30.6416, lng: -97.6779 },
+  "78628": { lat: 30.6516, lng: -97.7128 },
+  "78634": { lat: 30.5432, lng: -97.5489 }, // Hutto
+  "76574": { lat: 30.5688, lng: -97.4089 }, // Taylor
+  "78660": { lat: 30.4583, lng: -97.6189 }, // Pflugerville
+  "78750": { lat: 30.4634, lng: -97.7942 }, // Austin NW
+  "78759": { lat: 30.4334, lng: -97.7529 },
+  "78730": { lat: 30.3834, lng: -97.8242 },
+  "78731": { lat: 30.3734, lng: -97.7742 },
+  "78726": { lat: 30.4434, lng: -97.8142 },
+  "78729": { lat: 30.4534, lng: -97.7742 },
+  "78758": { lat: 30.3934, lng: -97.7042 },
+  "78734": { lat: 30.3734, lng: -97.9642 }, // Lakeway
+  "78735": { lat: 30.3234, lng: -97.8642 },
+  "78738": { lat: 30.3334, lng: -97.9142 },
+  "78746": { lat: 30.3134, lng: -97.8142 },
+  "78640": { lat: 29.9883, lng: -97.8789 }, // Kyle
+  "78610": { lat: 30.0883, lng: -97.8389 }, // Buda
+};
+
+const DRIVER_CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  "leander":      { lat: 30.5788, lng: -97.8531 },
+  "cedar park":   { lat: 30.5203, lng: -97.8202 },
+  "round rock":   { lat: 30.5083, lng: -97.6789 },
+  "georgetown":   { lat: 30.6332, lng: -97.6779 },
+  "pflugerville": { lat: 30.4583, lng: -97.6189 },
+  "hutto":        { lat: 30.5432, lng: -97.5489 },
+  "taylor":       { lat: 30.5688, lng: -97.4089 },
+  "liberty hill": { lat: 30.6588, lng: -97.9231 },
+  "lakeway":      { lat: 30.3734, lng: -97.9642 },
+  "bee cave":     { lat: 30.3234, lng: -97.9142 },
+  "austin":       { lat: 30.4634, lng: -97.7942 },
+  "kyle":         { lat: 29.9883, lng: -97.8789 },
+  "buda":         { lat: 30.0883, lng: -97.8389 },
+};
+
+function getAddrCoords(addr: { street?: string; city?: string; state?: string; zip?: string } | null): { lat: number; lng: number } | null {
+  if (!addr) return null;
+  if (addr.zip) {
+    const z = addr.zip.trim().slice(0, 5);
+    if (DRIVER_ZIP_COORDS[z]) return DRIVER_ZIP_COORDS[z];
+  }
+  if (addr.city) {
+    const c = addr.city.toLowerCase().trim();
+    for (const [key, coords] of Object.entries(DRIVER_CITY_COORDS)) {
+      if (c.includes(key) || key.includes(c)) return coords;
+    }
+  }
+  return null;
+}
+
+function calcDistanceFromDriver(
+  driverLat: number, driverLng: number,
+  deliveryAddress: any
+): { miles: string; minutes: number } | null {
+  const dest = getAddrCoords(deliveryAddress);
+  if (!dest) return null;
+  const dist = haversineMiles(driverLat, driverLng, dest.lat, dest.lng);
+  const minutes = Math.max(3, Math.round((dist / 25) * 60));
+  return { miles: dist.toFixed(1), minutes };
 }
 
 // Alert beeps via Web Audio API
@@ -107,9 +181,11 @@ async function updateStatus(orderId: string, status: string, extra?: Record<stri
 
 // ─── New Order Alert Modal ────────────────────────────────────────────────────
 function NewOrderAlert({
-  order, driverId, onAccept, onDecline,
-}: { order: any; driverId: string; onAccept: () => void; onDecline: () => void }) {
-  const { miles, minutes } = estimateDelivery(order.id);
+  order, driverId, driverLoc, onAccept, onDecline,
+}: { order: any; driverId: string; driverLoc: { lat: number; lng: number } | null; onAccept: () => void; onDecline: () => void }) {
+  const est = driverLoc ? calcDistanceFromDriver(driverLoc.lat, driverLoc.lng, order.deliveryAddress) : null;
+  const miles = est?.miles ?? "—";
+  const minutes = est?.minutes ?? "—";
   const itemCount = order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0;
   const [accepting, setAccepting] = useState(false);
 
@@ -148,12 +224,12 @@ function NewOrderAlert({
         <div className="grid grid-cols-2 gap-3 p-4 pb-2">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
             <MapPin size={14} className="text-blue-600 mx-auto mb-0.5" />
-            <p className="font-black text-blue-700 text-xl">{miles}mi</p>
-            <p className="text-[10px] text-blue-600 font-bold uppercase">Distance</p>
+            <p className="font-black text-blue-700 text-xl">{est ? `${miles}mi` : "…"}</p>
+            <p className="text-[10px] text-blue-600 font-bold uppercase">From You</p>
           </div>
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
             <Clock size={14} className="text-orange-600 mx-auto mb-0.5" />
-            <p className="font-black text-orange-700 text-xl">{minutes}m</p>
+            <p className="font-black text-orange-700 text-xl">{est ? `${minutes}m` : "…"}</p>
             <p className="text-[10px] text-orange-600 font-bold uppercase">Drive Time</p>
           </div>
         </div>
@@ -732,7 +808,7 @@ function DeliveryVerificationModal({
 }
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
-function OrderCard({ order, driverId, onRefresh }: { order: any; driverId: string; onRefresh: () => void }) {
+function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driverId: string; driverLoc: { lat: number; lng: number } | null; onRefresh: () => void }) {
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showVerification, setShowVerification] = useState(
@@ -751,7 +827,9 @@ function OrderCard({ order, driverId, onRefresh }: { order: any; driverId: strin
     ? `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
     : "Address unavailable";
   const itemCount = order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0;
-  const { miles, minutes } = estimateDelivery(order.id);
+  const est = driverLoc ? calcDistanceFromDriver(driverLoc.lat, driverLoc.lng, order.deliveryAddress) : null;
+  const miles = est?.miles ?? null;
+  const minutes = est?.minutes ?? null;
   const isAssigned = ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(order.status);
   const isArrived = order.status === "driver_arrived";
 
@@ -851,9 +929,15 @@ function OrderCard({ order, driverId, onRefresh }: { order: any; driverId: strin
 
         {/* Metrics */}
         <div className="px-4 pb-2 flex items-center gap-2.5 text-xs text-gray-500">
-          <span>{miles} mi</span>
-          <span className="text-gray-300">·</span>
-          <span>~{minutes} min</span>
+          {miles !== null ? (
+            <>
+              <span>{miles} mi from you</span>
+              <span className="text-gray-300">·</span>
+              <span>~{minutes} min</span>
+            </>
+          ) : (
+            <span className="text-gray-400 italic">Getting location…</span>
+          )}
           {itemCount > 0 && <>
             <span className="text-gray-300">·</span>
             <span>{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
@@ -1034,8 +1118,14 @@ function DriverLogin({ onLogin }: { onLogin: (driver: { id: string; name: string
 }
 
 // ─── GPS Poster ───────────────────────────────────────────────────────────────
-function useGPSPosting(driverId: string | null, isOnline: boolean) {
+function useGPSPosting(
+  driverId: string | null,
+  isOnline: boolean,
+  onLocation?: (lat: number, lng: number) => void
+) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onLocationRef = useRef(onLocation);
+  onLocationRef.current = onLocation;
 
   useEffect(() => {
     if (!driverId || !isOnline) {
@@ -1046,15 +1136,18 @@ function useGPSPosting(driverId: string | null, isOnline: boolean) {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(
         pos => {
+          const { latitude: lat, longitude: lng } = pos.coords;
+          onLocationRef.current?.(lat, lng);
           fetch("/api/driver/location", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ driverId, lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            body: JSON.stringify({ driverId, lat, lng }),
           }).catch(() => {});
         },
         () => {
           const baseLat = 30.5786 + (Math.random() - 0.5) * 0.02;
           const baseLng = -97.8536 + (Math.random() - 0.5) * 0.02;
+          onLocationRef.current?.(baseLat, baseLng);
           fetch("/api/driver/location", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1146,6 +1239,7 @@ function DashboardContent() {
   const [togglingOnline, setTogglingOnline] = useState(false);
   const [tab, setTab] = useState<"available" | "active" | "today" | "history">("available");
   const [alertOrder, setAlertOrder] = useState<any>(null);
+  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
   const qc = useQueryClient();
 
@@ -1156,7 +1250,7 @@ function DashboardContent() {
     }
   }, []);
 
-  useGPSPosting(driver?.id ?? null, online);
+  useGPSPosting(driver?.id ?? null, online, (lat, lng) => setDriverLoc({ lat, lng }));
 
   function handleLogin(d: { id: string; name: string }) {
     sessionStorage.setItem("csl-driver-session", JSON.stringify(d));
@@ -1242,6 +1336,7 @@ function DashboardContent() {
         <NewOrderAlert
           order={alertOrder}
           driverId={driver.id}
+          driverLoc={driverLoc}
           onAccept={() => {
             setAlertOrder(null);
             qc.invalidateQueries({ queryKey: ["driver-deliveries"] });
@@ -1346,7 +1441,7 @@ function DashboardContent() {
                 {newOrders.length} order{newOrders.length !== 1 ? "s" : ""} available
               </p>
               {newOrders.map((order: any) => (
-                <OrderCard key={order.id} order={order} driverId={driver.id} onRefresh={() => refetch()} />
+                <OrderCard key={order.id} order={order} driverId={driver.id} driverLoc={driverLoc} onRefresh={() => refetch()} />
               ))}
             </>
           )
@@ -1370,7 +1465,7 @@ function DashboardContent() {
                 {myActive.length} active delivery
               </p>
               {myActive.map((order: any) => (
-                <OrderCard key={order.id} order={order} driverId={driver.id} onRefresh={() => refetch()} />
+                <OrderCard key={order.id} order={order} driverId={driver.id} driverLoc={driverLoc} onRefresh={() => refetch()} />
               ))}
             </>
           )
