@@ -101,7 +101,6 @@ export function OrderBadge({ count }: { count: number }) {
 
 // ── Single order notification card (shown when no overlay) ───────────────────
 function OrderCard({ order, onDismiss }: { order: Order; onDismiss: () => void }) {
-  const itemCount = order.items?.reduce((a, i) => a + i.quantity, 0) ?? 0;
   return (
     <div className="bg-white border-2 border-red-400 rounded-2xl shadow-2xl overflow-hidden"
       style={{ animation: "slideInRight 0.3s ease-out" }}>
@@ -144,7 +143,7 @@ function OrderCard({ order, onDismiss }: { order: Order; onDismiss: () => void }
           )}
         </div>
         <div className="flex gap-2 pt-1">
-          <a href="/orders"
+          <a href="/orders" onClick={onDismiss}
             className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold bg-brand-500 hover:bg-brand-600 text-white py-2.5 rounded-xl transition-colors">
             View Order <ChevronRight size={13} />
           </a>
@@ -390,7 +389,7 @@ export function NewOrderNotifier() {
 
             {/* Action buttons */}
             <div className="px-6 pb-6 flex gap-3">
-              <a href="/orders"
+              <a href="/orders" onClick={() => dismiss(overlayOrder.id)}
                 className="flex-[2] flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-2xl text-base transition-colors shadow-lg">
                 <Bell size={18} /> View Order
               </a>
