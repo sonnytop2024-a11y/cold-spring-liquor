@@ -189,3 +189,149 @@ export async function dbResetSettings(): Promise<StoreSettings> {
   }
   return store.resetSettings();
 }
+
+// ── Supabase REST fetch helpers (bypass JS client — guaranteed to work) ────────
+
+import type { MockUser } from "../app/api/_mock/store";
+import type { MockOrder } from "../app/api/_mock/store";
+
+const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+async function supaGet(table: string, query: string): Promise<any[]> {
+  if (!SUPA_URL || !SUPA_KEY) return [];
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${query}&select=data`, {
+      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
+async function supaUpsert(table: string, row: Record<string, unknown>): Promise<boolean> {
+  if (!SUPA_URL || !SUPA_KEY) return false;
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${SUPA_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates",
+      },
+      body: JSON.stringify(row),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+async function supaUpdate(table: string, id: string, data: unknown): Promise<boolean> {
+  if (!SUPA_URL || !SUPA_KEY) return false;
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${SUPA_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ data }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+export async function dbGetUserByEmail(email: string): Promise<MockUser | undefined> {
+  const rows = await supaGet("csl_users", `data->>email=eq.${encodeURIComponent(email)}`);
+  if (rows.length > 0) return rows[0].data as MockUser;
+  return store.getUserByEmail(email);
+}
+
+export async function dbGetUserById(id: string): Promise<MockUser | undefined> {
+  const rows = await supaGet("csl_users", `id=eq.${encodeURIComponent(id)}`);
+  if (rows.length > 0) return rows[0].data as MockUser;
+  return store.getUserById(id);
+}
+
+/** Normalize any US phone variant to 10 digits: strips non-digits, removes leading "1" */
+function to10Digits(phone: string): string {
+  const d = phone.replace(/\D/g, "");
+  return d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+}
+
+export async function dbGetUserByPhone(phone: string): Promise<MockUser | undefined> {
+  const clean10 = to10Digits(phone);
+  if (!clean10 || clean10.length !== 10) return undefined;
+
+  // Fetch all users and filter client-side — Supabase JSONB substring match is unreliable
+  // across different stored formats (raw digits vs formatted vs E.164)
+  const rows = await supaGet("csl_users", "order=id.asc&limit=1000");
+  const match = (rows as any[]).find((r) => {
+    const stored = to10Digits(r.data?.phone ?? "");
+    return stored === clean10;
+  });
+  if (match) return match.data as MockUser;
+  return store.getUserByPhone(phone);
+}
+
+export async function dbGetUserByGoogleId(googleId: string): Promise<MockUser | undefined> {
+  const rows = await supaGet("csl_users", `data->>googleId=eq.${encodeURIComponent(googleId)}`);
+  if (rows.length > 0) return rows[0].data as MockUser;
+  return store.getUserByGoogleId?.(googleId);
+}
+
+export async function dbCreateUser(user: MockUser): Promise<void> {
+  const ok = await supaUpsert("csl_users", { id: user.id, data: user });
+  if (!ok) console.error("[db] dbCreateUser failed for", user.email);
+}
+
+export async function dbSaveUser(user: MockUser): Promise<void> {
+  const ok = await supaUpsert("csl_users", { id: user.id, data: user });
+  if (!ok) console.error("[db] dbSaveUser failed for", user.id);
+}
+
+// ── Orders ────────────────────────────────────────────────────────────────────
+
+export async function dbGetOrder(id: string): Promise<MockOrder | undefined> {
+  const rows = await supaGet("csl_orders", `id=eq.${encodeURIComponent(id)}`);
+  if (rows.length > 0) return rows[0].data as MockOrder;
+  return store.getOrder(id);
+}
+
+export async function dbGetAllOrders(): Promise<MockOrder[]> {
+  if (!SUPA_URL || !SUPA_KEY) return store.getAllOrders();
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/csl_orders?select=data&order=created_at.desc`, {
+      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return store.getAllOrders();
+    const rows = await res.json();
+    if (rows.length > 0) return rows.map((r: any) => r.data as MockOrder);
+  } catch {}
+  return store.getAllOrders();
+}
+
+export async function dbGetOrdersByCustomer(customerId: string): Promise<MockOrder[]> {
+  const rows = await supaGet("csl_orders", `data->>customerId=eq.${encodeURIComponent(customerId)}&order=created_at.desc`);
+  if (rows.length > 0) return rows.map((r: any) => r.data as MockOrder);
+  return store.getAllOrders().filter((o: MockOrder) => o.customerId === customerId);
+}
+
+export async function dbCreateOrder(order: MockOrder): Promise<void> {
+  const ok = await supaUpsert("csl_orders", { id: order.id, data: order });
+  if (!ok) console.error("[db] dbCreateOrder failed for", order.id);
+}
+
+export async function dbUpdateOrder(id: string, patch: Partial<MockOrder>): Promise<MockOrder | null> {
+  const existing = await dbGetOrder(id);
+  if (!existing) return null;
+  const updated: MockOrder = { ...existing, ...patch, updatedAt: new Date().toISOString() };
+  const ok = await supaUpdate("csl_orders", id, updated);
+  if (!ok) console.error("[db] dbUpdateOrder failed for", id);
+  return updated;
+}

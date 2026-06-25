@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import type { MockOrder } from "../../_mock/store";
+import { dbGetAllOrders } from "@/lib/db";
 
 const ACTIVE = ["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"];
 
-function stripPrivate(order: ReturnType<typeof store.getAllOrders>[0]) {
+function stripPrivate(order: MockOrder) {
   return {
     ...order,
     billingAddress: undefined,
@@ -13,7 +14,7 @@ function stripPrivate(order: ReturnType<typeof store.getAllOrders>[0]) {
 
 export async function GET(req: NextRequest) {
   const driverId = req.nextUrl.searchParams.get("driverId");
-  const orders = store.getAllOrders();
+  const orders = await dbGetAllOrders();
 
   let newOrders, activeOrders;
   if (driverId) {

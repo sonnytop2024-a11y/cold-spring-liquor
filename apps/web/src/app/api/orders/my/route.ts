@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetOrdersByCustomer } from "@/lib/db";
+import { verifySessionToken } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("csl-session")?.value;
-  if (!token) return NextResponse.json([], { status: 200 });
+  if (!token) return NextResponse.json([]);
 
-  const user = store.getUserBySession(token);
-  if (!user) return NextResponse.json([], { status: 200 });
+  const userId = verifySessionToken(token);
+  if (!userId) return NextResponse.json([]);
 
-  const orders = store.getOrdersByCustomer(user.id);
+  const orders = await dbGetOrdersByCustomer(userId);
   return NextResponse.json(orders);
 }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetUserByGoogleId, dbGetUserByEmail, dbSaveUser } from "@/lib/db";
+import { createSessionToken } from "@/lib/session";
+import type { MockUser } from "../../_mock/store";
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
 
-// GET /api/auth/callback?code=xxx — Google OAuth callback
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
@@ -43,10 +44,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${WEB_URL}/auth/login?error=google_failed`);
   }
 
-  // Only allow existing users — no auto-create
-  const existingUser =
-    store.getUserByGoogleId(googleUser.id) ??
-    store.getUserByEmail(googleUser.email);
+  // Look up by googleId first, then email
+  let existingUser =
+    (await dbGetUserByGoogleId(googleUser.id)) ??
+    (await dbGetUserByEmail(googleUser.email));
 
   if (!existingUser) {
     const params = new URLSearchParams({
@@ -57,14 +58,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${WEB_URL}/auth/register?${params.toString()}`);
   }
 
-  // Link googleId if not already linked
-  store.createOrUpdateGoogleUser({
-    googleId: googleUser.id,
-    name: existingUser.name,
-    email: existingUser.email,
-  });
+  // Link googleId if not yet linked
+  if (existingUser.googleId !== googleUser.id) {
+    const linked: MockUser = { ...existingUser, googleId: googleUser.id };
+    await dbSaveUser(linked);
+    existingUser = linked;
+  }
 
-  const token = store.createSession(existingUser.id);
+  const token = createSessionToken(existingUser.id);
   const res = NextResponse.redirect(`${WEB_URL}/`);
   res.cookies.set("csl-session", token, {
     httpOnly: true,

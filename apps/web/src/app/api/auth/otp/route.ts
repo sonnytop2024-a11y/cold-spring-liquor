@@ -1,76 +1,109 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
-import { store } from "../../_mock/store";
+import twilio from "twilio";
+import { dbGetUserByPhone } from "@/lib/db";
+import { createSessionToken } from "@/lib/session";
 
-const SECRET = process.env.OTP_SECRET ?? "csl-otp-secret-2024";
-const WINDOW = 5 * 60 * 1000; // 5-minute windows
+const VERIFY_SID = process.env.TWILIO_VERIFY_SID ?? "";
 
-function generateOtp(phone: string, windowTs: number): string {
-  const hash = createHmac("sha256", SECRET)
-    .update(`${phone}:${windowTs}`)
-    .digest("hex");
-  return (parseInt(hash.slice(0, 8), 16) % 1000000).toString().padStart(6, "0");
+function toE164(phone: string): string {
+  const d = phone.replace(/\D/g, "");
+  return d.startsWith("1") ? `+${d}` : `+1${d}`;
 }
 
-function currentWindow(): number {
-  return Math.floor(Date.now() / WINDOW);
-}
-
-async function sendSms(to: string, body: string): Promise<void> {
+function getClient() {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_PHONE_NUMBER;
-  if (!sid || !token || !from) throw new Error("Twilio not configured");
-  const twilio = (await import("twilio")).default;
-  const client = twilio(sid, token);
-  await client.messages.create({ body, from, to });
+  if (!sid || !token || !VERIFY_SID) return null;
+  return twilio(sid, token);
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { action, phone, code, name } = body;
+  const { action, phone, code } = body;
+  if (!phone) return NextResponse.json({ error: "Phone required" }, { status: 400 });
 
+  const normalized = toE164(phone);
+  const client = getClient();
+
+  // ── SEND ────────────────────────────────────────────────────────────────────
   if (action === "send") {
-    if (!phone) return NextResponse.json({ error: "Phone required" }, { status: 400 });
-    const normalizedPhone = phone.startsWith("+") ? phone : `+1${phone.replace(/\D/g, "")}`;
-    const otp = generateOtp(normalizedPhone, currentWindow());
-
-    if (process.env.TWILIO_ACCOUNT_SID) {
-      try {
-        await sendSms(normalizedPhone, `Your Cold Spring Liquor verification code is: ${otp}`);
-        return NextResponse.json({ ok: true, message: `OTP sent to ${normalizedPhone}` });
-      } catch {
-        return NextResponse.json({ error: "Failed to send SMS. Check your phone number." }, { status: 500 });
-      }
+    if (!client) {
+      // Dev fallback — no Twilio configured
+      const { createHmac } = await import("crypto");
+      const otp = (parseInt(createHmac("sha256", "dev").update(`${normalized}:${Math.floor(Date.now() / 300000)}`).digest("hex").slice(0, 8), 16) % 1_000_000).toString().padStart(6, "0");
+      return NextResponse.json({ ok: true, devCode: otp });
     }
-
-    // Demo fallback
-    return NextResponse.json({ ok: true, mockOtp: otp, message: `OTP sent to ${normalizedPhone}` });
+    try {
+      await client.verify.v2.services(VERIFY_SID).verifications.create({
+        to: normalized,
+        channel: "sms",
+      });
+      return NextResponse.json({ ok: true });
+    } catch (e: any) {
+      console.error("[otp] Twilio Verify send error:", e.message, e.code);
+      return NextResponse.json(
+        { error: "Failed to send verification code. Please check your phone number and try again." },
+        { status: 500 }
+      );
+    }
   }
 
+  // ── VERIFY (for login) ────────────────────────────────────────────────────
   if (action === "verify") {
-    if (!phone || !code) return NextResponse.json({ error: "Phone and code required" }, { status: 400 });
-    const normalizedPhone = phone.startsWith("+") ? phone : `+1${phone.replace(/\D/g, "")}`;
+    if (!code) return NextResponse.json({ error: "Code required" }, { status: 400 });
 
-    const win = currentWindow();
-    const valid = code === generateOtp(normalizedPhone, win) || code === generateOtp(normalizedPhone, win - 1);
-    if (!valid) return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 401 });
-
-    const user = store.getUserByPhone(normalizedPhone);
-    if (!user) {
-      return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
+    if (!client) {
+      return NextResponse.json({ error: "Verification service not configured." }, { status: 500 });
     }
 
-    const token = store.createSession(user.id);
+    try {
+      const check = await client.verify.v2.services(VERIFY_SID).verificationChecks.create({
+        to: normalized,
+        code,
+      });
+      if (check.status !== "approved") {
+        return NextResponse.json({ error: "Invalid or expired code. Please try again." }, { status: 401 });
+      }
+    } catch (e: any) {
+      console.error("[otp] Twilio Verify check error:", e.message);
+      return NextResponse.json({ error: "Invalid or expired code. Please try again." }, { status: 401 });
+    }
+
+    const user = await dbGetUserByPhone(normalized);
+    if (!user) {
+      return NextResponse.json({ status: "needs_registration", verifiedPhone: normalized });
+    }
+
+    const token = createSessionToken(user.id);
     const { passwordHash: _ph, ...safe } = user;
-    const res = NextResponse.json({ user: safe });
+    const res = NextResponse.json({ status: "login", user: safe });
     res.cookies.set("csl-session", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
+      httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30, path: "/",
     });
     return res;
+  }
+
+  // ── VERIFY-ONLY (for register — confirms code then discards) ──────────────
+  if (action === "verify-only") {
+    if (!code) return NextResponse.json({ error: "Code required" }, { status: 400 });
+
+    if (!client) {
+      return NextResponse.json({ error: "Verification service not configured." }, { status: 500 });
+    }
+
+    try {
+      const check = await client.verify.v2.services(VERIFY_SID).verificationChecks.create({
+        to: normalized,
+        code,
+      });
+      if (check.status !== "approved") {
+        return NextResponse.json({ error: "Invalid or expired code. Please try again." }, { status: 401 });
+      }
+      return NextResponse.json({ ok: true, verified: true });
+    } catch (e: any) {
+      console.error("[otp] Twilio Verify check error:", e.message);
+      return NextResponse.json({ error: "Invalid or expired code. Please try again." }, { status: 401 });
+    }
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });

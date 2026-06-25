@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetAllOrders } from "@/lib/db";
 
 function startOf(period: "day" | "week" | "month"): Date {
   const now = new Date();
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const driverId = req.nextUrl.searchParams.get("driverId");
   if (!driverId) return NextResponse.json({ error: "driverId required" }, { status: 400 });
 
-  const allOrders = store.getAllOrders();
+  const allOrders = await dbGetAllOrders();
   const myOrders = allOrders.filter(o => o.driverId === driverId);
   const delivered = myOrders.filter(o => o.status === "delivered");
 

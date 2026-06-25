@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../_mock/store";
+import { dbGetAllOrders } from "@/lib/db";
 
 export async function GET() {
   const drivers = store.getAllDrivers();
-  const orders = store.getAllOrders();
+  const orders = await dbGetAllOrders();
 
   const enriched = drivers.map(d => {
     const activeOrder = orders.find(o =>

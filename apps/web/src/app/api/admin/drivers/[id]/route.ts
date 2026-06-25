@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../../_mock/store";
+import { dbGetAllOrders } from "@/lib/db";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const driver = store.getDriver(params.id);
   if (!driver) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const orders = store.getOrdersByDriver(params.id);
+  const allOrders = await dbGetAllOrders();
+  const orders = allOrders.filter(o => o.driverId === params.id);
   const todayOrders = orders.filter(o =>
     new Date(o.createdAt).toDateString() === new Date().toDateString()
   );

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../_mock/store";
+import type { MockOrder } from "../../_mock/store";
+import { dbGetAllOrders } from "@/lib/db";
 
 function startOfDay(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 
@@ -31,7 +33,7 @@ function getRange(period: string, from?: string, to?: string): { start: Date; en
   return { start: today, end: now };
 }
 
-function buildDailyChart(orders: ReturnType<typeof store.getAllOrders>, start: Date, end: Date) {
+function buildDailyChart(orders: MockOrder[], start: Date, end: Date) {
   const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
   const limit = Math.min(days, 30);
 
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest) {
   const fromParam = searchParams.get("from") ?? undefined;
   const toParam = searchParams.get("to") ?? undefined;
 
-  const allOrders = store.getAllOrders();
+  const allOrders = await dbGetAllOrders();
   const { start, end } = getRange(period, fromParam, toParam);
 
   const periodOrders = allOrders.filter(o => {

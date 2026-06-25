@@ -1,23 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { X, Copy, Check, Sparkles } from "lucide-react";
-
-const WELCOME_KEY = "csl_welcome_seen";
 
 export function WelcomeBonus() {
   const [visible, setVisible] = useState(false);
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    if (!sessionStorage.getItem(WELCOME_KEY)) {
-      setTimeout(() => setVisible(true), 2000);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("welcome") === "new") {
+      // Clean the URL immediately so refresh / share doesn't re-trigger
+      window.history.replaceState({}, "", window.location.pathname);
+      setTimeout(() => setVisible(true), 400);
     }
   }, []);
 
   function dismiss() {
-    sessionStorage.setItem(WELCOME_KEY, "1");
     setVisible(false);
+  }
+
+  function shopNow() {
+    setVisible(false);
+    router.push("/products");
   }
 
   function copyCode() {
@@ -30,7 +37,7 @@ export function WelcomeBonus() {
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl">
+      <div className="relative bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl">
         <div className="bg-gradient-to-r from-brand-500 to-brand-700 px-6 py-5 text-white text-center">
           <Sparkles size={32} className="mx-auto mb-2" />
           <h2 className="font-heading text-2xl font-bold">Welcome Offer!</h2>
@@ -65,7 +72,7 @@ export function WelcomeBonus() {
           </div>
 
           <button
-            onClick={dismiss}
+            onClick={shopNow}
             className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3 rounded-xl transition-colors"
           >
             Shop Now & Save $10

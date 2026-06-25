@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../../_mock/store";
+import { dbGetOrder, dbUpdateOrder } from "@/lib/db";
 import type { OrderStatus } from "../../../_mock/store";
 
 const VALID_STATUSES: OrderStatus[] = [
@@ -21,41 +22,36 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const now = new Date().toISOString();
-  const order = store.getOrder(params.id);
+  const order = await dbGetOrder(params.id);
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
-  const extra: Record<string, unknown> = {};
-  if (driverId !== undefined) extra.driverId = driverId;
-  if (ageVerified !== undefined) extra.ageVerified = ageVerified;
-  if (signatureUrl !== undefined) extra.signatureUrl = signatureUrl;
-  if (deliveryProof !== undefined) extra.deliveryProof = deliveryProof;
-  if (failReason !== undefined) extra.failReason = failReason;
-  if (deliveryConfirmations !== undefined) extra.deliveryConfirmations = deliveryConfirmations;
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    status,
+    statusTimestamps: { ...(order.statusTimestamps ?? {}), [status]: now },
+  };
 
-  // Record timestamp for this status transition
-  const existingTimestamps = order.statusTimestamps ?? {};
-  extra.statusTimestamps = { ...existingTimestamps, [status]: now };
+  if (driverId !== undefined) patch.driverId = driverId;
+  if (ageVerified !== undefined) patch.ageVerified = ageVerified;
+  if (signatureUrl !== undefined) patch.signatureUrl = signatureUrl;
+  if (deliveryProof !== undefined) patch.deliveryProof = deliveryProof;
+  if (failReason !== undefined) patch.failReason = failReason;
+  if (deliveryConfirmations !== undefined) patch.deliveryConfirmations = deliveryConfirmations;
+  if (status === "driver_arrived") patch.waitTimerStart = now;
 
-  // Start wait timer when driver arrives
-  if (status === "driver_arrived") {
-    extra.waitTimerStart = now;
-  }
-
-  const updated = store.updateOrderStatus(params.id, status as OrderStatus, extra);
+  const updated = await dbUpdateOrder(params.id, patch as any);
   if (!updated) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
-  // Create in-app notification for customer on key status changes
+  // Create in-app notification for customer
   const notifKey = NOTIFICATION_STATUSES[status];
   if (notifKey && updated.customerId) {
     const settings = store.getSettings();
-    const message = settings[notifKey] as string;
     store.createNotification({
       orderId: updated.id,
       customerId: updated.customerId,
       orderNumber: updated.orderNumber,
       triggerStatus: status,
-      message,
+      message: settings[notifKey] as string,
     });
   }
 

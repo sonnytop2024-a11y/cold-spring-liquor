@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../_mock/store";
+import { dbGetUserById } from "@/lib/db";
+import { verifySessionToken } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
   const sessionToken = req.cookies.get("csl-session")?.value;
   if (!sessionToken) return NextResponse.json([]);
-  const user = store.getUserBySession(sessionToken);
+  const userId = verifySessionToken(sessionToken);
+  if (!userId) return NextResponse.json([]);
+  const user = await dbGetUserById(userId);
   if (!user) return NextResponse.json([]);
-  const notifications = store.getNotificationsForCustomer(user.id);
-  return NextResponse.json(notifications);
+  return NextResponse.json(store.getNotificationsForCustomer(user.id));
 }
 
 export async function PATCH(req: NextRequest) {
   const sessionToken = req.cookies.get("csl-session")?.value;
   if (!sessionToken) return NextResponse.json({ ok: false });
-  const user = store.getUserBySession(sessionToken);
-  if (!user) return NextResponse.json({ ok: false });
-  store.markNotificationsRead(user.id);
+  const userId = verifySessionToken(sessionToken);
+  if (!userId) return NextResponse.json({ ok: false });
+  store.markNotificationsRead(userId);
   return NextResponse.json({ ok: true });
 }

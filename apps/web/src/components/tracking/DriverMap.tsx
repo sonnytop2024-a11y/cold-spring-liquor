@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Navigation, Clock, MapPin } from "lucide-react";
+import { Navigation, Clock, MapPin, Wifi, WifiOff } from "lucide-react";
 
 async function fetchDriverLocation(orderId: string) {
   const res = await fetch(`/api/orders/${orderId}/driver-location`);
@@ -14,10 +14,14 @@ declare global {
   interface Window { L: any; }
 }
 
+const MOVE_THRESHOLD = 0.0001; // ~11m — don't pan for tiny changes
+
 export function DriverMap({ orderId }: { orderId: string }) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const driverMarkerRef = useRef<any>(null);
+  const destMarkerRef = useRef<any>(null);
+  const lastPanRef = useRef<{ lat: number; lng: number } | null>(null);
   const [leafletReady, setLeafletReady] = useState(false);
 
   const { data: location } = useQuery({
@@ -27,8 +31,9 @@ export function DriverMap({ orderId }: { orderId: string }) {
     enabled: !!orderId,
   });
 
-  // Load Leaflet CSS + JS from CDN once
+  // Load Leaflet from CDN once
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (window.L) { setLeafletReady(true); return; }
 
     const link = document.createElement("link");
@@ -42,49 +47,73 @@ export function DriverMap({ orderId }: { orderId: string }) {
     document.head.appendChild(script);
   }, []);
 
-  // Init map once Leaflet is ready
+  // Init map once Leaflet loads
   useEffect(() => {
     if (!leafletReady || !mapDivRef.current || mapRef.current) return;
     const L = window.L;
-    const map = L.map(mapDivRef.current, { zoomControl: true, attributionControl: false }).setView(
-      [30.5786, -97.8536], 13
-    );
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18,
-    }).addTo(map);
+    const map = L.map(mapDivRef.current, {
+      zoomControl: true, attributionControl: false, scrollWheelZoom: false,
+    }).setView([30.5786, -97.8536], 13);
 
-    // Store marker pin
-    const storeIcon = L.divIcon({
-      html: `<div style="background:#1a1a1a;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid #ff6b1a;">🏪</div>`,
-      className: "", iconSize: [32, 32], iconAnchor: [16, 16],
-    });
-    L.marker([30.5786, -97.8536], { icon: storeIcon })
-      .bindPopup("<strong>Cold Spring Liquor</strong><br>15609 Ronald Reagan Blvd")
-      .addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+
+    // Store pin
+    L.marker([30.5786, -97.8536], {
+      icon: L.divIcon({
+        html: `<div style="background:#1a1a1a;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid #ff6b1a;">🏪</div>`,
+        className: "", iconSize: [32, 32], iconAnchor: [16, 16],
+      })
+    }).bindPopup("<strong>Cold Spring Liquor</strong><br>15609 Ronald Reagan Blvd").addTo(map);
 
     mapRef.current = map;
   }, [leafletReady]);
 
-  // Update driver marker when location changes
+  // Update driver + destination markers
   useEffect(() => {
     if (!mapRef.current || !location || !window.L) return;
     const L = window.L;
-    const { lat, lng } = location;
+    const { lat, lng, destLat, destLng, driverName, status } = location;
 
+    // Driver marker
     const driverIcon = L.divIcon({
-      html: `<div style="background:#ff6b1a;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);">🚗</div>`,
+      html: `<div style="background:#ff6b1a;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);">${status === "driver_arrived" ? "📍" : "🚗"}</div>`,
       className: "", iconSize: [40, 40], iconAnchor: [20, 20],
     });
 
     if (driverMarkerRef.current) {
       driverMarkerRef.current.setLatLng([lat, lng]);
+      driverMarkerRef.current.setIcon(driverIcon);
     } else {
       driverMarkerRef.current = L.marker([lat, lng], { icon: driverIcon })
-        .bindPopup(`<strong>${location.driverName ?? "Your Driver"}</strong><br>On the way! 🚗`)
+        .bindPopup(`<strong>${driverName}</strong>`)
         .addTo(mapRef.current);
     }
 
-    mapRef.current.panTo([lat, lng], { animate: true, duration: 1 });
+    // Destination marker
+    if (destLat && destLng) {
+      if (!destMarkerRef.current) {
+        destMarkerRef.current = L.marker([destLat, destLng], {
+          icon: L.divIcon({
+            html: `<div style="background:#22c55e;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🏠</div>`,
+            className: "", iconSize: [32, 32], iconAnchor: [16, 16],
+          })
+        }).bindPopup("<strong>Your Address</strong>").addTo(mapRef.current);
+      }
+    }
+
+    // Pan only when driver moves more than threshold
+    const last = lastPanRef.current;
+    const moved = !last || Math.abs(lat - last.lat) > MOVE_THRESHOLD || Math.abs(lng - last.lng) > MOVE_THRESHOLD;
+    if (moved) {
+      mapRef.current.panTo([lat, lng], { animate: true, duration: 1.5 });
+      lastPanRef.current = { lat, lng };
+    }
+
+    // Fit bounds to show both driver and destination on first load
+    if (!last && destLat && destLng) {
+      const bounds = L.latLngBounds([[lat, lng], [destLat, destLng]]).pad(0.2);
+      mapRef.current.fitBounds(bounds);
+    }
   }, [location]);
 
   const hasLocation = !!location;
@@ -98,7 +127,7 @@ export function DriverMap({ orderId }: { orderId: string }) {
             Live Driver Tracking
           </h2>
           {hasLocation ? (
-            <div className="flex items-center gap-4 mt-1">
+            <div className="flex items-center gap-4 mt-1 flex-wrap">
               <span className="text-sm text-gray-600 flex items-center gap-1">
                 <MapPin size={13} className="text-brand-500" />
                 {location.distanceMiles?.toFixed(1)} miles away
@@ -107,13 +136,19 @@ export function DriverMap({ orderId }: { orderId: string }) {
                 <Clock size={13} className="text-green-500" />
                 ~{location.etaMinutes} min ETA
               </span>
+              <span className="text-xs flex items-center gap-1 text-gray-400">
+                {location.isLiveGPS
+                  ? <><Wifi size={11} className="text-green-500" /> GPS</>
+                  : <><WifiOff size={11} /> Estimated</>
+                }
+              </span>
             </div>
           ) : (
             <p className="text-sm text-gray-400 mt-1">Tracking activates once driver is assigned</p>
           )}
         </div>
         {hasLocation && (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full shrink-0">
             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
             Live
           </span>
@@ -126,7 +161,15 @@ export function DriverMap({ orderId }: { orderId: string }) {
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
             <div className="text-center text-gray-400">
               <div className="animate-spin border-2 border-brand-500 border-t-transparent rounded-full w-8 h-8 mx-auto mb-2" />
-              <p className="text-sm">Loading map...</p>
+              <p className="text-sm">Loading map…</p>
+            </div>
+          </div>
+        )}
+        {leafletReady && !hasLocation && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50/80">
+            <div className="text-center text-gray-400">
+              <Navigation size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Waiting for driver to be assigned…</p>
             </div>
           </div>
         )}
