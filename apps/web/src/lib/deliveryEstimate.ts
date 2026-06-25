@@ -86,36 +86,61 @@ export function estimateDeliveryFromStore(address: {
 }): { distanceMiles: number; etaMinutes: number } {
   let dest: { lat: number; lng: number } | null = null;
 
-  // Try zip code first (more precise)
   if (address.zip) {
     const zip = address.zip.trim().slice(0, 5);
     dest = ZIP_COORDS[zip] ?? null;
   }
-
-  // Fallback: city name match
   if (!dest && address.city) {
     const city = address.city.toLowerCase().trim();
     for (const [key, coords] of Object.entries(CITY_COORDS)) {
-      if (city.includes(key) || key.includes(city)) {
-        dest = coords;
-        break;
-      }
+      if (city.includes(key) || key.includes(city)) { dest = coords; break; }
     }
   }
-
-  // Final fallback: same area as store (~3 miles)
-  if (!dest) {
-    dest = { lat: 30.5417, lng: -97.8530 };
-  }
+  if (!dest) dest = { lat: 30.5417, lng: -97.8530 };
 
   const distanceMiles = haversineMiles(STORE_LAT, STORE_LNG, dest.lat, dest.lng);
-  // 15 min prep at store + driving at ~25 mph city speed
   const rawMinutes = 15 + (distanceMiles / 25) * 60;
-  // Round to nearest 5 min, minimum 20 min
   const etaMinutes = Math.max(20, Math.round(rawMinutes / 5) * 5);
+  return { distanceMiles: Math.round(distanceMiles * 10) / 10, etaMinutes };
+}
 
-  return {
-    distanceMiles: Math.round(distanceMiles * 10) / 10,
-    etaMinutes,
-  };
+// Async version — uses Google Maps Distance Matrix API for accurate road distance.
+// Falls back to Haversine if API key not configured or request fails.
+export async function estimateDeliveryFromStoreAsync(address: {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}): Promise<{ distanceMiles: number; etaMinutes: number }> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const addressStr = [address.street, address.city, address.state, address.zip]
+    .filter(Boolean).join(", ");
+
+  if (!apiKey || !addressStr.trim()) {
+    return estimateDeliveryFromStore(address);
+  }
+
+  try {
+    const url =
+      `https://maps.googleapis.com/maps/api/distancematrix/json` +
+      `?origins=${encodeURIComponent(`${STORE_LAT},${STORE_LNG}`)}` +
+      `&destinations=${encodeURIComponent(addressStr)}` +
+      `&mode=driving&units=imperial&key=${apiKey}`;
+
+    const res = await fetch(url, { cache: "no-store" });
+    const data = await res.json();
+
+    if (data.status !== "OK") return estimateDeliveryFromStore(address);
+    const element = data.rows?.[0]?.elements?.[0];
+    if (!element || element.status !== "OK") return estimateDeliveryFromStore(address);
+
+    const distanceMiles = Math.round((element.distance.value / 1609.344) * 10) / 10;
+    const drivingMinutes = Math.ceil(element.duration.value / 60);
+    // 15 min store prep + actual driving time, round to nearest 5, minimum 20
+    const etaMinutes = Math.max(20, Math.round((15 + drivingMinutes) / 5) * 5);
+
+    return { distanceMiles, etaMinutes };
+  } catch {
+    return estimateDeliveryFromStore(address);
+  }
 }

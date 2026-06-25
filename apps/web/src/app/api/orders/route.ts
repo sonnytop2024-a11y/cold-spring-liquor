@@ -4,7 +4,7 @@ import { TAX_RATE } from "../_mock/data";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetAllOrders } from "@/lib/db";
 import { verifySessionToken } from "@/lib/session";
-import { estimateDeliveryFromStore } from "@/lib/deliveryEstimate";
+import { estimateDeliveryFromStoreAsync } from "@/lib/deliveryEstimate";
 import type { MockOrder } from "../_mock/store";
 
 function calcBundleDiscount(totalQty: number, subtotal: number): number {
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const nowDate = new Date();
   const nowStr = nowDate.toISOString();
   const timing = getDeliveryTiming(nowDate);
-  const { distanceMiles, etaMinutes } = estimateDeliveryFromStore(deliveryAddress ?? {});
+  const { distanceMiles, etaMinutes } = await estimateDeliveryFromStoreAsync(deliveryAddress ?? {});
 
   const order: MockOrder = {
     id, orderNumber: createOrderNumber(), status: "pending",
