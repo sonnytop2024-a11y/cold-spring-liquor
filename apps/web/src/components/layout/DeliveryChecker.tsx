@@ -188,7 +188,7 @@ export function DeliveryChecker() {
         </h2>
         <p className="text-green-100 mb-2">
           We serve <strong>Leander</strong>, <strong>Cedar Park</strong>, and{" "}
-          <strong>Liberty Hill</strong> within 5 miles of our store
+          <strong>Liberty Hill</strong> within 10 miles of our store
         </p>
         <p className="text-green-200 text-sm mb-6">
           15609 Ronald Reagan Blvd, Leander, TX 78641
@@ -258,7 +258,7 @@ export function DeliveryChecker() {
               <span>Outside our current delivery zone</span>
             </div>
             <p className="text-green-100 text-sm">
-              We currently serve Leander, Cedar Park, and Liberty Hill within 5 miles of our store.
+              We currently serve Leander, Cedar Park, and Liberty Hill within 10 miles of our store.
             </p>
           </div>
         )}

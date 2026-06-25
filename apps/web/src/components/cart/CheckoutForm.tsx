@@ -281,7 +281,7 @@ export function CheckoutForm() {
             <span>{zoneError}</span>
           </div>
         )}
-        <p className="text-xs text-gray-400 mt-3">Service area: Leander · Cedar Park · Liberty Hill, TX (within 5 miles of store)</p>
+        <p className="text-xs text-gray-400 mt-3">Service area: Leander · Cedar Park · Liberty Hill, TX (within 10 miles of store)</p>
       </div>
 
       {/* Billing Address */}

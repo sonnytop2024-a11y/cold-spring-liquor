@@ -106,7 +106,7 @@ export function CartView() {
           <div>
             <p className="font-bold text-green-700">FREE Delivery — NO Tip Required</p>
             <p className="text-xs text-green-600">
-              All orders to Leander, Cedar Park & Liberty Hill within 5 miles
+              All orders to Leander, Cedar Park & Liberty Hill within 10 miles
             </p>
           </div>
         </div>

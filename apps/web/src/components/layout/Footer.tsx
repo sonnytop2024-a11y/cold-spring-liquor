@@ -120,7 +120,7 @@ export async function Footer() {
               </li>
             </ul>
             <div className="mt-4 bg-brand-600/20 border border-brand-600/30 rounded-lg p-3 text-xs text-brand-300">
-              Within 5 miles of our store · Must be 21+ · Valid ID required at delivery
+              Within 10 miles of our store · Must be 21+ · Valid ID required at delivery
             </div>
           </div>
         </div>
