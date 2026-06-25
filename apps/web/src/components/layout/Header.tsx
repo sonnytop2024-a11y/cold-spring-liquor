@@ -133,9 +133,9 @@ export function Header() {
             <Image
               src="/logo-transparent.png"
               alt="Cold Spring Liquor"
-              width={68}
-              height={68}
-              className="w-12 h-12 sm:w-14 sm:h-14 md:w-[68px] md:h-[68px] object-contain"
+              width={80}
+              height={80}
+              className="w-[54px] h-[54px] sm:w-[62px] sm:h-[62px] md:w-[80px] md:h-[80px] object-contain mt-3"
               priority
             />
             <div className="flex flex-col">
