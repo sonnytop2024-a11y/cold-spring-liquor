@@ -135,7 +135,7 @@ export function Header() {
               alt="Cold Spring Liquor"
               width={80}
               height={80}
-              className="w-[54px] h-[54px] sm:w-[62px] sm:h-[62px] md:w-[80px] md:h-[80px] object-contain mt-3"
+              className="w-[65px] h-[65px] md:w-[80px] md:h-[80px] object-contain mt-3"
               priority
             />
             <div className="flex flex-col">
