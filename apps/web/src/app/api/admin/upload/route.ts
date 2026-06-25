@@ -12,8 +12,7 @@ async function processImage(buffer: ArrayBuffer): Promise<Buffer> {
   return sharp(input)
     .trim({ background: "#FFFFFF", threshold: 15 }) // strip excess whitespace
     .resize(800, 800, {
-      fit: "contain",
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
+      fit: "cover",
       position: "centre",
     })
     .flatten({ background: { r: 255, g: 255, b: 255 } }) // remove transparency → white
