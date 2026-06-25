@@ -582,17 +582,40 @@ export default function InventoryPage() {
     onError: (e: Error) => { invalidate(); showToast(e.message, false); },
   });
 
-  // Batch save all pending category changes
+  // Batch save all pending category changes via PATCH (surgical field update)
   const saveCatsMutation = useMutation({
     mutationFn: async (cats: Record<string, string>) => {
       const entries = Object.entries(cats);
-      await Promise.all(entries.map(([id, category]) => updateProduct({ id, category })));
-      return entries.length;
+      await Promise.all(entries.map(async ([id, category]) => {
+        const res = await fetch(`${API}/admin/products/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as Record<string, string>).error ?? `Save failed (${res.status})`);
+        }
+        return res.json();
+      }));
+      return entries;
     },
-    onSuccess: (count) => {
+    onSuccess: (entries) => {
+      // Immediately update the cached products list with new categories so there is no
+      // visible flicker back to the old value while the background refetch runs.
+      qc.setQueriesData(
+        { queryKey: ["admin-products"] },
+        (old: unknown) => {
+          if (!Array.isArray(old)) return old;
+          const catMap = Object.fromEntries(entries);
+          return old.map((p: Product) =>
+            catMap[p.id] ? { ...p, category: catMap[p.id] } : p
+          );
+        }
+      );
       setPendingCats({});
-      invalidate();
-      showToast(`${count} categor${count === 1 ? "y" : "ies"} updated successfully.`);
+      invalidate(); // background refetch from server to confirm
+      showToast(`${entries.length} categor${entries.length === 1 ? "y" : "ies"} updated successfully.`);
     },
     onError: (e: Error) => showToast(e.message, false),
   });

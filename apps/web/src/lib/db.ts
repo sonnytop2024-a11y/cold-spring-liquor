@@ -73,6 +73,31 @@ export async function dbSaveProduct(product: MockProduct): Promise<void> {
   store.saveProduct(product);
 }
 
+// Patch specific fields on an existing product (UPDATE, not upsert).
+// Returns the merged product, or null if not found.
+export async function dbUpdateProduct(id: string, patch: Partial<MockProduct>): Promise<MockProduct | null> {
+  const t = tbl("csl_products");
+  if (t) {
+    const { data: row, error: getErr } = await t.select("data").eq("id", id).maybeSingle();
+    if (!getErr && row?.data) {
+      const merged: MockProduct = { ...(row.data as MockProduct), ...patch };
+      const { error: updateErr } = await t.update({ data: merged }).eq("id", id);
+      if (!updateErr) {
+        console.log(`[db] patched product ${id}:`, Object.keys(patch));
+        return merged;
+      }
+      throw new Error(`Patch failed: ${updateErr.message}`);
+    }
+  }
+  // Fallback: mock store
+  const all = store.getAllProducts();
+  const existing = all.find((p) => p.id === id);
+  if (!existing) return null;
+  const merged: MockProduct = { ...existing, ...patch };
+  store.saveProduct(merged);
+  return merged;
+}
+
 export async function dbDeleteProduct(id: string): Promise<boolean> {
   const t = tbl("csl_products");
   if (t) {

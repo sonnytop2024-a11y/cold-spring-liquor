@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetProduct, dbSaveProduct, dbDeleteProduct } from "@/lib/db";
+import { dbGetProduct, dbSaveProduct, dbDeleteProduct, dbUpdateProduct } from "@/lib/db";
 import type { MockProduct } from "@/app/api/_mock/store";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -41,6 +41,22 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json(updated);
   } catch (e) {
     console.error(`[admin/products] PUT save error:`, e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+// PATCH — surgical partial update (only the provided fields, uses UPDATE not upsert)
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const body = await req.json();
+    const result = await dbUpdateProduct(params.id, body);
+    if (!result) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    console.log(`[admin/products] PATCH ${params.id}:`, Object.keys(body));
+    return NextResponse.json(result);
+  } catch (e) {
+    console.error(`[admin/products] PATCH error:`, e);
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

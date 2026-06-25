@@ -4,6 +4,8 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "**.cloudfront.net" },
       { protocol: "https", hostname: "**.amazonaws.com" },
+      // Supabase Storage public URLs
+      { protocol: "https", hostname: "*.supabase.co" },
     ],
   },
   // Rewrite to real API — uncomment when backend is running on port 4000
