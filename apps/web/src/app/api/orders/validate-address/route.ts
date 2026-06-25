@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { estimateDeliveryFromStoreAsync } from "@/lib/deliveryEstimate";
 
-export const MAX_DELIVERY_MILES = 5;
+const MAX_DELIVERY_MILES = 5;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
