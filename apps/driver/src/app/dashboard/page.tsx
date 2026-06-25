@@ -105,15 +105,7 @@ function useDriverDistance(
   const [minutes, setMinutes] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
-  const [gpsBlocked, setGpsBlocked] = useState(false);
   const fetchedRef = useRef(false);
-
-  // After 15s with no GPS fix, stop spinning and tell driver to enable location
-  useEffect(() => {
-    if (driverLoc) { setGpsBlocked(false); return; }
-    const t = setTimeout(() => setGpsBlocked(true), 15_000);
-    return () => clearTimeout(t);
-  }, [!!driverLoc]);
 
   useEffect(() => {
     if (!driverLoc || !deliveryAddress || fetchedRef.current) return;
@@ -150,7 +142,7 @@ function useDriverDistance(
       .finally(() => { setLoading(false); clearTimeout(timeout); });
   }, [driverLoc?.lat, driverLoc?.lng, deliveryAddress]);
 
-  return { miles, minutes, loading, unavailable, gpsBlocked };
+  return { miles, minutes, loading, unavailable };
 }
 
 // ─── New Order Alert Modal ────────────────────────────────────────────────────
@@ -159,7 +151,7 @@ function NewOrderAlert({
 }: { order: any; driverId: string; driverLoc: { lat: number; lng: number } | null; onAccept: () => void; onDecline: () => void }) {
   const itemCount = order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0;
   const [accepting, setAccepting] = useState(false);
-  const { miles, minutes, loading, unavailable, gpsBlocked } = useDriverDistance(driverLoc, order.deliveryAddress);
+  const { miles, minutes, loading, unavailable } = useDriverDistance(driverLoc, order.deliveryAddress);
 
   async function handleAccept() {
     setAccepting(true);
@@ -193,14 +185,10 @@ function NewOrderAlert({
         </div>
 
         {/* Key metrics */}
-        {(unavailable || gpsBlocked) ? (
-          <div className={`mx-4 mt-4 mb-2 rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-semibold ${
-            gpsBlocked
-              ? "bg-amber-50 border border-amber-200 text-amber-700"
-              : "bg-red-50 border border-red-200 text-red-700"
-          }`}>
+        {unavailable ? (
+          <div className="mx-4 mt-4 mb-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2 text-red-700 text-sm font-semibold">
             <MapPin size={15} className="shrink-0" />
-            {gpsBlocked ? "Enable location to see distance" : "Unable to calculate distance"}
+            Unable to calculate distance
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 p-4 pb-2">
@@ -818,7 +806,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
     ? `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
     : "Address unavailable";
   const itemCount = order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0;
-  const { miles, minutes, loading: distLoading, unavailable: distUnavailable, gpsBlocked: distGpsBlocked } = useDriverDistance(driverLoc, order.deliveryAddress);
+  const { miles, minutes, loading: distLoading, unavailable: distUnavailable } = useDriverDistance(driverLoc, order.deliveryAddress);
   const isAssigned = ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(order.status);
   const isArrived = order.status === "driver_arrived";
 
@@ -920,8 +908,6 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
         <div className="px-4 pb-2 flex items-center gap-2.5 text-xs text-gray-500">
           {distUnavailable ? (
             <span className="text-red-500 font-medium">Unable to calculate distance</span>
-          ) : distGpsBlocked ? (
-            <span className="text-amber-600 font-medium">📍 Enable location</span>
           ) : distLoading || !driverLoc ? (
             <span className="text-gray-400 italic flex items-center gap-1">
               <Loader2 size={11} className="animate-spin" /> Calculating…
@@ -1246,6 +1232,30 @@ function HistoryTab({ driverId }: { driverId: string }) {
   );
 }
 
+// ─── GPS Required Gate ────────────────────────────────────────────────────────
+function GPSRequiredScreen({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+        <MapPin size={36} className="text-red-500" />
+      </div>
+      <h2 className="text-2xl font-black text-gray-900 mb-3">Location Required</h2>
+      <p className="text-gray-500 text-sm mb-6 leading-relaxed max-w-xs">
+        This app requires your GPS location to calculate delivery distances. You cannot use the driver app without enabling location access.
+      </p>
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-left text-sm text-gray-700 mb-6 w-full max-w-xs space-y-2">
+        <p className="font-bold text-gray-900 mb-1">How to enable:</p>
+        <p>📱 <strong>iPhone:</strong> Settings → Privacy → Location Services → Safari → <em>While Using</em></p>
+        <p>🤖 <strong>Android:</strong> Settings → Apps → Browser → Permissions → Location → Allow</p>
+      </div>
+      <button onClick={onRetry}
+        className="w-full max-w-xs bg-brand-500 hover:bg-brand-600 text-white font-black py-4 rounded-2xl text-base transition-colors">
+        I've Enabled Location — Retry
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 function DashboardContent() {
   const [driver, setDriver] = useState<{ id: string; name: string } | null>(null);
@@ -1254,6 +1264,7 @@ function DashboardContent() {
   const [tab, setTab] = useState<"available" | "active" | "today" | "history">("available");
   const [alertOrder, setAlertOrder] = useState<any>(null);
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<"idle" | "checking" | "granted" | "denied">("idle");
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
   const qc = useQueryClient();
 
@@ -1266,14 +1277,24 @@ function DashboardContent() {
 
   useGPSPosting(driver?.id ?? null, online, (lat, lng) => setDriverLoc({ lat, lng }));
 
-  // Seed GPS as soon as driver logs in — don't wait for "go online"
-  useEffect(() => {
-    if (!driver || !navigator.geolocation) return;
+  // Request GPS immediately on login — block app if denied
+  function requestGPS() {
+    if (!driver) return;
+    if (!navigator.geolocation) { setGpsStatus("denied"); return; }
+    setGpsStatus("checking");
     navigator.geolocation.getCurrentPosition(
-      pos => setDriverLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
-      { timeout: 8000, maximumAge: 30000 }
+      pos => {
+        setDriverLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsStatus("granted");
+      },
+      () => setGpsStatus("denied"),
+      { timeout: 10000, maximumAge: 0, enableHighAccuracy: true }
     );
+  }
+
+  useEffect(() => {
+    if (driver) requestGPS();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driver?.id]);
 
   function handleLogin(d: { id: string; name: string }) {
@@ -1345,6 +1366,8 @@ function DashboardContent() {
   }, [newOrders, online]);
 
   if (!driver) return <DriverLogin onLogin={handleLogin} />;
+
+  if (gpsStatus === "denied") return <GPSRequiredScreen onRetry={requestGPS} />;
 
   const TABS: { key: "available" | "active" | "today" | "history"; label: string; count: number }[] = [
     { key: "available", label: "Available", count: online ? newOrders.length : 0 },
