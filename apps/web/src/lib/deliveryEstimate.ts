@@ -1,6 +1,7 @@
 // Distance + ETA from store to customer address
-// Store: 15609 Ronald Reagan Blvd Ste B100, Leander TX 78641
+export const STORE_ADDRESS = "15609 Ronald Reagan Blvd Ste B100, Leander, TX 78641";
 
+// Kept for Haversine fallback only — not used as Google Maps origin
 export const STORE_LAT = 30.5786;
 export const STORE_LNG = -97.8536;
 
@@ -123,7 +124,7 @@ export async function estimateDeliveryFromStoreAsync(address: {
   try {
     const url =
       `https://maps.googleapis.com/maps/api/distancematrix/json` +
-      `?origins=${encodeURIComponent(`${STORE_LAT},${STORE_LNG}`)}` +
+      `?origins=${encodeURIComponent(STORE_ADDRESS)}` +
       `&destinations=${encodeURIComponent(addressStr)}` +
       `&mode=driving&units=imperial&key=${apiKey}`;
 
