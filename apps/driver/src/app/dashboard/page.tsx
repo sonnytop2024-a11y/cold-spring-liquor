@@ -98,6 +98,10 @@ async function updateStatus(orderId: string, status: string, extra?: Record<stri
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status, ...extra }),
   });
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    throw new Error(`Status update failed (${r.status}): ${text.slice(0, 200)}`);
+  }
   return r.json();
 }
 
@@ -382,7 +386,21 @@ function DeliveryVerificationModal({
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => setProofPhoto(ev.target?.result as string);
+    reader.onload = ev => {
+      const src = ev.target?.result as string;
+      // Compress to max 800px wide, JPEG 60% — camera photos can be 5MB+ raw
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 800;
+        const scale = img.width > MAX ? MAX / img.width : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setProofPhoto(canvas.toDataURL("image/jpeg", 0.6));
+      };
+      img.src = src;
+    };
     reader.readAsDataURL(file);
   }
 
@@ -769,12 +787,19 @@ function OrderCard({ order, driverId, onRefresh }: { order: any; driverId: strin
   }) {
     setShowVerification(false);
     setLoading(true);
-    await updateStatus(order.id, "delivered", {
-      ageVerified: true,
-      signatureUrl: data.signatureUrl,
-      deliveryProof: data.deliveryProof,
-      deliveryConfirmations: data.deliveryConfirmations,
-    });
+    try {
+      await updateStatus(order.id, "delivered", {
+        ageVerified: true,
+        signatureUrl: data.signatureUrl,
+        deliveryProof: data.deliveryProof,
+        deliveryConfirmations: data.deliveryConfirmations,
+      });
+    } catch (err) {
+      alert(`Failed to save delivery: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`);
+      setLoading(false);
+      setShowVerification(true);
+      return;
+    }
     setLoading(false);
     onRefresh();
   }

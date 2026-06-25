@@ -353,14 +353,16 @@ export default function OrdersPage() {
                   <Edit2 size={12} /> Edit Order
                 </button>
               )}
-              <select onChange={e => { if (e.target.value) statusMutation.mutate({ id: order.id, status: e.target.value }); }}
-                defaultValue=""
-                className="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="">Set Status…</option>
-                {ALL_STATUSES.filter(s => s !== order.status).map(s => (
-                  <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
-                ))}
-              </select>
+              {!isDone && (
+                <select onChange={e => { if (e.target.value) statusMutation.mutate({ id: order.id, status: e.target.value }); }}
+                  defaultValue=""
+                  className="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">Set Status…</option>
+                  {ALL_STATUSES.filter(s => s !== order.status).map(s => (
+                    <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                  ))}
+                </select>
+              )}
               {order.status === "cancelled" && (
                 <button onClick={() => adminUpdateMutation.mutate({ id: order.id, data: { status: "pending", refundType: "full" } })}
                   className="flex items-center gap-1.5 text-xs border border-green-200 text-green-700 rounded-lg px-3 py-1.5 hover:bg-green-50 font-medium">
@@ -481,7 +483,7 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {/* Delivery confirmations */}
+            {/* Delivery confirmations (ID check checklist) */}
             {order.deliveryConfirmations && (
               <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Delivery Verification Details</p>
@@ -514,19 +516,37 @@ export default function OrdersPage() {
                     <span>Order handed directly to customer</span>
                   </div>
                 </div>
-                {order.ageVerified && (
-                  <div className="border-t mt-2 pt-2 space-y-1">
-                    <p className="text-xs text-green-600 font-medium">✅ Customer signature captured</p>
-                    {order.deliveryProof && <p className="text-xs text-green-600 font-medium">📷 Proof of delivery photo saved</p>}
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Legacy age verified (no confirmations object) */}
-            {order.ageVerified && !order.deliveryConfirmations && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs text-green-700">
-                ✅ Age verified · Customer signature captured
+            {/* Delivery evidence — shown whenever present, independent of deliveryConfirmations */}
+            {(order.signatureUrl || order.deliveryProof) && (
+              <div className="border border-gray-200 rounded-xl p-3 space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase">Delivery Evidence</p>
+                {order.signatureUrl && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 mb-1.5">✍️ Customer Signature</p>
+                    <div className="border rounded-xl overflow-hidden bg-gray-50 p-2">
+                      <img
+                        src={order.signatureUrl}
+                        alt="Customer signature"
+                        className="w-full max-h-28 object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+                {order.deliveryProof && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 mb-1.5">📷 Proof of Delivery Photo</p>
+                    <div className="rounded-xl overflow-hidden">
+                      <img
+                        src={order.deliveryProof}
+                        alt="Proof of delivery"
+                        className="w-full max-h-56 object-cover rounded-xl"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {order.failReason && (
