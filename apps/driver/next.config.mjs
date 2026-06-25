@@ -5,7 +5,7 @@
 const webUrl =
   process.env.WEB_API_URL ??
   process.env.NEXT_PUBLIC_WEB_URL ??
-  "https://coldspringliquor.com";
+  "https://www.coldspringliquor.com";
 
 const nextConfig = {
   async rewrites() {
