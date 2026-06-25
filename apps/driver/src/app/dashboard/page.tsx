@@ -1137,7 +1137,7 @@ function useGPSPosting(
         }).catch(() => {});
       },
       () => { /* GPS unavailable — leave driverLoc null, show "…" not fake data */ },
-      { timeout: 10000, maximumAge: 5000, enableHighAccuracy: true }
+      { timeout: 30000, maximumAge: 15000, enableHighAccuracy: true }
     );
 
     // Heartbeat: re-post last known location every 8s to keep server up to date
@@ -1278,7 +1278,10 @@ function DashboardContent() {
 
   useGPSPosting(driver?.id ?? null, online, (lat, lng) => setDriverLoc({ lat, lng }));
 
-  // Request GPS immediately on login — block app if denied
+  // Request GPS immediately on login — block app if denied.
+  // Use maximumAge: 60000 so iOS returns a cached fix instantly rather than
+  // cold-starting the GPS chip (which can take 30-60 s and exceed any timeout).
+  // watchPosition will continuously refine accuracy once the driver is active.
   function requestGPS() {
     if (!driver) return;
     if (!navigator.geolocation) { setGpsStatus("denied"); return; }
@@ -1289,7 +1292,7 @@ function DashboardContent() {
         setGpsStatus("granted");
       },
       () => setGpsStatus("denied"),
-      { timeout: 10000, maximumAge: 0, enableHighAccuracy: true }
+      { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false }
     );
   }
 
