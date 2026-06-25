@@ -1123,43 +1123,62 @@ function useGPSPosting(
   isOnline: boolean,
   onLocation?: (lat: number, lng: number) => void
 ) {
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onLocationRef = useRef(onLocation);
   onLocationRef.current = onLocation;
+  const watchIdRef = useRef<number | null>(null);
+  const postIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const latestLocRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    if (!driverId || !isOnline) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+    if (!driverId || !isOnline || !navigator.geolocation) {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (postIntervalRef.current) {
+        clearInterval(postIntervalRef.current);
+        postIntervalRef.current = null;
+      }
       return;
     }
-    function postLocation() {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          const { latitude: lat, longitude: lng } = pos.coords;
-          onLocationRef.current?.(lat, lng);
-          fetch("/api/driver/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ driverId, lat, lng }),
-          }).catch(() => {});
-        },
-        () => {
-          const baseLat = 30.5786 + (Math.random() - 0.5) * 0.02;
-          const baseLng = -97.8536 + (Math.random() - 0.5) * 0.02;
-          onLocationRef.current?.(baseLat, baseLng);
-          fetch("/api/driver/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ driverId, lat: baseLat, lng: baseLng }),
-          }).catch(() => {});
-        },
-        { timeout: 5000, maximumAge: 10000 }
-      );
-    }
-    postLocation();
-    intervalRef.current = setInterval(postLocation, 8_000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+
+    // watchPosition gives real-time continuous updates
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      pos => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        latestLocRef.current = { lat, lng };
+        onLocationRef.current?.(lat, lng);
+        fetch("/api/driver/location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ driverId, lat, lng }),
+        }).catch(() => {});
+      },
+      () => { /* GPS unavailable — leave driverLoc null, show "…" not fake data */ },
+      { timeout: 10000, maximumAge: 5000, enableHighAccuracy: true }
+    );
+
+    // Heartbeat: re-post last known location every 8s to keep server up to date
+    postIntervalRef.current = setInterval(() => {
+      const loc = latestLocRef.current;
+      if (!loc) return;
+      fetch("/api/driver/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId, lat: loc.lat, lng: loc.lng }),
+      }).catch(() => {});
+    }, 8_000);
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (postIntervalRef.current) {
+        clearInterval(postIntervalRef.current);
+        postIntervalRef.current = null;
+      }
+    };
   }, [driverId, isOnline]);
 }
 
@@ -1251,6 +1270,16 @@ function DashboardContent() {
   }, []);
 
   useGPSPosting(driver?.id ?? null, online, (lat, lng) => setDriverLoc({ lat, lng }));
+
+  // Seed GPS as soon as driver logs in — don't wait for "go online"
+  useEffect(() => {
+    if (!driver || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => setDriverLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { timeout: 8000, maximumAge: 30000 }
+    );
+  }, [driver?.id]);
 
   function handleLogin(d: { id: string; name: string }) {
     sessionStorage.setItem("csl-driver-session", JSON.stringify(d));
