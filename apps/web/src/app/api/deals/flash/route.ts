@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { FLASH_DEALS } from "../../_mock/data";
+import { store } from "../../_mock/store";
 
 export async function GET() {
-  return NextResponse.json(FLASH_DEALS);
+  return NextResponse.json(store.getActiveFlashDeals());
 }

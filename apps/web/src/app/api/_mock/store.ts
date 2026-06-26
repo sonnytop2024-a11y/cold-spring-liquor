@@ -128,6 +128,32 @@ export interface MockCoupon {
   createdAt: string;
 }
 
+export interface MockFlashDeal {
+  id: string;
+  name: string;
+  brand: string;
+  slug: string;
+  price: number;
+  salePrice: number;
+  imageUrl: string | null;
+  volume: string;
+  stockQty: number;
+  maxStock: number;
+  active: boolean;
+  startAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+}
+
+export interface MockBundleTier {
+  id: string;
+  minQty: number;
+  discountPct: number;
+  label: string;
+  active: boolean;
+  sortOrder: number;
+}
+
 export interface StoreSettings {
   storeName: string;
   storeAddress: string;
@@ -188,6 +214,8 @@ interface StoreData {
   driverSessions: Record<string, string>;
   otpCodes: Record<string, { code: string; expires: number }>;
   coupons: Record<string, MockCoupon> | null;
+  flashDeals: Record<string, MockFlashDeal> | null;
+  bundleTiers: MockBundleTier[] | null;
   settings: StoreSettings | null;
   notifications: MockNotification[];
   counter: number;
@@ -269,12 +297,30 @@ function getDefaultSettings(): StoreSettings {
   };
 }
 
+function getDefaultFlashDeals(): Record<string, MockFlashDeal> {
+  const now = Date.now();
+  const seeds: MockFlashDeal[] = [
+    { id: "fd1", name: "Casamigos Blanco Tequila", brand: "Casamigos", slug: "casamigos-blanco-tequila", price: 54.99, salePrice: 39.99, imageUrl: null, volume: "750ml", stockQty: 8, maxStock: 8, active: true, startAt: null, endsAt: new Date(now + 2 * 60 * 60 * 1000).toISOString(), createdAt: new Date().toISOString() },
+    { id: "fd2", name: "Tito's Handmade Vodka", brand: "Tito's", slug: "titos-handmade-vodka", price: 32.99, salePrice: 24.99, imageUrl: null, volume: "1L", stockQty: 15, maxStock: 15, active: true, startAt: null, endsAt: new Date(now + 4 * 60 * 60 * 1000).toISOString(), createdAt: new Date().toISOString() },
+    { id: "fd3", name: "Jameson Irish Whiskey", brand: "Jameson", slug: "jameson-irish-whiskey", price: 39.99, salePrice: 29.99, imageUrl: null, volume: "750ml", stockQty: 5, maxStock: 5, active: true, startAt: null, endsAt: new Date(now + 6 * 60 * 60 * 1000).toISOString(), createdAt: new Date().toISOString() },
+  ];
+  return Object.fromEntries(seeds.map(d => [d.id, d]));
+}
+
+function getDefaultBundleTiers(): MockBundleTier[] {
+  return [
+    { id: "bt1", minQty: 2, discountPct: 5, label: "Buy 2+ bottles — Save 5%", active: true, sortOrder: 1 },
+    { id: "bt2", minQty: 3, discountPct: 10, label: "Buy 3+ bottles — Save 10%", active: true, sortOrder: 2 },
+    { id: "bt3", minQty: 6, discountPct: 15, label: "Buy 6+ bottles — Save 15%", active: true, sortOrder: 3 },
+  ];
+}
+
 function read(): StoreData {
   try {
     const raw = JSON.parse(fs.readFileSync(STORE_FILE, "utf-8"));
-    return { users: {}, sessions: {}, drivers: null, driverSessions: {}, otpCodes: {}, coupons: null, settings: null, notifications: [], ...raw };
+    return { users: {}, sessions: {}, drivers: null, driverSessions: {}, otpCodes: {}, coupons: null, flashDeals: null, bundleTiers: null, settings: null, notifications: [], ...raw };
   } catch {
-    return { orders: {}, products: null, users: {}, drivers: null, sessions: {}, driverSessions: {}, otpCodes: {}, coupons: null, settings: null, notifications: [], counter: 100 };
+    return { orders: {}, products: null, users: {}, drivers: null, sessions: {}, driverSessions: {}, otpCodes: {}, coupons: null, flashDeals: null, bundleTiers: null, settings: null, notifications: [], counter: 100 };
   }
 }
 
@@ -584,8 +630,74 @@ export const store = {
     data.settings = defaults; write(data); return defaults;
   },
 
+  // ── Flash Deals ───────────────────────────────────────────────────────────────
+  getAllFlashDeals(): MockFlashDeal[] {
+    const data = read();
+    const deals = data.flashDeals ?? getDefaultFlashDeals();
+    if (!data.flashDeals) { data.flashDeals = deals; write(data); }
+    return Object.values(deals).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+  getActiveFlashDeals(): MockFlashDeal[] {
+    const now = new Date();
+    return this.getAllFlashDeals().filter(d => {
+      if (!d.active) return false;
+      if (d.startAt && new Date(d.startAt) > now) return false;
+      if (d.endsAt && new Date(d.endsAt) < now) return false;
+      return true;
+    });
+  },
+  createFlashDeal(fields: Omit<MockFlashDeal, "id" | "createdAt">): MockFlashDeal {
+    const data = read();
+    if (!data.flashDeals) data.flashDeals = getDefaultFlashDeals();
+    const id = `fd${Date.now()}`;
+    const deal: MockFlashDeal = { id, createdAt: new Date().toISOString(), ...fields };
+    data.flashDeals[id] = deal; write(data); return deal;
+  },
+  updateFlashDeal(id: string, fields: Partial<MockFlashDeal>): MockFlashDeal | undefined {
+    const data = read();
+    if (!data.flashDeals) data.flashDeals = getDefaultFlashDeals();
+    const deal = data.flashDeals[id]; if (!deal) return undefined;
+    Object.assign(deal, fields); write(data); return deal;
+  },
+  deleteFlashDeal(id: string): boolean {
+    const data = read();
+    if (!data.flashDeals) data.flashDeals = getDefaultFlashDeals();
+    if (!data.flashDeals[id]) return false;
+    delete data.flashDeals[id]; write(data); return true;
+  },
+
+  // ── Bundle Tiers ──────────────────────────────────────────────────────────────
+  getAllBundleTiers(): MockBundleTier[] {
+    const data = read();
+    const tiers = data.bundleTiers ?? getDefaultBundleTiers();
+    if (!data.bundleTiers) { data.bundleTiers = tiers; write(data); }
+    return tiers.sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+  getActiveBundleTiers(): MockBundleTier[] {
+    return this.getAllBundleTiers().filter(t => t.active);
+  },
+  createBundleTier(fields: Omit<MockBundleTier, "id">): MockBundleTier {
+    const data = read();
+    if (!data.bundleTiers) data.bundleTiers = getDefaultBundleTiers();
+    const id = `bt${Date.now()}`;
+    const tier: MockBundleTier = { id, ...fields };
+    data.bundleTiers.push(tier); write(data); return tier;
+  },
+  updateBundleTier(id: string, fields: Partial<MockBundleTier>): MockBundleTier | undefined {
+    const data = read();
+    if (!data.bundleTiers) data.bundleTiers = getDefaultBundleTiers();
+    const tier = data.bundleTiers.find(t => t.id === id); if (!tier) return undefined;
+    Object.assign(tier, fields); write(data); return tier;
+  },
+  deleteBundleTier(id: string): boolean {
+    const data = read();
+    if (!data.bundleTiers) data.bundleTiers = getDefaultBundleTiers();
+    const idx = data.bundleTiers.findIndex(t => t.id === id); if (idx === -1) return false;
+    data.bundleTiers.splice(idx, 1); write(data); return true;
+  },
+
   clear(): void {
-    write({ orders: {}, products: null, users: {}, drivers: null, sessions: {}, driverSessions: {}, otpCodes: {}, coupons: null, settings: null, notifications: [], counter: 100 });
+    write({ orders: {}, products: null, users: {}, drivers: null, sessions: {}, driverSessions: {}, otpCodes: {}, coupons: null, flashDeals: null, bundleTiers: null, settings: null, notifications: [], counter: 100 });
   },
 };
 

@@ -8,9 +8,10 @@ import { estimateDeliveryFromStoreAsync } from "@/lib/deliveryEstimate";
 import type { MockOrder } from "../_mock/store";
 
 function calcBundleDiscount(totalQty: number, subtotal: number): number {
-  if (totalQty >= 6) return subtotal * 0.15;
-  if (totalQty >= 3) return subtotal * 0.10;
-  if (totalQty >= 2) return subtotal * 0.05;
+  const tiers = store.getActiveBundleTiers().sort((a, b) => b.minQty - a.minQty);
+  for (const tier of tiers) {
+    if (totalQty >= tier.minQty) return subtotal * (tier.discountPct / 100);
+  }
   return 0;
 }
 
