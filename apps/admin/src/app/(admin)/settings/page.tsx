@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { API } from "@/lib/api";
+import { enablePushNotifications, disablePushNotifications } from "@/components/PushRegistrar";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 type Settings = {
@@ -32,6 +33,7 @@ type Settings = {
   notifySmsEnabled: boolean; notifyEmailEnabled: boolean; notifyPushEnabled: boolean;
   waitTimerMinutes: number;
   msgOnTheWay: string; msgArrivingSoon: string; msgArrived: string;
+  telegramBotToken?: string; telegramChatId?: string;
   updatedAt: string;
 };
 
@@ -134,6 +136,9 @@ export default function SettingsPage() {
   const [form, setForm] = useState<Settings | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [resetConfirm, setResetConfirm] = useState(false);
+  const [pushStatus, setPushStatus] = useState<"idle" | "working" | "on" | "off">("idle");
+  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [telegramTestResult, setTelegramTestResult] = useState<string | null>(null);
 
   // Store logo upload
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -211,6 +216,45 @@ export default function SettingsPage() {
   const set = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setForm(prev => prev ? { ...prev, [key]: value } : prev);
   }, []);
+
+  // Check if push is already subscribed on mount
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    navigator.serviceWorker.getRegistration("/sw.js").then(async reg => {
+      if (!reg) return;
+      const sub = await reg.pushManager.getSubscription();
+      setPushStatus(sub ? "on" : "off");
+    }).catch(() => {});
+  }, []);
+
+  async function handlePushToggle() {
+    setPushStatus("working");
+    if (pushStatus === "on") {
+      await disablePushNotifications();
+      setPushStatus("off");
+    } else {
+      const result = await enablePushNotifications();
+      setPushStatus(result === "granted" ? "on" : "off");
+    }
+  }
+
+  async function testTelegram() {
+    setTelegramTesting(true);
+    setTelegramTestResult(null);
+    try {
+      const token = form?.telegramBotToken?.trim();
+      const chatId = form?.telegramChatId?.trim();
+      if (!token || !chatId) { setTelegramTestResult("❌ Please save Bot Token and Chat ID first."); return; }
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: "✅ Cold Spring Liquor — Telegram notifications are working!" }),
+      });
+      const json = await res.json();
+      setTelegramTestResult(json.ok ? "✅ Message sent! Check your Telegram." : `❌ Error: ${json.description}`);
+    } catch (e) { setTelegramTestResult(`❌ ${e}`); }
+    finally { setTelegramTesting(false); }
+  }
 
   const setHours = useCallback((day: string, field: "open" | "close" | "closed", value: string | boolean) => {
     setForm(prev => {
@@ -547,6 +591,76 @@ export default function SettingsPage() {
                 <Field label="Driver Wait Time (minutes)" description="How long driver waits at customer door before marking failed">
                   <Input value={form.waitTimerMinutes ?? 5} onChange={v => set("waitTimerMinutes", Number(v))} type="text" inputMode="decimal" />
                 </Field>
+              </SectionCard>
+
+              {/* ── Telegram ── */}
+              <SectionCard title="Telegram Notifications (Owner Alerts)" icon={Bell}>
+                <div className="py-2 space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 space-y-1">
+                    <p className="font-semibold">Setup (one time):</p>
+                    <p>1. Open Telegram → search <strong>@BotFather</strong> → send <code>/newbot</code></p>
+                    <p>2. Copy the <strong>Bot Token</strong> into the field below</p>
+                    <p>3. Search your new bot → send it <code>/start</code></p>
+                    <p>4. Visit <code>https://api.telegram.org/bot{"<TOKEN>"}/getUpdates</code> to find your <strong>Chat ID</strong></p>
+                  </div>
+                  <Field label="Bot Token" description="From @BotFather (e.g. 6234567890:AABBxx...)">
+                    <input
+                      type="text"
+                      value={form.telegramBotToken ?? ""}
+                      onChange={e => set("telegramBotToken", e.target.value)}
+                      placeholder="6234567890:AABBCCDDEEFFxx..."
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                    />
+                  </Field>
+                  <Field label="Chat ID" description="Your personal chat ID with the bot">
+                    <input
+                      type="text"
+                      value={form.telegramChatId ?? ""}
+                      onChange={e => set("telegramChatId", e.target.value)}
+                      placeholder="123456789"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                    />
+                  </Field>
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      onClick={testTelegram}
+                      disabled={telegramTesting}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#229ED9] text-white text-sm font-semibold rounded-lg hover:bg-[#1a8fc0] disabled:opacity-50 transition-colors"
+                    >
+                      {telegramTesting ? "Sending…" : "📨 Test Telegram"}
+                    </button>
+                    {telegramTestResult && (
+                      <p className="text-sm font-medium">{telegramTestResult}</p>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400">Remember to Save Settings after entering your token and chat ID.</p>
+                </div>
+              </SectionCard>
+
+              {/* ── Browser Push ── */}
+              <SectionCard title="Browser Push Notifications" icon={Bell}>
+                <div className="py-3 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Enable on This Device</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Receive a browser notification even when the admin tab is closed.
+                      Works on Chrome, Edge, and Safari (macOS/iOS 16.4+).
+                    </p>
+                    {pushStatus === "on" && <p className="text-xs text-green-600 font-semibold mt-1">✅ Active on this device</p>}
+                    {pushStatus === "off" && <p className="text-xs text-gray-400 mt-1">Not enabled on this device</p>}
+                  </div>
+                  <button
+                    onClick={handlePushToggle}
+                    disabled={pushStatus === "working" || pushStatus === "idle"}
+                    className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      pushStatus === "on"
+                        ? "bg-red-100 text-red-700 hover:bg-red-200"
+                        : "bg-brand-500 text-white hover:bg-brand-600"
+                    } disabled:opacity-50`}
+                  >
+                    {pushStatus === "working" ? "…" : pushStatus === "on" ? "Disable" : "Enable"}
+                  </button>
+                </div>
               </SectionCard>
 
               <SectionCard title="Delivery Notification Messages" icon={Phone}>

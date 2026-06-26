@@ -206,6 +206,9 @@ export interface StoreSettings {
   updatedAt: string;
   coupons?: Record<string, MockCoupon>;
   flashDeals?: Record<string, MockFlashDeal>;
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  pushSubscription?: Record<string, unknown> | null;
 }
 
 interface StoreData {

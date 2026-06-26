@@ -3,6 +3,7 @@ import { store, createOrderNumber } from "../_mock/store";
 import { TAX_RATE } from "../_mock/data";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetAllOrders } from "@/lib/db";
+import { notifyNewOrder } from "@/lib/notify";
 import { verifySessionToken } from "@/lib/session";
 import { estimateDeliveryFromStoreAsync } from "@/lib/deliveryEstimate";
 import { calcDiscounts } from "@/lib/discountRules";
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
   };
 
   await dbCreateOrder(order);
+  notifyNewOrder(order).catch(() => {}); // fire-and-forget, never block the response
 
   if (couponCode) store.incrementCouponUsage(couponCode);
 

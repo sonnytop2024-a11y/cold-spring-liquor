@@ -2,6 +2,7 @@ import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { NewOrderNotifier } from "@/components/NewOrderNotifier";
+import { PushRegistrar } from "@/components/PushRegistrar";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
       <MobileBottomNav />
       <NewOrderNotifier />
+      <PushRegistrar />
     </div>
   );
 }
