@@ -60,14 +60,14 @@ export function HeroSection() {
             <div className="space-y-4 xs:space-y-5 sm:space-y-7">
 
               {/* Location pill */}
-              <div className="inline-flex items-center gap-1.5 border border-white/15 bg-white/5 backdrop-blur-sm text-[10px] xs:text-xs font-bold uppercase tracking-widest px-3 xs:px-4 py-1.5 rounded-full">
+              <div className="inline-flex items-center gap-1.5 border border-white/15 bg-white/5 backdrop-blur-sm text-[10px] xs:text-xs font-bold uppercase tracking-widest px-3 xs:px-4 py-1.5 rounded-full max-w-full overflow-hidden">
                 <span className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-pulse flex-shrink-0" />
-                <span className="truncate">Leander · Cedar Park · Liberty Hill, Texas</span>
+                <span className="truncate min-w-0">Leander · Cedar Park · Liberty Hill, Texas</span>
               </div>
 
               {/* Headline */}
               <div>
-                <h1 className="font-heading text-4xl xs:text-5xl md:text-7xl font-black leading-[1.02] tracking-tight mb-3 xs:mb-4" style={{ letterSpacing: "-1px" }}>
+                <h1 className="font-heading text-[2rem] xs:text-5xl md:text-7xl font-black leading-[1.02] tracking-tight mb-3 xs:mb-4" style={{ letterSpacing: "-1px" }}>
                   Premium
                   <br />
                   <span style={{ color: "#f97316" }}>Liquor</span>
