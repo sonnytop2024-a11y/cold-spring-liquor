@@ -18,7 +18,8 @@ export async function GET() {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (sb as any).from("csl_settings").select("data").eq("id", 2).maybeSingle();
-    if (error || !data?.data) return NextResponse.json([]);
+    if (error) return NextResponse.json({ _debug: "error", error: String(error.message ?? error) });
+    if (!data?.data) return NextResponse.json({ _debug: "no-data", data });
 
     const map = data.data as Record<string, FlashDeal>;
     const now = new Date();
@@ -30,7 +31,7 @@ export async function GET() {
     });
 
     return NextResponse.json(active);
-  } catch {
-    return NextResponse.json([]);
+  } catch (e) {
+    return NextResponse.json({ _debug: "exception", error: String(e) });
   }
 }
