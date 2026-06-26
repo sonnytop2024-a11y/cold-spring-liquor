@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Server-side proxy: forwards all /api/* calls from admin to the web app.
 // Runs server-side so there is no CORS issue — browser always calls the admin domain.
-const WEB_URL = (process.env.WEB_API_URL ?? "https://coldspringliquor.com").replace(/\/$/, "");
+// WEB_API_URL must point to www. (e.g. https://www.coldspringliquor.com) — the non-www
+// domain issues a 308 redirect which drops custom headers including x-admin-secret.
+const WEB_URL = (process.env.WEB_API_URL ?? "https://www.coldspringliquor.com").replace(/\/$/, "");
 
 type Ctx = { params: { path: string[] } };
 
