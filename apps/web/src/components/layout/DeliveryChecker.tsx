@@ -88,15 +88,22 @@ export function DeliveryChecker() {
     document.head.appendChild(script);
   }, []);
 
-  // Close on outside click
+  // Close on outside click/tap (mousedown for desktop, touchstart for mobile)
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      const target = e.type === "touchstart"
+        ? (e as TouchEvent).touches[0]?.target as Node
+        : (e as MouseEvent).target as Node;
+      if (containerRef.current && !containerRef.current.contains(target)) {
         setShowSuggestions(false);
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
   }, []);
 
   function fetchSuggestions(value: string) {
@@ -214,12 +221,15 @@ export function DeliveryChecker() {
 
               {/* Suggestions dropdown */}
               {showSuggestions && suggestions.length > 0 && (
-                <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden text-left">
+                <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden text-left" style={{ zIndex: 9999 }}>
                   {suggestions.map((s, i) => (
                     <li
                       key={s}
-                      onMouseDown={() => selectSuggestion(s)}
-                      className={`flex items-center gap-2 px-4 py-2.5 text-sm cursor-pointer transition-colors ${
+                      onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
+                      onTouchStart={(e) => { e.stopPropagation(); selectSuggestion(s); }}
+                      onClick={() => selectSuggestion(s)}
+                      style={{ cursor: "pointer" }}
+                      className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors ${
                         i === activeIdx ? "bg-green-50 text-green-800" : "text-gray-700 hover:bg-gray-50"
                       }`}
                     >
