@@ -95,7 +95,7 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
                   setCapturing(false);
                 }
               }}
-              onError={() => setError("PayPal encountered an error. Please try again.")}
+              onError={(err) => setError(`PayPal error: ${JSON.stringify(err)}`)}
               onCancel={() => setError(null)}
             />
           )}
