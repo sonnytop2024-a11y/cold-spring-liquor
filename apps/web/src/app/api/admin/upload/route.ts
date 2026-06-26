@@ -22,7 +22,6 @@ async function processImage(buffer: ArrayBuffer): Promise<Buffer> {
 }
 
 export async function POST(req: NextRequest) {
-  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   try {
     const formData = await req.formData();
     const file = formData.get("image");
