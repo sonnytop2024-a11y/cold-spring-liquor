@@ -79,16 +79,11 @@ const EMPTY: Omit<Product, "id" | "slug"> = {
   inStock: false, featured: false, active: false, description: "", imageUrl: null, bundleEligible: false,
 };
 
-async function fetchProducts(search: string, category: string, stock: string) {
-  const params = new URLSearchParams();
-  if (search)   params.set("q", search);
-  if (category) params.set("category", category);
-  if (stock)    params.set("stock", stock); // "in" | "out" | "" = all
-  const res = await fetch(`${API}/admin/products?${params}`);
+async function fetchAllProducts(): Promise<Product[]> {
+  const res = await fetch(`${API}/admin/products`);
   if (!res.ok) throw new Error(`Failed to load products (${res.status})`);
   const data = await res.json();
-  const list = (Array.isArray(data) ? data : (data.products ?? data.data ?? [])) as Product[];
-  return list;
+  return (Array.isArray(data) ? data : (data.products ?? data.data ?? [])) as Product[];
 }
 
 async function createProduct(body: Partial<Product>) {
@@ -580,10 +575,20 @@ export default function InventoryPage() {
     toastTimer.current = setTimeout(() => setToast(null), ok ? 2500 : 5000);
   }
 
-  const { data: products = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["admin-products", search, catFilter, stockFilter],
-    queryFn: () => fetchProducts(search, catFilter, stockFilter),
-    refetchInterval: 30_000,
+  const { data: allProducts = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ["admin-products"],
+    queryFn: fetchAllProducts,
+    refetchInterval: 60_000,
+  });
+
+  // Client-side filtering — instant, no extra network calls
+  const products = allProducts.filter((p: Product) => {
+    const q = search.toLowerCase();
+    if (q && !p.name.toLowerCase().includes(q) && !(p.brand ?? "").toLowerCase().includes(q)) return false;
+    if (catFilter && p.category !== catFilter) return false;
+    if (stockFilter === "in" && p.stockQty <= 0) return false;
+    if (stockFilter === "out" && p.stockQty > 0) return false;
+    return true;
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-products"] });
@@ -591,10 +596,8 @@ export default function InventoryPage() {
   const createMutation = useMutation({
     mutationFn: createProduct,
     onSuccess: (newProduct: Product) => {
-      // Optimistically prepend the new product to all cached queries
-      qc.setQueriesData(
-        { queryKey: ["admin-products"] },
-        (old: unknown) => Array.isArray(old) ? [newProduct, ...old] : [newProduct],
+      qc.setQueryData(["admin-products"], (old: unknown) =>
+        Array.isArray(old) ? [newProduct, ...old] : [newProduct]
       );
       invalidate();
       setShowModal(false);
@@ -610,12 +613,9 @@ export default function InventoryPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteProduct,
     onMutate: async (id: string) => {
-      // Cancel in-flight fetches so they don't overwrite our optimistic update
       await qc.cancelQueries({ queryKey: ["admin-products"] });
-      // Immediately remove the product from all cached queries
-      qc.setQueriesData(
-        { queryKey: ["admin-products"] },
-        (old: unknown) => Array.isArray(old) ? old.filter((p: Product) => p.id !== id) : old,
+      qc.setQueryData(["admin-products"], (old: unknown) =>
+        Array.isArray(old) ? old.filter((p: Product) => p.id !== id) : old
       );
     },
     onSuccess: () => { invalidate(); showToast("Product deleted."); },
@@ -641,18 +641,11 @@ export default function InventoryPage() {
       return entries;
     },
     onSuccess: (entries) => {
-      // Immediately update the cached products list with new categories so there is no
-      // visible flicker back to the old value while the background refetch runs.
-      qc.setQueriesData(
-        { queryKey: ["admin-products"] },
-        (old: unknown) => {
-          if (!Array.isArray(old)) return old;
-          const catMap = Object.fromEntries(entries);
-          return old.map((p: Product) =>
-            catMap[p.id] ? { ...p, category: catMap[p.id] } : p
-          );
-        }
-      );
+      qc.setQueryData(["admin-products"], (old: unknown) => {
+        if (!Array.isArray(old)) return old;
+        const catMap = Object.fromEntries(entries);
+        return old.map((p: Product) => catMap[p.id] ? { ...p, category: catMap[p.id] } : p);
+      });
       setPendingCats({});
       invalidate(); // background refetch from server to confirm
       showToast(`${entries.length} categor${entries.length === 1 ? "y" : "ies"} updated successfully.`);
@@ -673,9 +666,9 @@ export default function InventoryPage() {
 
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  const activeCount  = products.filter((p: Product) => p.stockQty > 0).length;
-  const lowStock     = products.filter((p: Product) => p.stockQty > 0 && p.stockQty < 5).length;
-  const inactiveCount = products.filter((p: Product) => p.stockQty <= 0).length;
+  const activeCount  = allProducts.filter((p: Product) => p.stockQty > 0).length;
+  const lowStock     = allProducts.filter((p: Product) => p.stockQty > 0 && p.stockQty < 5).length;
+  const inactiveCount = allProducts.filter((p: Product) => p.stockQty <= 0).length;
 
   return (
     <div>
@@ -685,7 +678,11 @@ export default function InventoryPage() {
           <div>
             <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Product Management</h1>
             <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-              <span className="text-sm text-gray-500">{products.length} total</span>
+              <span className="text-sm text-gray-500">
+              {search || catFilter || stockFilter
+                ? <>{products.length} <span className="text-gray-400">of {allProducts.length}</span></>
+                : <>{allProducts.length} total</>}
+            </span>
               <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
                 {activeCount} active
               </span>
