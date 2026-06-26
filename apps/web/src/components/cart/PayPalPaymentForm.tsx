@@ -1,9 +1,55 @@
 "use client";
 
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/utils";
+
+// Waits for PayPal SDK to finish loading before rendering buttons
+function PayPalButtonsWithGuard({ total, orderPayload, onApproveOrder, onError }: {
+  total: number;
+  orderPayload: object;
+  onApproveOrder: (paypalOrderId: string) => Promise<void>;
+  onError: (msg: string) => void;
+}) {
+  const [{ isPending, isRejected }] = usePayPalScriptReducer();
+
+  if (isRejected) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+        <AlertTriangle size={15} className="shrink-0" />
+        Failed to load PayPal. Please check your connection and try again.
+      </div>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-6 text-gray-400 text-sm">
+        <Loader2 size={18} className="animate-spin" /> Loading PayPal…
+      </div>
+    );
+  }
+
+  return (
+    <PayPalButtons
+      style={{ layout: "vertical", shape: "rect", label: "pay", height: 48 }}
+      createOrder={async () => {
+        const res = await fetch("/api/paypal/create-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: total }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.id) throw new Error(data.error ?? "Failed");
+        return data.id as string;
+      }}
+      onApprove={async (data) => { await onApproveOrder(data.orderID); }}
+      onError={(err) => onError(`PayPal error: ${err instanceof Error ? err.message : JSON.stringify(err)}`)}
+      onCancel={() => {}}
+    />
+  );
+}
 
 interface Props {
   total: number;
@@ -66,26 +112,16 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
               <p className="text-sm font-medium">Confirming your payment…</p>
             </div>
           ) : (
-            <PayPalButtons
-              style={{ layout: "vertical", shape: "rect", label: "pay", height: 48 }}
-              createOrder={async () => {
-                setError(null);
-                const res = await fetch("/api/paypal/create-order", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ amount: total }),
-                });
-                const data = await res.json();
-                if (!res.ok || !data.id) throw new Error(data.error ?? "Failed");
-                return data.id as string;
-              }}
-              onApprove={async (data) => {
+            <PayPalButtonsWithGuard
+              total={total}
+              orderPayload={orderPayload}
+              onApproveOrder={async (paypalOrderId) => {
                 setCapturing(true);
                 try {
                   const res = await fetch("/api/paypal/capture-order", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ paypalOrderId: data.orderID, orderPayload }),
+                    body: JSON.stringify({ paypalOrderId, orderPayload }),
                   });
                   const order = await res.json();
                   if (!res.ok) throw new Error(order.error ?? "Capture failed");
@@ -95,8 +131,7 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
                   setCapturing(false);
                 }
               }}
-              onError={(err) => setError(`PayPal error: ${JSON.stringify(err)}`)}
-              onCancel={() => setError(null)}
+              onError={(msg) => setError(msg)}
             />
           )}
 
