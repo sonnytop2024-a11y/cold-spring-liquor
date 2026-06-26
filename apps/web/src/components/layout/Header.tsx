@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingCart, User, Search, Menu, X, Gift, LogOut, ChevronDown, Star, Package } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { CartDrawer } from "@/components/cart/CartDrawer";
@@ -114,8 +115,10 @@ export function Header() {
   const [cartOpen, setCartOpen] = useState(false);
   const { user, isLoggedIn, logout, fetchMe } = useAuthStore();
   const itemCount = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0));
+  const pathname = usePathname();
 
   useEffect(() => { fetchMe(); }, [fetchMe]);
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   return (
     <>
