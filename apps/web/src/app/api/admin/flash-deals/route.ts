@@ -1,3 +1,4 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../_mock/store";
 
@@ -6,6 +7,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json();
   const { name, brand, slug, price, salePrice, imageUrl, volume, stockQty, maxStock, active, startAt, endsAt } = body;
 

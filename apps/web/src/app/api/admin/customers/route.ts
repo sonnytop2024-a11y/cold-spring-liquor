@@ -1,3 +1,4 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetAllOrders } from "@/lib/db";
 
@@ -18,6 +19,7 @@ async function getAllUsers(): Promise<any[]> {
 }
 
 export async function GET(req: NextRequest) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const search = req.nextUrl.searchParams.get("search")?.toLowerCase() ?? "";
 
   const [users, orders] = await Promise.all([getAllUsers(), dbGetAllOrders()]);

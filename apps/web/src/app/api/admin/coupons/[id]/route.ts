@@ -1,7 +1,9 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../../_mock/store";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json();
   const coupon = store.updateCoupon(params.id, {
     ...body,

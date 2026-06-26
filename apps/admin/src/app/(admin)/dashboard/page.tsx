@@ -127,9 +127,13 @@ export default function DashboardPage() {
     ? `${API}/admin/reports?period=custom&from=${from}&to=${to}`
     : `${API}/admin/reports?period=${period}`;
 
-  const { data: d = {}, isLoading, dataUpdatedAt, refetch } = useQuery({
+  const { data: d = {}, isLoading, isError, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["admin-dashboard", period, from, to],
-    queryFn: () => fetch(apiUrl).then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error(`Failed to load dashboard (${res.status})`);
+      return res.json();
+    },
     refetchInterval: 10_000,
     staleTime: 5_000,
   });
@@ -181,6 +185,13 @@ export default function DashboardPage() {
           <span className="text-sm">To</span>
           <input type="date" value={to} onChange={e => setTo(e.target.value)}
             className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+      )}
+
+      {isError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3 text-red-700 text-sm">
+          <span>⚠️ Failed to load dashboard data.</span>
+          <button onClick={() => refetch()} className="underline font-medium hover:text-red-900">Retry</button>
         </div>
       )}
 

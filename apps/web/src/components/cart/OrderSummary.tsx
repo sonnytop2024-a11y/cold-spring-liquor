@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCartStore } from "@/store/cartStore";
+import { useCheckoutStore } from "@/store/checkoutStore";
 import { formatCurrency } from "@/lib/utils";
 
 const TAX_RATE = 0.0825;
@@ -20,6 +21,7 @@ function calcBundlePct(totalQty: number, tiers: BundleTier[]): number {
 
 export function OrderSummary() {
   const { items } = useCartStore();
+  const { promoCode, promoDiscount } = useCheckoutStore();
   const [bundleTiers, setBundleTiers] = useState<BundleTier[]>([]);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function OrderSummary() {
   const bundlePct = calcBundlePct(totalQty, bundleTiers);
   const bundleDiscount = subtotal * bundlePct;
   const tax = subtotal * TAX_RATE;
-  const total = subtotal - bundleDiscount + tax;
+  const total = Math.max(0, subtotal - bundleDiscount - promoDiscount + tax);
 
   return (
     <div className="bg-white border rounded-xl p-5 sticky top-20 xs:top-24">
@@ -104,6 +106,13 @@ export function OrderSummary() {
           </div>
         )}
 
+        {promoDiscount > 0 && (
+          <div className="flex justify-between text-green-600 font-medium">
+            <span>🏷️ Promo {promoCode && `(${promoCode})`}</span>
+            <span>-{formatCurrency(promoDiscount)}</span>
+          </div>
+        )}
+
         <div className="flex justify-between text-green-600 font-medium">
           <span>🚚 Delivery</span>
           <span>FREE</span>
@@ -122,10 +131,10 @@ export function OrderSummary() {
           <span>{formatCurrency(total)}</span>
         </div>
 
-        {(flashSavings > 0 || bundleDiscount > 0) && (
+        {(flashSavings > 0 || bundleDiscount > 0 || promoDiscount > 0) && (
           <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-green-700 font-semibold">
-              You save {formatCurrency(flashSavings + bundleDiscount)} on this order!
+              You save {formatCurrency(flashSavings + bundleDiscount + promoDiscount)} on this order!
             </p>
           </div>
         )}

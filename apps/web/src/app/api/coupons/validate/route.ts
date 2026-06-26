@@ -26,8 +26,10 @@ export async function POST(req: NextRequest) {
   }
 
   let discount = 0;
+  let message = `✓ ${coupon.label}`;
   if (coupon.type === "fixed") discount = Math.min(coupon.value, subtotal);
-  else if (coupon.type === "percentage") discount = Math.round(subtotal * coupon.value) / 100;
+  else if (coupon.type === "percentage") discount = Math.round(subtotal * (coupon.value / 100) * 100) / 100;
+  else if (coupon.type === "free_delivery") { discount = 0; message = "✓ FREE Delivery applied!"; }
 
-  return NextResponse.json({ discount, message: `✓ ${coupon.label}`, code: coupon.code, type: coupon.type });
+  return NextResponse.json({ discount, message, code: coupon.code, type: coupon.type });
 }

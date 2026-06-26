@@ -1,3 +1,4 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetOrder, dbUpdateOrder } from "@/lib/db";
 import type { OrderStatus } from "../../../_mock/store";
@@ -9,6 +10,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json();
   const order = await dbGetOrder(params.id);
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });

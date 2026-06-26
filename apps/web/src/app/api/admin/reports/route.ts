@@ -1,3 +1,4 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../_mock/store";
 import type { MockOrder } from "../../_mock/store";
@@ -66,6 +67,7 @@ function buildDailyChart(orders: MockOrder[], start: Date, end: Date) {
 }
 
 export async function GET(req: NextRequest) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const { searchParams } = req.nextUrl;
   const period = searchParams.get("period") ?? "today";
   const fromParam = searchParams.get("from") ?? undefined;

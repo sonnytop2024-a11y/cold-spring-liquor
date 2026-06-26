@@ -13,6 +13,9 @@ async function proxy(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
   const forwardHeaders: Record<string, string> = {};
   const ct = req.headers.get("content-type");
   if (ct) forwardHeaders["content-type"] = ct;
+  // Forward admin secret so web API can verify the request came from admin panel
+  const adminSecret = process.env.ADMIN_SECRET ?? "csl-admin-dev-secret";
+  forwardHeaders["x-admin-secret"] = adminSecret;
 
   try {
     const hasBody = req.method !== "GET" && req.method !== "HEAD";

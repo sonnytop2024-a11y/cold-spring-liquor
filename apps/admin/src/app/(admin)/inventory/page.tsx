@@ -551,7 +551,7 @@ export default function InventoryPage() {
     toastTimer.current = setTimeout(() => setToast(null), ok ? 2500 : 5000);
   }
 
-  const { data: products = [], isLoading } = useQuery({
+  const { data: products = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-products", search, catFilter, stockFilter],
     queryFn: () => fetchProducts(search, catFilter, stockFilter),
     refetchInterval: 30_000,
@@ -749,7 +749,12 @@ export default function InventoryPage() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border overflow-hidden">
-        {isLoading ? (
+        {isError ? (
+          <div className="p-12 text-center text-red-500">
+            <p className="font-medium mb-2">⚠️ Failed to load products.</p>
+            <button onClick={() => refetch()} className="text-sm underline hover:text-red-700">Retry</button>
+          </div>
+        ) : isLoading ? (
           <div className="p-12 text-center text-gray-400">
             <div className="animate-spin border-2 border-brand-500 border-t-transparent rounded-full w-8 h-8 mx-auto mb-2" />
             Loading products...

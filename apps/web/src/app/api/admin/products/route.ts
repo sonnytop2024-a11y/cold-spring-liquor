@@ -1,8 +1,10 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetAllProducts, dbSaveProduct } from "@/lib/db";
 import type { MockProduct } from "../../_mock/store";
 
 export async function GET(req: NextRequest) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const { searchParams } = req.nextUrl;
   const q        = searchParams.get("q")?.toLowerCase() ?? searchParams.get("search")?.toLowerCase();
   const category = searchParams.get("category");
@@ -19,6 +21,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json();
   const stockQty = Number(body.stockQty) || 0;
   const id = `p${Date.now()}`;

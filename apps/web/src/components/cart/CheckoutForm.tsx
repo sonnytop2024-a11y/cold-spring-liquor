@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
+import { useCheckoutStore } from "@/store/checkoutStore";
 import { useRouter } from "next/navigation";
 import { formatCurrency, MIN_ORDER } from "@/lib/utils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
@@ -274,6 +275,7 @@ export function CheckoutForm() {
   const [promoMsg, setPromoMsg] = useState("");
   const [promoError, setPromoError] = useState("");
   const [applyingPromo, setApplyingPromo] = useState(false);
+  const { setPromo, clearPromo } = useCheckoutStore();
 
   const [showSummary, setShowSummary] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -350,8 +352,8 @@ export function CheckoutForm() {
     try {
       const res = await fetch("/api/coupons/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotal: subtotal - bundleDiscount }) });
       const data = await res.json();
-      if (!res.ok) { setPromoError(data.error ?? "Invalid code"); setPromoDiscount(0); setPromoCode(null); }
-      else { setPromoCode(code); setPromoDiscount(data.discount); setPromoMsg(data.message); }
+      if (!res.ok) { setPromoError(data.error ?? "Invalid code"); setPromoDiscount(0); setPromoCode(null); clearPromo(); }
+      else { setPromoCode(code); setPromoDiscount(data.discount); setPromoMsg(data.message); setPromo(code, data.discount); }
     } catch { setPromoError("Could not validate. Try: WELCOME10"); }
     finally { setApplyingPromo(false); }
   }
@@ -394,7 +396,9 @@ export function CheckoutForm() {
         return;
       }
     } catch {
-      // If validation API fails, let the order proceed (don't block on API error)
+      setZoneError("Could not verify delivery address. Please check your address and try again.");
+      setSubmitting(false);
+      return;
     }
 
     try {
@@ -548,7 +552,7 @@ export function CheckoutForm() {
               <p className="font-bold text-green-700 text-sm">{promoCode} applied!</p>
               <p className="text-xs text-green-600">{promoMsg}</p>
             </div>
-            <button type="button" onClick={() => { setPromoCode(null); setPromoDiscount(0); setPromoMsg(""); setPromoInput(""); }} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
+            <button type="button" onClick={() => { setPromoCode(null); setPromoDiscount(0); setPromoMsg(""); setPromoInput(""); clearPromo(); }} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
           </div>
         ) : (
           <div>

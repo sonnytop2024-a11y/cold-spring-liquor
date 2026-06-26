@@ -1,8 +1,10 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetProduct, dbSaveProduct, dbDeleteProduct, dbUpdateProduct } from "@/lib/db";
 import type { MockProduct } from "@/app/api/_mock/store";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json();
 
   // Direct single-row lookup — much faster than loading all products
@@ -47,6 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 // PATCH — surgical partial update (only the provided fields, uses UPDATE not upsert)
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   try {
     const body = await req.json();
     const result = await dbUpdateProduct(params.id, body);
