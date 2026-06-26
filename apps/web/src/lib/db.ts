@@ -229,6 +229,50 @@ export async function dbDeleteCoupon(id: string): Promise<boolean> {
   return true;
 }
 
+// ── Flash Deals (stored inside csl_settings.flashDeals) ──────────────────────
+
+import type { MockFlashDeal } from "../app/api/_mock/store";
+
+async function dbLoadFlashDealMap(): Promise<Record<string, MockFlashDeal>> {
+  const settings = await dbGetSettings();
+  if (settings.flashDeals) return settings.flashDeals as Record<string, MockFlashDeal>;
+  // First time: no seed defaults — start empty
+  const empty: Record<string, MockFlashDeal> = {};
+  await dbSaveSettings({ flashDeals: empty } as any);
+  return empty;
+}
+
+export async function dbGetAllFlashDeals(): Promise<MockFlashDeal[]> {
+  const map = await dbLoadFlashDealMap();
+  return Object.values(map).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function dbGetActiveFlashDeals(): Promise<MockFlashDeal[]> {
+  const all = await dbGetAllFlashDeals();
+  const now = new Date();
+  return all.filter(d => {
+    if (!d.active) return false;
+    if (d.startAt && new Date(d.startAt) > now) return false;
+    if (d.endsAt && new Date(d.endsAt) < now) return false;
+    return true;
+  });
+}
+
+export async function dbSaveFlashDeal(deal: MockFlashDeal): Promise<MockFlashDeal> {
+  const map = await dbLoadFlashDealMap();
+  map[deal.id] = deal;
+  await dbSaveSettings({ flashDeals: map } as any);
+  return deal;
+}
+
+export async function dbDeleteFlashDeal(id: string): Promise<boolean> {
+  const map = await dbLoadFlashDealMap();
+  if (!map[id]) return false;
+  delete map[id];
+  await dbSaveSettings({ flashDeals: map } as any);
+  return true;
+}
+
 // ── Supabase REST fetch helpers (bypass JS client — guaranteed to work) ────────
 
 import type { MockUser } from "../app/api/_mock/store";

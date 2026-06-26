@@ -205,6 +205,7 @@ export interface StoreSettings {
   msgArrived: string;
   updatedAt: string;
   coupons?: Record<string, MockCoupon>;
+  flashDeals?: Record<string, MockFlashDeal>;
 }
 
 interface StoreData {

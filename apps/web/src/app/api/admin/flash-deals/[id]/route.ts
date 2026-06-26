@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../../_mock/store";
+import { dbGetAllFlashDeals, dbSaveFlashDeal, dbDeleteFlashDeal } from "@/lib/db";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const updated = store.updateFlashDeal(params.id, body);
-  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const all = await dbGetAllFlashDeals();
+  const existing = all.find(d => d.id === params.id);
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const updated = { ...existing, ...body, id: params.id };
+  await dbSaveFlashDeal(updated);
   return NextResponse.json(updated);
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const ok = store.deleteFlashDeal(params.id);
+  const ok = await dbDeleteFlashDeal(params.id);
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true });
 }

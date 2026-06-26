@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetAllFlashDeals, dbSaveFlashDeal } from "@/lib/db";
 
 export async function GET() {
-  return NextResponse.json(store.getAllFlashDeals());
+  return NextResponse.json(await dbGetAllFlashDeals());
 }
 
 export async function POST(req: NextRequest) {
@@ -13,7 +13,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name, price, salePrice required" }, { status: 400 });
   }
 
-  const deal = store.createFlashDeal({
+  const deal = {
+    id: `fd${Date.now()}`,
+    createdAt: new Date().toISOString(),
     name, brand: brand ?? "", slug: slug ?? name.toLowerCase().replace(/\s+/g, "-"),
     price: Number(price), salePrice: Number(salePrice),
     imageUrl: imageUrl ?? null, volume: volume ?? "",
@@ -22,7 +24,8 @@ export async function POST(req: NextRequest) {
     startAt: startAt || null,
     endsAt: endsAt || null,
     productId: productId ?? null,
-  });
+  };
 
+  await dbSaveFlashDeal(deal);
   return NextResponse.json(deal, { status: 201 });
 }
