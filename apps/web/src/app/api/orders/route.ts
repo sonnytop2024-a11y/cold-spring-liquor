@@ -31,9 +31,8 @@ export async function POST(req: NextRequest) {
   const subtotal = Math.round(items.reduce((acc: number, i: any) => acc + i.price * i.quantity, 0) * 100) / 100;
   const totalQty = items.reduce((acc: number, i: any) => acc + i.quantity, 0);
   const bundleDiscount = Math.round(calcBundleDiscount(totalQty, subtotal) * 100) / 100;
-  const discountedSub = subtotal - bundleDiscount - couponDiscount;
-  const tax = Math.round(discountedSub * TAX_RATE * 100) / 100;
-  const total = Math.round(Math.max(0, discountedSub + tax) * 100) / 100;
+  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
+  const total = Math.round(Math.max(0, subtotal - bundleDiscount - couponDiscount + tax) * 100) / 100;
 
   const id = `order_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const nowDate = new Date();

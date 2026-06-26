@@ -337,9 +337,8 @@ export function CheckoutForm() {
     return 0;
   })();
   const bundleDiscount = subtotal * bundlePct;
-  const afterBundle = subtotal - bundleDiscount;
-  const tax = (afterBundle - promoDiscount) * TAX;
-  const total = Math.max(0, afterBundle - promoDiscount + tax);
+  const tax = subtotal * TAX;
+  const total = Math.max(0, subtotal - bundleDiscount - promoDiscount + tax);
   const pointsEarned = Math.floor(total * 10);
   const meetsMinimum = subtotal >= MIN_ORDER;
   const amountToMin = Math.max(0, MIN_ORDER - subtotal);
@@ -349,7 +348,7 @@ export function CheckoutForm() {
     if (!code) return;
     setApplyingPromo(true); setPromoError(""); setPromoMsg("");
     try {
-      const res = await fetch("/api/coupons/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotal: afterBundle }) });
+      const res = await fetch("/api/coupons/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotal: subtotal - bundleDiscount }) });
       const data = await res.json();
       if (!res.ok) { setPromoError(data.error ?? "Invalid code"); setPromoDiscount(0); setPromoCode(null); }
       else { setPromoCode(code); setPromoDiscount(data.discount); setPromoMsg(data.message); }

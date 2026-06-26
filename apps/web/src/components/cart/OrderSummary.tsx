@@ -47,9 +47,8 @@ export function OrderSummary() {
 
   const bundlePct = calcBundlePct(totalQty, bundleTiers);
   const bundleDiscount = subtotal * bundlePct;
-  const afterBundle = subtotal - bundleDiscount;
-  const tax = afterBundle * TAX_RATE;
-  const total = afterBundle + tax;
+  const tax = subtotal * TAX_RATE;
+  const total = subtotal - bundleDiscount + tax;
 
   return (
     <div className="bg-white border rounded-xl p-5 sticky top-24">
