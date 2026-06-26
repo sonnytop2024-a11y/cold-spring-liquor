@@ -286,6 +286,10 @@ export function CheckoutForm() {
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
   const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number } | null>(null);
 
+  // Scroll to top on mount and whenever switching to the payment step
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
+  useEffect(() => { if (clientSecret) window.scrollTo({ top: 0, behavior: "smooth" }); }, [clientSecret]);
+
   // ── Read reorder prefill from localStorage (runs once on mount) ───────────
   const [reorderPrefill, setReorderPrefill] = useState<Record<string, any> | null>(null);
   useEffect(() => {
