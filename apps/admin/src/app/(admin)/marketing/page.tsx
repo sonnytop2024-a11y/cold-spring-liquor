@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Tag, Edit2, Trash2, Loader2, X, Check,
@@ -194,20 +194,30 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
   const [search, setSearch] = useState("");
   const [showPicker, setShowPicker] = useState(!isEdit);
 
+  // Products for picker — fetch fresh each time picker opens, no cache
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productError, setProductError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    setLoadingProducts(true);
+    setProductError(null);
+    fetch(`${API}/admin/products`)
+      .then(r => {
+        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+        return r.json();
+      })
+      .then(json => {
+        const list: InventoryProduct[] = Array.isArray(json) ? json : (json.products ?? []);
+        setProducts(list);
+      })
+      .catch(e => setProductError(String(e)))
+      .finally(() => setLoadingProducts(false));
+  }, [showPicker]);
+
   function set(k: keyof FlashDeal, v: any) { setForm(f => ({ ...f, [k]: v })); }
   async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
-
-  const { data: products = [], isLoading: loadingProducts } = useQuery<InventoryProduct[]>({
-    queryKey: ["admin-products-picker"],
-    queryFn: async () => {
-      const r = await fetch(`${API}/admin/products`);
-      if (!r.ok) throw new Error("Failed");
-      const json = await r.json();
-      // API returns { products: [...], total: N } or array directly
-      return Array.isArray(json) ? json : (json.products ?? []);
-    },
-    staleTime: 60_000,
-  });
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -270,8 +280,19 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
                 <div className="py-12 flex items-center justify-center gap-2 text-gray-400">
                   <Loader2 size={20} className="animate-spin" /> Loading products…
                 </div>
+              ) : productError ? (
+                <div className="py-10 text-center">
+                  <p className="text-red-500 text-sm font-medium mb-2">Failed to load products</p>
+                  <p className="text-xs text-gray-400 mb-3">{productError}</p>
+                  <button onClick={() => { setShowPicker(false); setTimeout(() => setShowPicker(true), 50); }}
+                    className="text-xs bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-600">
+                    Retry
+                  </button>
+                </div>
               ) : filtered.length === 0 ? (
-                <p className="text-center text-gray-400 py-10 text-sm">No products found</p>
+                <p className="text-center text-gray-400 py-10 text-sm">
+                  {products.length === 0 ? "No products in inventory" : "No products match your search"}
+                </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2.5 max-h-[52vh] overflow-y-auto pr-1">
                   {filtered.map(p => (
