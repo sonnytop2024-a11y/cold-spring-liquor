@@ -37,6 +37,7 @@ async function exportProductsCSV() {
 
 const CATEGORIES: { value: string; label: string }[] = [
   { value: "whiskey",   label: "Whiskey" },
+  { value: "scotch",    label: "Scotch" },
   { value: "tequila",   label: "Tequila" },
   { value: "vodka",     label: "Vodka" },
   { value: "rum",       label: "Rum" },
@@ -46,6 +47,7 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: "champagne", label: "Champagne" },
   { value: "cognac",    label: "Cognac" },
   { value: "rtd",       label: "RTD" },
+  { value: "mixer",     label: "Mixer" },
   { value: "liqueur",   label: "Liqueur" },
   { value: "rare",      label: "💎 Hard to Find" },
   { value: "other",     label: "Other" },

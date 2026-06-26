@@ -17,6 +17,7 @@ const CATS: Cat[] = [
   { label: "New Products", value: "featured",  emoji: "⭐", type: "featured" },
   { label: "Hard to Find", value: "rare",      emoji: "💎", type: "category" },
   { label: "Whiskey",      value: "whiskey",   emoji: "🥃", type: "category" },
+  { label: "Scotch",       value: "scotch",    emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", type: "category" },
   { label: "Vodka",        value: "vodka",     emoji: "🍸", type: "category" },
   { label: "Tequila",      value: "tequila",   emoji: "🌵", type: "category" },
   { label: "Rum",          value: "rum",       emoji: "🍹", type: "category" },
@@ -26,6 +27,7 @@ const CATS: Cat[] = [
   { label: "Beer",         value: "beer",      emoji: "🍺", type: "category" },
   { label: "Cognac",       value: "cognac",    emoji: "🥂", type: "category" },
   { label: "RTD",          value: "rtd",       emoji: "🧃", type: "category" },
+  { label: "Mixer",        value: "mixer",     emoji: "🥤", type: "category" },
   { label: "Liqueur",      value: "liqueur",   emoji: "🌸", type: "category" },
 ];
 
