@@ -8,11 +8,13 @@ import { API } from "@/lib/api";
 async function fetchCustomers(search: string) {
   const q = search ? `?search=${encodeURIComponent(search)}` : "";
   const res = await fetch(`${API}/admin/customers${q}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load customers (${res.status})`);
   return res.json();
 }
 
 async function fetchCustomerOrders(customerId: string) {
   const res = await fetch(`${API}/admin/customers/${customerId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load customer orders (${res.status})`);
   return res.json();
 }
 

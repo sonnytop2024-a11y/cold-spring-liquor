@@ -207,6 +207,7 @@ export default function OrdersPage() {
     queryFn: async () => {
       const q = statusFilter ? `?status=${statusFilter}` : "";
       const r = await fetch(`${API}/admin/orders${q}`);
+      if (!r.ok) throw new Error(`Failed to load orders (${r.status})`);
       return r.json();
     },
     refetchInterval: 5_000,

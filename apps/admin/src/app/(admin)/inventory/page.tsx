@@ -82,8 +82,10 @@ async function fetchProducts(search: string, category: string, stock: string) {
   if (category) params.set("category", category);
   if (stock)    params.set("stock", stock); // "in" | "out" | "" = all
   const res = await fetch(`${API}/admin/products?${params}`);
+  if (!res.ok) throw new Error(`Failed to load products (${res.status})`);
   const data = await res.json();
-  return (data.products ?? data.data ?? data) as Product[];
+  const list = data.products ?? data.data ?? data;
+  return (Array.isArray(list) ? list : []) as Product[];
 }
 
 async function createProduct(body: Partial<Product>) {
