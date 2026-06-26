@@ -17,11 +17,10 @@ export async function GET() {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (sb as any).from("csl_settings").select("data").eq("id", 2).maybeSingle();
-    if (error) return NextResponse.json({ _debug: "error", error: String(error.message ?? error) });
-    if (!data?.data) return NextResponse.json({ _debug: "no-data", data });
+    const { data, error } = await (sb as any).from("csl_settings").select("data").eq("id", 1).maybeSingle();
+    if (error || !data?.data?.flashDeals) return NextResponse.json([]);
 
-    const map = data.data as Record<string, FlashDeal>;
+    const map = data.data.flashDeals as Record<string, FlashDeal>;
     const now = new Date();
     const active = Object.values(map).filter(d => {
       if (!d.active) return false;
@@ -31,7 +30,7 @@ export async function GET() {
     });
 
     return NextResponse.json(active);
-  } catch (e) {
-    return NextResponse.json({ _debug: "exception", error: String(e) });
+  } catch {
+    return NextResponse.json([]);
   }
 }

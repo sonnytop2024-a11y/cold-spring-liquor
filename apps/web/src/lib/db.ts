@@ -229,18 +229,16 @@ export async function dbDeleteCoupon(id: string): Promise<boolean> {
   return true;
 }
 
-// ── Flash Deals (stored in csl_settings row id=2, separate from main settings) ─
+// ── Flash Deals (stored in csl_settings row id=1 under flashDeals key) ───────
 
 import type { MockFlashDeal } from "../app/api/_mock/store";
-
-const FLASH_ROW_ID = 2;
 
 async function dbLoadFlashDealMap(): Promise<Record<string, MockFlashDeal>> {
   const t = tbl("csl_settings");
   if (t) {
     try {
-      const { data, error } = await t.select("data").eq("id", FLASH_ROW_ID).maybeSingle();
-      if (!error && data?.data) return data.data as Record<string, MockFlashDeal>;
+      const { data, error } = await t.select("data").eq("id", 1).maybeSingle();
+      if (!error && data?.data?.flashDeals) return data.data.flashDeals as Record<string, MockFlashDeal>;
       if (error) console.error("[db] loadFlashDeals error:", error.message);
     } catch (e) {
       console.error("[db] loadFlashDeals exception:", e);
@@ -253,7 +251,11 @@ async function dbSaveFlashDealMap(map: Record<string, MockFlashDeal>): Promise<v
   const t = tbl("csl_settings");
   if (!t) return;
   try {
-    const { error } = await t.upsert({ id: FLASH_ROW_ID, data: map }, { onConflict: "id" });
+    // Read current row, patch flashDeals field, write back
+    const { data } = await t.select("data").eq("id", 1).maybeSingle();
+    const current = (data?.data ?? {}) as Record<string, unknown>;
+    const updated = { ...current, flashDeals: map };
+    const { error } = await t.upsert({ id: 1, data: updated }, { onConflict: "id" });
     if (error) console.error("[db] saveFlashDeals error:", error.message);
   } catch (e) {
     console.error("[db] saveFlashDeals exception:", e);
