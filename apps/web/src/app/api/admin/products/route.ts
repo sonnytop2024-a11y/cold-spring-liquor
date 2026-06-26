@@ -4,7 +4,6 @@ import { dbGetAllProducts, dbSaveProduct } from "@/lib/db";
 import type { MockProduct } from "../../_mock/store";
 
 export async function GET(req: NextRequest) {
-  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const { searchParams } = req.nextUrl;
   const q        = searchParams.get("q")?.toLowerCase() ?? searchParams.get("search")?.toLowerCase();
   const category = searchParams.get("category");
