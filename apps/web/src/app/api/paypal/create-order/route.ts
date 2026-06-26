@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       cache: "no-store",
     });
     const data = await res.json();
-    if (!data.id) console.error("[paypal] create-order response:", JSON.stringify(data));
+    if (!data.id) return NextResponse.json({ error: data }, { status: 400 });
     return NextResponse.json({ id: data.id });
   } catch (err) {
     console.error("[paypal] create-order error:", err);
