@@ -40,7 +40,7 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
 
       script = document.createElement("script");
       script.setAttribute("data-paypal-sdk", "true");
-      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&components=buttons&enable-funding=venmo&disable-funding=credit,card,paylater`;
+      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&enable-funding=venmo`;
       script.async = true;
 
       script.onload = () => setSdkReady(true);
