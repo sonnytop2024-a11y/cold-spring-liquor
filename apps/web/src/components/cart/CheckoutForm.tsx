@@ -12,6 +12,7 @@ import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { PayPalPaymentForm } from "./PayPalPaymentForm";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -284,11 +285,12 @@ export function CheckoutForm() {
   const [zoneError, setZoneError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
+  const [paymentStep, setPaymentStep] = useState<null | "select" | "paypal">(null);
   const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number } | null>(null);
 
   // Scroll to top on mount and whenever switching to the payment step
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
-  useEffect(() => { if (clientSecret) window.scrollTo({ top: 0, behavior: "smooth" }); }, [clientSecret]);
+  useEffect(() => { if (clientSecret || paymentStep) window.scrollTo({ top: 0, behavior: "smooth" }); }, [clientSecret, paymentStep]);
 
   // ── Read reorder prefill from localStorage (runs once on mount) ───────────
   const [reorderPrefill, setReorderPrefill] = useState<Record<string, any> | null>(null);
@@ -402,18 +404,25 @@ export function CheckoutForm() {
       return;
     }
 
+    const payload = {
+      items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity })),
+      deliveryAddress: delivery,
+      billingAddress: sameBilling ? delivery : billing,
+      billingAddressSameAsDelivery: sameBilling,
+      customerName: name,
+      customerEmail: email,
+      customerPhone: phone,
+      couponCode: promoCode,
+      couponDiscount: promoDiscount,
+    };
+    setOrderPayload(payload);
+    setPaymentStep("select");
+    setSubmitting(false);
+  }
+
+  async function selectStripe() {
+    setSubmitting(true);
     try {
-      const payload = {
-        items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity })),
-        deliveryAddress: delivery,
-        billingAddress: sameBilling ? delivery : billing,
-        billingAddressSameAsDelivery: sameBilling,
-        customerName: name,
-        customerEmail: email,
-        customerPhone: phone,
-        couponCode: promoCode,
-        couponDiscount: promoDiscount,
-      };
       const res = await fetch("/api/stripe/payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -421,10 +430,11 @@ export function CheckoutForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setOrderPayload(payload);
+      setPaymentStep(null);
       setClientSecret(data.clientSecret);
     } catch {
       alert("Something went wrong. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -436,6 +446,81 @@ export function CheckoutForm() {
         total={thankYouOrder.total}
         customerName={name}
         onTrack={() => router.push(`/track/${thankYouOrder.orderId}`)}
+      />
+    );
+  }
+
+  // ── Payment method selection ────────────────────────────────────────────────
+  if (paymentStep === "select") {
+    return (
+      <div className="space-y-5">
+        <div className="bg-white border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-bold text-xl">Choose Payment</h2>
+            <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+          </div>
+          <p className="text-xs text-gray-400 mb-6">Select how you'd like to pay</p>
+
+          <div className="space-y-3">
+            {/* Card / Apple Pay / Klarna */}
+            <button onClick={selectStripe} disabled={submitting}
+              className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-brand-400 rounded-2xl p-4 text-left transition-all group">
+              <div className="w-12 h-12 bg-gray-100 group-hover:bg-brand-50 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                <CreditCard size={22} className="text-gray-600 group-hover:text-brand-500" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-gray-900">Card · Apple Pay · Klarna</p>
+                <p className="text-xs text-gray-400 mt-0.5">Credit/debit, Apple Pay, Google Pay, or pay later</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                {["💳", "🍎", "K"].map(icon => (
+                  <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-bold">{icon}</span>
+                ))}
+              </div>
+            </button>
+
+            {/* PayPal / Venmo */}
+            <button onClick={() => setPaymentStep("paypal")}
+              className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-[#0070BA] rounded-2xl p-4 text-left transition-all group">
+              <div className="w-12 h-12 bg-[#003087] rounded-xl flex items-center justify-center shrink-0">
+                <span className="text-white font-black text-lg">P</span>
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-gray-900">PayPal · Venmo</p>
+                <p className="text-xs text-gray-400 mt-0.5">Pay with your PayPal balance, bank, or Venmo</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                {["🅿️", "V"].map(icon => (
+                  <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-sm font-bold">{icon}</span>
+                ))}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" onClick={() => { setPaymentStep(null); setOrderPayload(null); }}
+          className="w-full border-2 border-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+          ← Back to your details
+        </button>
+
+        <p className="text-center text-xs text-gray-400">
+          🔒 All payments are encrypted and secure. Must be 21+.
+        </p>
+      </div>
+    );
+  }
+
+  // ── PayPal / Venmo ───────────────────────────────────────────────────────────
+  if (paymentStep === "paypal") {
+    return (
+      <PayPalPaymentForm
+        total={total}
+        orderPayload={orderPayload!}
+        onSuccess={(order) => {
+          clearCart();
+          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total });
+        }}
+        onCancel={() => setPaymentStep("select")}
       />
     );
   }
@@ -477,7 +562,7 @@ export function CheckoutForm() {
               total: order.total,
             });
           }}
-          onCancel={() => { setClientSecret(null); setOrderPayload(null); setSubmitting(false); }}
+          onCancel={() => { setClientSecret(null); setPaymentStep("select"); setSubmitting(false); }}
         />
       </Elements>
     );
