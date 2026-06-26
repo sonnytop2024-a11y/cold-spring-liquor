@@ -425,7 +425,7 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
               <label className="block text-sm font-medium mb-1">Stock Qty *</label>
               <input
                 required
-                type="number"
+                type="text" inputMode="decimal"
                 min="0"
                 value={form.stockQty}
                 onChange={(e) => set("stockQty", parseInt(e.target.value) || 0)}
@@ -448,7 +448,7 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
             <div>
               <label className="block text-sm font-medium mb-1">ABV (%)</label>
               <input
-                type="number"
+                type="text" inputMode="decimal"
                 min="0"
                 max="100"
                 step="0.1"

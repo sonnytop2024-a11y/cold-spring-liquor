@@ -83,13 +83,14 @@ function Field({ label, description, children }: { label: string; description?: 
 
 function Input({ value, onChange, type = "text", placeholder, prefix }: {
   value: string | number; onChange: (v: string) => void; type?: string;
-  placeholder?: string; prefix?: string;
+  placeholder?: string; prefix?: string; inputMode?: string;
 }) {
   return (
     <div className="flex items-center border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-400 bg-white">
       {prefix && <span className="px-3 text-sm text-gray-500 border-r bg-gray-50 h-full flex items-center py-2">{prefix}</span>}
       <input
         type={type}
+        inputMode="decimal"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
@@ -418,20 +419,20 @@ export default function SettingsPage() {
             <>
             <SectionCard title="Delivery Settings" icon={Truck}>
               <Field label="Delivery Radius" description="Maximum miles for delivery">
-                <Input value={form.deliveryRadius} onChange={v => set("deliveryRadius", Number(v))} type="number" prefix="miles" />
+                <Input value={form.deliveryRadius} onChange={v => set("deliveryRadius", Number(v))} type="text" inputMode="decimal" prefix="miles" />
               </Field>
               <Field label="Same-Day Delivery Time" description="Normal estimated range when store is open">
                 <div className="flex items-center gap-2">
-                  <input type="number" value={form.deliveryTimeMin} onChange={e => set("deliveryTimeMin", Number(e.target.value))}
+                  <input type="text" inputMode="decimal" value={form.deliveryTimeMin} onChange={e => set("deliveryTimeMin", Number(e.target.value))}
                     className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
                   <span className="text-gray-400 text-sm">to</span>
-                  <input type="number" value={form.deliveryTimeMax} onChange={e => set("deliveryTimeMax", Number(e.target.value))}
+                  <input type="text" inputMode="decimal" value={form.deliveryTimeMax} onChange={e => set("deliveryTimeMax", Number(e.target.value))}
                     className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
                   <span className="text-sm text-gray-500">minutes</span>
                 </div>
               </Field>
               <Field label="Minimum Order" description="Block checkout if order is below this">
-                <Input value={form.minOrderAmount} onChange={v => set("minOrderAmount", Number(v))} type="number" prefix="$" />
+                <Input value={form.minOrderAmount} onChange={v => set("minOrderAmount", Number(v))} type="text" inputMode="decimal" prefix="$" />
                 <p className="text-xs text-gray-500 mt-1">Customers see: "Add items to reach ${form.minOrderAmount} minimum."</p>
               </Field>
               <Toggle checked={form.freeDeliveryEnabled} onChange={v => set("freeDeliveryEnabled", v)}
@@ -449,11 +450,11 @@ export default function SettingsPage() {
               </div>
               <Field label="Delivery Cutoff Time" description="Orders after this time → next business morning">
                 <div className="flex items-center gap-2">
-                  <input type="number" min={0} max={23} value={form.deliveryCutoffHour ?? 20}
+                  <input type="text" inputMode="decimal" min={0} max={23} value={form.deliveryCutoffHour ?? 20}
                     onChange={e => set("deliveryCutoffHour", Number(e.target.value))}
                     className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
                   <span className="text-gray-400">:</span>
-                  <input type="number" min={0} max={59} value={form.deliveryCutoffMinute ?? 30}
+                  <input type="text" inputMode="decimal" min={0} max={59} value={form.deliveryCutoffMinute ?? 30}
                     onChange={e => set("deliveryCutoffMinute", Number(e.target.value))}
                     className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
                   <span className="text-sm text-gray-500">
@@ -544,7 +545,7 @@ export default function SettingsPage() {
                 <Toggle checked={form.notifyPushEnabled ?? false} onChange={v => set("notifyPushEnabled", v)}
                   label="Push Notifications" description="Browser push notifications (requires VAPID keys in production)" />
                 <Field label="Driver Wait Time (minutes)" description="How long driver waits at customer door before marking failed">
-                  <Input value={form.waitTimerMinutes ?? 5} onChange={v => set("waitTimerMinutes", Number(v))} type="number" />
+                  <Input value={form.waitTimerMinutes ?? 5} onChange={v => set("waitTimerMinutes", Number(v))} type="text" inputMode="decimal" />
                 </Field>
               </SectionCard>
 
@@ -601,7 +602,7 @@ export default function SettingsPage() {
             <>
               <SectionCard title="Tax Settings" icon={CreditCard}>
                 <Field label="Sales Tax Rate" description="Applied to all taxable items">
-                  <Input value={form.salesTaxPercent} onChange={v => set("salesTaxPercent", Number(v))} type="number" prefix="%" />
+                  <Input value={form.salesTaxPercent} onChange={v => set("salesTaxPercent", Number(v))} type="text" inputMode="decimal" prefix="%" />
                   <p className="text-xs text-gray-500 mt-1">Texas standard rate: 8.25%</p>
                 </Field>
               </SectionCard>

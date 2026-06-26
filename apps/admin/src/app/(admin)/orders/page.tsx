@@ -90,7 +90,7 @@ function CancelModal({ order, onClose, onConfirm }: { order: any; onClose: () =>
             </div>
             {refund === "full" && <p className="text-xs text-green-600 mt-2">Refund ${Number(order.total).toFixed(2)} to customer</p>}
             {refund === "partial" && (
-              <input type="number" min="0" max={order.total} value={partial} onChange={e => setPartial(e.target.value)}
+              <input type="text" inputMode="decimal" min="0" max={order.total} value={partial} onChange={e => setPartial(e.target.value)}
                 placeholder={`Amount (max $${Number(order.total).toFixed(2)})`}
                 className="mt-2 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             )}
