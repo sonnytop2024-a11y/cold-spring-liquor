@@ -595,33 +595,65 @@ export default function SettingsPage() {
 
               {/* ── Telegram ── */}
               <SectionCard title="Telegram Notifications (Owner Alerts)" icon={Bell}>
-                <div className="py-2 space-y-3">
+                <div className="py-2 space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 space-y-1">
-                    <p className="font-semibold">Setup (one time):</p>
-                    <p>1. Open Telegram → search <strong>@BotFather</strong> → send <code>/newbot</code></p>
-                    <p>2. Copy the <strong>Bot Token</strong> into the field below</p>
-                    <p>3. Search your new bot → send it <code>/start</code></p>
-                    <p>4. Visit <code>https://api.telegram.org/bot{"<TOKEN>"}/getUpdates</code> to find your <strong>Chat ID</strong></p>
+                    <p className="font-semibold">Setup (3 steps):</p>
+                    <p>1. Open Telegram → find <strong>@BotFather</strong> → send <code>/mybots</code> → select your bot → <strong>API Token</strong></p>
+                    <p>2. Paste the token below, then click <strong>"Get My Chat ID"</strong></p>
+                    <p>3. Click <strong>Save Settings</strong> → then Test</p>
                   </div>
-                  <Field label="Bot Token" description="From @BotFather (e.g. 6234567890:AABBxx...)">
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-gray-800">Bot Token</p>
+                    <p className="text-xs text-gray-500">From @BotFather → /mybots → API Token</p>
                     <input
                       type="text"
                       value={form.telegramBotToken ?? ""}
-                      onChange={e => set("telegramBotToken", e.target.value)}
-                      placeholder="6234567890:AABBCCDDEEFFxx..."
+                      onChange={e => { set("telegramBotToken", e.target.value); setTelegramTestResult(null); }}
+                      placeholder="1234567890:AABBCCDDEEFFxxYYZZ..."
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
                     />
-                  </Field>
-                  <Field label="Chat ID" description="Your personal chat ID with the bot">
-                    <input
-                      type="text"
-                      value={form.telegramChatId ?? ""}
-                      onChange={e => set("telegramChatId", e.target.value)}
-                      placeholder="123456789"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-                    />
-                  </Field>
-                  <div className="flex items-center gap-3 pt-1">
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-gray-800">Chat ID <span className="text-xs font-normal text-gray-400">(numeric, e.g. 123456789)</span></p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={form.telegramChatId ?? ""}
+                        onChange={e => set("telegramChatId", e.target.value)}
+                        placeholder="Click 'Get My Chat ID' →"
+                        className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                      />
+                      <button
+                        onClick={async () => {
+                          const token = form?.telegramBotToken?.trim();
+                          if (!token) { setTelegramTestResult("❌ Enter Bot Token first"); return; }
+                          setTelegramTesting(true); setTelegramTestResult(null);
+                          try {
+                            const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+                            const json = await res.json();
+                            if (!json.ok) { setTelegramTestResult(`❌ Token invalid: ${json.description}`); return; }
+                            const updates = json.result ?? [];
+                            if (updates.length === 0) {
+                              setTelegramTestResult("⚠️ No messages found. Open Telegram → find your bot → send /start first");
+                              return;
+                            }
+                            const chatId = String(updates[updates.length - 1]?.message?.chat?.id ?? "");
+                            if (chatId) { set("telegramChatId", chatId); setTelegramTestResult(`✅ Chat ID found: ${chatId} — now Save Settings`); }
+                            else setTelegramTestResult("❌ Could not find chat ID in updates");
+                          } catch { setTelegramTestResult("❌ Network error"); }
+                          finally { setTelegramTesting(false); }
+                        }}
+                        disabled={telegramTesting}
+                        className="shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl disabled:opacity-50 transition-colors whitespace-nowrap"
+                      >
+                        {telegramTesting ? "…" : "🔍 Get My Chat ID"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-1 flex-wrap">
                     <button
                       onClick={testTelegram}
                       disabled={telegramTesting}
@@ -633,7 +665,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium">{telegramTestResult}</p>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400">Remember to Save Settings after entering your token and chat ID.</p>
+                  <p className="text-xs text-gray-400">⚠️ Always Save Settings before testing.</p>
                 </div>
               </SectionCard>
 
