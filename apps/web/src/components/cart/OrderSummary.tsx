@@ -51,7 +51,7 @@ export function OrderSummary() {
   const total = subtotal - bundleDiscount + tax;
 
   return (
-    <div className="bg-white border rounded-xl p-5 sticky top-24">
+    <div className="bg-white border rounded-xl p-5 sticky top-20 xs:top-24">
       <h3 className="font-bold text-lg mb-4">Order Summary</h3>
 
       {/* Item list */}

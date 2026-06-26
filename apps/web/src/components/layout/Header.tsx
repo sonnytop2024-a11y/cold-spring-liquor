@@ -127,30 +127,30 @@ export function Header() {
           borderBottom: "1px solid rgba(255,255,255,0.07)",
         }}
       >
-        <div className="container-main flex items-center justify-between h-[76px]">
+        <div className="container-main flex items-center justify-between h-[60px] xs:h-[76px]">
           {/* Logo */}
-          <Link href="/" className="flex flex-row items-center gap-2 shrink-0 group">
+          <Link href="/" className="flex flex-row items-center gap-1.5 xs:gap-2 shrink-0 group">
             <Image
               src="/logo-transparent.png"
               alt="Cold Spring Liquor"
               width={80}
               height={80}
-              className="w-[65px] h-[65px] md:w-[80px] md:h-[80px] object-contain mt-3"
+              className="w-[52px] h-[52px] xs:w-[65px] xs:h-[65px] md:w-[80px] md:h-[80px] object-contain mt-2 xs:mt-3"
               priority
             />
-            <div className="flex flex-col">
-            <span className="font-heading text-xl font-black text-white tracking-tight group-hover:text-brand-400 transition-colors">
-              Cold Spring Liquor
-            </span>
-            <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: "#f97316" }}>
-              FREE Delivery · No Tip Required
-            </span>
-            <span
-              className="hidden sm:block text-[8px] font-medium tracking-wide"
-              style={{ color: "#9a845a" }}
-            >
-              15609 Ronald Reagan Blvd Ste B100 · Leander, TX 78641
-            </span>
+            <div className="hidden xs:flex flex-col">
+              <span className="font-heading text-base sm:text-xl font-black text-white tracking-tight group-hover:text-brand-400 transition-colors">
+                Cold Spring Liquor
+              </span>
+              <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: "#f97316" }}>
+                FREE Delivery · No Tip Required
+              </span>
+              <span
+                className="hidden sm:block text-[8px] font-medium tracking-wide"
+                style={{ color: "#9a845a" }}
+              >
+                15609 Ronald Reagan Blvd Ste B100 · Leander, TX 78641
+              </span>
             </div>
           </Link>
 

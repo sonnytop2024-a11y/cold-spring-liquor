@@ -56,18 +56,18 @@ export function HeroSection() {
         />
 
         <div className="container-main relative z-10">
-          <div className="py-16 md:py-20 lg:py-28 max-w-2xl">
-            <div className="space-y-7">
+          <div className="py-10 xs:py-12 sm:py-16 md:py-20 lg:py-28 max-w-2xl">
+            <div className="space-y-4 xs:space-y-5 sm:space-y-7">
 
               {/* Location pill */}
-              <div className="inline-flex items-center gap-2 border border-white/15 bg-white/5 backdrop-blur-sm text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full">
-                <span className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-pulse" />
-                Leander · Cedar Park · Liberty Hill, TX
+              <div className="inline-flex items-center gap-1.5 border border-white/15 bg-white/5 backdrop-blur-sm text-[10px] xs:text-xs font-bold uppercase tracking-widest px-3 xs:px-4 py-1.5 rounded-full">
+                <span className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-pulse flex-shrink-0" />
+                <span className="truncate">Leander · Cedar Park · TX Area</span>
               </div>
 
               {/* Headline */}
               <div>
-                <h1 className="font-heading text-5xl md:text-7xl font-black leading-[1.02] tracking-tight mb-4" style={{ letterSpacing: "-1.5px" }}>
+                <h1 className="font-heading text-4xl xs:text-5xl md:text-7xl font-black leading-[1.02] tracking-tight mb-3 xs:mb-4" style={{ letterSpacing: "-1px" }}>
                   Premium
                   <br />
                   <span style={{ color: "#f97316" }}>Liquor</span>
@@ -75,25 +75,25 @@ export function HeroSection() {
                   Delivered.
                 </h1>
                 <p
-                  className="text-xl md:text-2xl font-bold"
+                  className="text-base xs:text-xl md:text-2xl font-bold"
                   style={{ color: "#f97316" }}
                 >
                   FREE Delivery. NO Tip. Ever.
                 </p>
               </div>
 
-              {/* Body */}
-              <p className="text-gray-400 text-base md:text-lg leading-relaxed max-w-lg">
+              {/* Body — hidden on fold, visible on phones+ */}
+              <p className="hidden xs:block text-gray-400 text-sm sm:text-base md:text-lg leading-relaxed max-w-lg">
                 The only liquor delivery in the area with{" "}
                 <span className="text-white font-semibold">absolutely no extra charges</span> —
                 no delivery fee, no tip, no hidden costs. Just premium spirits at your door in 10–30 minutes.
               </p>
 
               {/* CTAs */}
-              <div className="flex flex-wrap gap-3 pt-1">
+              <div className="flex flex-wrap gap-2 xs:gap-3 pt-1">
                 <Link
                   href="/products"
-                  className="inline-flex items-center gap-2 font-bold px-8 py-4 rounded-xl text-base transition-all text-white shadow-lg"
+                  className="inline-flex items-center gap-2 font-bold px-5 xs:px-8 py-3 xs:py-4 rounded-xl text-sm xs:text-base transition-all text-white shadow-lg"
                   style={{
                     background: "linear-gradient(135deg, #f97316, #ea580c)",
                     boxShadow: "0 8px 24px rgba(249,115,22,0.35)",
@@ -103,15 +103,15 @@ export function HeroSection() {
                 </Link>
                 <Link
                   href="#delivery-check"
-                  className="inline-flex items-center gap-2 font-bold px-8 py-4 rounded-xl text-base border border-white/20 hover:border-white/50 hover:bg-white/5 transition-all text-white/90"
+                  className="inline-flex items-center gap-2 font-bold px-5 xs:px-8 py-3 xs:py-4 rounded-xl text-sm xs:text-base border border-white/20 hover:border-white/50 hover:bg-white/5 transition-all text-white/90"
                 >
                   Check My Area
                 </Link>
               </div>
 
-              {/* Stats */}
+              {/* Stats — 2×2 grid on fold, row on phones+ */}
               <div
-                className="flex gap-6 pt-2 border-t"
+                className="grid grid-cols-2 gap-x-4 gap-y-3 pt-3 border-t xs:flex xs:gap-6 xs:pt-2"
                 style={{ borderColor: "rgba(255,255,255,0.08)" }}
               >
                 {[
@@ -120,9 +120,9 @@ export function HeroSection() {
                   { value: "10–30", label: "Min Delivery" },
                   { value: "500+", label: "Products" },
                 ].map(({ value, label }, i) => (
-                  <div key={label} className={i > 0 ? "pl-6 border-l border-white/10" : ""}>
-                    <p className="text-2xl md:text-3xl font-black text-white">{value}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+                  <div key={label} className={i > 0 ? "xs:pl-6 xs:border-l xs:border-white/10" : ""}>
+                    <p className="text-xl xs:text-2xl md:text-3xl font-black text-white">{value}</p>
+                    <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5">{label}</p>
                   </div>
                 ))}
               </div>
@@ -136,18 +136,18 @@ export function HeroSection() {
           style={{ borderTop: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.03)" }}
         >
           <div className="container-main py-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 xs:gap-4">
               {[
                 { icon: "🚚", label: "FREE Delivery", sub: "No minimum, every order" },
                 { icon: "💰", label: "No Tip Required", sub: "We pay our drivers fairly" },
                 { icon: "⚡", label: "10–30 Min", sub: "Fastest in Leander area" },
                 { icon: "🔒", label: "Safe & Secure", sub: "Verified ID at delivery" },
               ].map(({ icon, label, sub }) => (
-                <div key={label} className="flex items-center gap-3">
-                  <span className="text-2xl">{icon}</span>
-                  <div>
-                    <p className="font-bold text-sm text-white">{label}</p>
-                    <p className="text-xs text-gray-500">{sub}</p>
+                <div key={label} className="flex items-center gap-2 xs:gap-3">
+                  <span className="text-xl xs:text-2xl flex-shrink-0">{icon}</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs xs:text-sm text-white truncate">{label}</p>
+                    <p className="text-[10px] xs:text-xs text-gray-500 truncate">{sub}</p>
                   </div>
                 </div>
               ))}
