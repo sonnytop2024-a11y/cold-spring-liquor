@@ -7,7 +7,7 @@ const BASE =
     : "https://api-m.paypal.com";
 
 async function getAccessToken(): Promise<string> {
-  const clientId = process.env.PAYPAL_CLIENT_ID!;
+  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!;
   const secret = process.env.PAYPAL_CLIENT_SECRET!;
   const res = await fetch(`${BASE}/v1/oauth2/token`, {
     method: "POST",
