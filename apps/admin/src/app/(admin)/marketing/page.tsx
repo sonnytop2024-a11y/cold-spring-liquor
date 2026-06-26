@@ -90,6 +90,17 @@ function CouponModal({ coupon, onClose, onSave }: { coupon: Partial<Coupon> | nu
   function set(k: keyof Coupon, v: any) { setForm(f => ({ ...f, [k]: v })); }
   async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
 
+  const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
+  function setNum(k: keyof Coupon, raw: string, nullable = false) {
+    setRawInputs(r => ({ ...r, [k]: raw }));
+    if (raw === "") { set(k, nullable ? null : 0); return; }
+    const n = parseFloat(raw);
+    if (!isNaN(n)) set(k, n);
+  }
+  function numVal(k: keyof Coupon): string {
+    return k in rawInputs ? rawInputs[k] : String((form as any)[k] ?? "");
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -115,7 +126,7 @@ function CouponModal({ coupon, onClose, onSave }: { coupon: Partial<Coupon> | nu
           {form.type !== "free_delivery" && (
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Value ({form.type === "fixed" ? "$" : "%"}) *</label>
-              <input type="text" inputMode="decimal" min="0" value={form.value ?? 0} onChange={e => set("value", Number(e.target.value))}
+              <input type="text" inputMode="decimal" value={numVal("value")} onChange={e => setNum("value", e.target.value)}
                 className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
           )}
@@ -127,19 +138,19 @@ function CouponModal({ coupon, onClose, onSave }: { coupon: Partial<Coupon> | nu
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Min Order ($)</label>
-              <input type="text" inputMode="decimal" min="0" value={form.minOrder ?? 0} onChange={e => set("minOrder", Number(e.target.value))}
+              <input type="text" inputMode="decimal" value={numVal("minOrder")} onChange={e => setNum("minOrder", e.target.value)}
                 className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Max Uses</label>
-              <input type="text" inputMode="decimal" min="0" value={form.maxUsage ?? ""} placeholder="Unlimited"
-                onChange={e => set("maxUsage", e.target.value ? Number(e.target.value) : null)}
+              <input type="text" inputMode="decimal" value={numVal("maxUsage")} placeholder="Unlimited"
+                onChange={e => setNum("maxUsage", e.target.value, true)}
                 className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Per Customer</label>
-              <input type="text" inputMode="decimal" min="0" value={form.usagePerCustomer ?? ""} placeholder="Unlimited"
-                onChange={e => set("usagePerCustomer", e.target.value ? Number(e.target.value) : null)}
+              <input type="text" inputMode="decimal" value={numVal("usagePerCustomer")} placeholder="Unlimited"
+                onChange={e => setNum("usagePerCustomer", e.target.value, true)}
                 className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
           </div>
@@ -219,6 +230,18 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
 
   function set(k: keyof FlashDeal, v: any) { setForm(f => ({ ...f, [k]: v })); }
   async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
+
+  // Raw string inputs to preserve decimals while typing (e.g. "12." → Number("12.") = 12 → loses dot)
+  const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
+  function setNum(k: keyof FlashDeal, raw: string) {
+    setRawInputs(r => ({ ...r, [k]: raw }));
+    const n = parseFloat(raw);
+    if (!isNaN(n)) set(k, n);
+    else if (raw === "" || raw === "-") set(k, 0);
+  }
+  function numVal(k: keyof FlashDeal): string {
+    return k in rawInputs ? rawInputs[k] : String((form as any)[k] ?? "");
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -354,9 +377,9 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Sale Price ($) *</label>
                   <input
                     autoFocus
-                    type="text" inputMode="decimal" min="0" step="0.01"
-                    value={form.salePrice ?? ""}
-                    onChange={e => set("salePrice", Number(e.target.value))}
+                    type="text" inputMode="decimal"
+                    value={numVal("salePrice")}
+                    onChange={e => setNum("salePrice", e.target.value)}
                     className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   />
                 </div>
@@ -372,13 +395,13 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Flash Stock</label>
-                  <input type="text" inputMode="decimal" min="0" value={form.stockQty ?? ""} onChange={e => set("stockQty", Number(e.target.value))}
+                  <input type="text" inputMode="decimal" value={numVal("stockQty")} onChange={e => setNum("stockQty", e.target.value)}
                     className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
                   <p className="text-[11px] text-gray-400 mt-1">Available units for this deal</p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Max Stock</label>
-                  <input type="text" inputMode="decimal" min="0" value={form.maxStock ?? ""} onChange={e => set("maxStock", Number(e.target.value))}
+                  <input type="text" inputMode="decimal" value={numVal("maxStock")} onChange={e => setNum("maxStock", e.target.value)}
                     className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
                   <p className="text-[11px] text-gray-400 mt-1">For progress bar display</p>
                 </div>
@@ -436,6 +459,17 @@ function BundleTierModal({ tier, onClose, onSave }: { tier: Partial<BundleTier> 
   function set(k: keyof BundleTier, v: any) { setForm(f => ({ ...f, [k]: v })); }
   async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
 
+  const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
+  function setNum(k: keyof BundleTier, raw: string) {
+    setRawInputs(r => ({ ...r, [k]: raw }));
+    const n = parseFloat(raw);
+    if (!isNaN(n)) set(k, n);
+    else if (raw === "") set(k, 0);
+  }
+  function numVal(k: keyof BundleTier): string {
+    return k in rawInputs ? rawInputs[k] : String((form as any)[k] ?? "");
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -450,13 +484,13 @@ function BundleTierModal({ tier, onClose, onSave }: { tier: Partial<BundleTier> 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Min Quantity *</label>
-              <input type="text" inputMode="decimal" min="1" value={form.minQty ?? 2} onChange={e => set("minQty", Number(e.target.value))}
+              <input type="text" inputMode="decimal" value={numVal("minQty")} onChange={e => setNum("minQty", e.target.value)}
                 className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
               <p className="text-xs text-gray-400 mt-1">Bottles in cart to trigger</p>
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Discount % *</label>
-              <input type="text" inputMode="decimal" min="1" max="99" value={form.discountPct ?? 5} onChange={e => set("discountPct", Number(e.target.value))}
+              <input type="text" inputMode="decimal" value={numVal("discountPct")} onChange={e => setNum("discountPct", e.target.value)}
                 className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
               <p className="text-xs text-gray-400 mt-1">Applied to subtotal</p>
             </div>
@@ -470,7 +504,7 @@ function BundleTierModal({ tier, onClose, onSave }: { tier: Partial<BundleTier> 
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Sort Order</label>
-            <input type="text" inputMode="decimal" min="1" value={form.sortOrder ?? 1} onChange={e => set("sortOrder", Number(e.target.value))}
+            <input type="text" inputMode="decimal" value={numVal("sortOrder")} onChange={e => setNum("sortOrder", e.target.value)}
               className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <label className="flex items-center gap-3 cursor-pointer">
