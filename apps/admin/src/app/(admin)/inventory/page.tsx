@@ -11,8 +11,9 @@ import { API } from "@/lib/api";
 
 // ── Export helper (CSV generated in browser) ──────────────────────────────────
 async function exportProductsCSV() {
-  const res = await fetch(`${API}/admin/products`);
-  const products = await res.json() as Record<string, unknown>[];
+  const res = await fetch(`${API}/products?limit=1000&activeOnly=false`);
+  const json = await res.json();
+  const products = (Array.isArray(json) ? json : (json.products ?? json.data ?? [])) as Record<string, unknown>[];
 
   const headers = ["SKU","Product Name","Brand","Category","Price","Sale Price",
     "Stock Qty","Volume","ABV","Country","Description","Image URL","Active","Featured"];
@@ -77,16 +78,17 @@ const EMPTY: Omit<Product, "id" | "slug"> = {
 };
 
 async function fetchProducts(search: string, category: string, stock: string) {
-  // Use /api/admin/products — returns ALL products (no limit, no activeOnly filter)
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ limit: "1000", activeOnly: "false" });
   if (search)   params.set("q", search);
   if (category) params.set("category", category);
-  if (stock)    params.set("stock", stock); // "in" | "out" | "" = all
-  const res = await fetch(`${API}/admin/products?${params}`);
+  // stock filter: "in" → activeOnly=true, "out" handled client-side below
+  if (stock === "in") params.set("activeOnly", "true");
+  const res = await fetch(`${API}/products?${params}`);
   if (!res.ok) throw new Error(`Failed to load products (${res.status})`);
   const data = await res.json();
-  const list = data.products ?? data.data ?? data;
-  return (Array.isArray(list) ? list : []) as Product[];
+  let list = (Array.isArray(data) ? data : (data.products ?? data.data ?? [])) as Product[];
+  if (stock === "out") list = list.filter(p => p.stockQty <= 0);
+  return list;
 }
 
 async function createProduct(body: Partial<Product>) {
