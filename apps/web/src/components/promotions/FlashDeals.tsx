@@ -89,7 +89,9 @@ function FlashDealCard({ deal }: { deal: (typeof PLACEHOLDER_DEALS)[0] }) {
   const { h, m, s, expired } = useCountdown(deal.endsAt);
   const addItem = useCartStore((st) => st.addItem);
   const pct = Math.round(((deal.price - deal.salePrice) / deal.price) * 100);
-  const stockPct = Math.min((deal.stockQty / 20) * 100, 100);
+  const maxStock = (deal as any).maxStock || 20;
+  const stockPct = Math.min((deal.stockQty / maxStock) * 100, 100);
+  const inStock = deal.stockQty > 0;
 
   return (
     <div className="bg-white rounded-2xl border-2 border-red-200 overflow-hidden">
@@ -147,10 +149,10 @@ function FlashDealCard({ deal }: { deal: (typeof PLACEHOLDER_DEALS)[0] }) {
       <div className="px-4 pb-4">
         <button
           onClick={() => addItem(deal as any)}
-          disabled={expired || !deal.inStock}
+          disabled={expired || !inStock}
           className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
         >
-          {expired ? "Deal Expired" : "Add to Cart"}
+          {expired ? "Deal Expired" : !inStock ? "Out of Stock" : "Add to Cart"}
         </button>
       </div>
     </div>

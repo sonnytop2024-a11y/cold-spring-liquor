@@ -17,6 +17,7 @@ export interface Product {
   reviewCount?: number;
   country?: string;
   featured?: boolean;
+  bundleEligible?: boolean;
 }
 
 export interface CartItem {

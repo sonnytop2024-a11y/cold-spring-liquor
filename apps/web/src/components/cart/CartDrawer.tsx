@@ -3,8 +3,10 @@
 import { X, Trash2, Plus, Minus, Truck, ShoppingBag, ChevronRight, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/cartStore";
-import { formatCurrency, calcCartTotals, calcBundleDiscount, calcPointsEarned, MIN_ORDER } from "@/lib/utils";
+import { formatCurrency, calcCartTotals, calcPointsEarned, MIN_ORDER } from "@/lib/utils";
+import { calcDiscounts } from "@/lib/discountRules";
 
 // Cheap add-on suggestions to help reach the $20 minimum
 const ADDONS = [
@@ -21,9 +23,16 @@ interface CartDrawerProps {
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const { items, updateQuantity, removeItem, addItem, couponDiscount, giftCardAmount, rewardsPointsToRedeem } = useCartStore();
 
-  const subtotal = items.reduce((acc, i) => acc + (i.product.salePrice ?? i.product.price) * i.quantity, 0);
+  const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
+  useEffect(() => {
+    fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
+  }, []);
+
+  const { subtotal, flashSavings, bundleDiscount, bundleQty } = calcDiscounts(
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    bundleTiers,
+  );
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
-  const bundleDiscount = calcBundleDiscount(totalQty, subtotal);
   const rewardsDiscount = rewardsPointsToRedeem >= 100 ? Math.floor(rewardsPointsToRedeem / 100) * 5 : 0;
   const { tax, total } = calcCartTotals(subtotal, couponDiscount + bundleDiscount, rewardsDiscount, giftCardAmount);
   const pointsEarned = calcPointsEarned(subtotal);
@@ -56,7 +65,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               <div>
                 <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
                   <span className="text-amber-700 flex items-center gap-1.5">
-                    <AlertCircle size={13} /> Add <strong>{formatCurrency(amountToMin)}</strong> more for FREE delivery
+                    <AlertCircle size={13} /> Add <strong>{formatCurrency(amountToMin)}</strong> more to get delivery to you
                   </span>
                   <span className="text-gray-500">${subtotal.toFixed(2)} / $20</span>
                 </div>
@@ -80,20 +89,15 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {/* Bundle deal notice */}
-              {totalQty >= 2 && totalQty < 3 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 font-medium">
-                  Add 1 more bottle → <strong>10% off</strong> your order!
-                </div>
-              )}
-              {totalQty >= 3 && totalQty < 6 && (
-                <div className="bg-brand-50 border border-brand-200 rounded-lg px-3 py-2 text-xs text-brand-700 font-medium">
-                  🎉 <strong>10% bundle discount</strong> applied! Add {6 - totalQty} more for 15% off.
-                </div>
-              )}
-              {totalQty >= 6 && (
+              {/* Bundle deal notice — only shows for bundleEligible items */}
+              {bundleDiscount > 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700 font-medium">
-                  🎉 <strong>15% bundle discount</strong> applied!
+                  🎉 Bundle discount applied to {bundleQty} bundle-eligible bottle{bundleQty !== 1 ? "s" : ""}!
+                </div>
+              )}
+              {flashSavings > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700 font-medium">
+                  ⚡ Flash Sale savings: -{formatCurrency(flashSavings)}
                 </div>
               )}
 

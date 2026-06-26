@@ -67,12 +67,13 @@ interface Product {
   active: boolean;
   description: string;
   imageUrl: string | null;
+  bundleEligible: boolean;
 }
 
 const EMPTY: Omit<Product, "id" | "slug"> = {
   name: "", brand: "", category: "whiskey", price: 0, salePrice: null,
   volume: "750ml", abv: 40, country: "USA", stockQty: 0,
-  inStock: false, featured: false, active: false, description: "", imageUrl: null,
+  inStock: false, featured: false, active: false, description: "", imageUrl: null, bundleEligible: false,
 };
 
 async function fetchProducts(search: string, category: string, stock: string) {
@@ -144,6 +145,7 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
     stockQty: product?.stockQty ?? EMPTY.stockQty,
     inStock: product?.inStock ?? EMPTY.inStock,
     featured: product?.featured ?? EMPTY.featured,
+    bundleEligible: product?.bundleEligible ?? EMPTY.bundleEligible,
     active: product?.active ?? EMPTY.active,
     description: product?.description ?? EMPTY.description,
     imageUrl: product?.imageUrl ?? EMPTY.imageUrl,
@@ -505,6 +507,29 @@ function ProductModal({ product, onClose, onSave, saving }: ProductModalProps) {
             </label>
           </div>
 
+          {/* Bundle Sale eligibility */}
+          <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-purple-50 border-purple-200">
+            <div>
+              <p className="text-sm font-semibold text-purple-800">📦 Bundle Sale Eligible</p>
+              <p className="text-xs text-purple-600 mt-0.5">
+                {form.bundleEligible
+                  ? "This product participates in Bundle deals (buy 2+, 3+…)"
+                  : "Not included in Bundle deals — add to enable"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => set("bundleEligible", !form.bundleEligible)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                form.bundleEligible ? "bg-purple-600" : "bg-gray-300"
+              }`}
+            >
+              <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                form.bundleEligible ? "translate-x-5" : "translate-x-0"
+              }`} />
+            </button>
+          </div>
+
           <div className="flex gap-3 pt-2 border-t">
             <button
               type="button"
@@ -800,6 +825,7 @@ export default function InventoryPage() {
                             <p className="text-xs text-gray-400">{p.volume}</p>
                           </div>
                           {p.featured && <Star size={12} className="text-yellow-500 fill-yellow-400 shrink-0" />}
+                          {p.bundleEligible && <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold shrink-0">📦</span>}
                         </div>
                       </td>
                       <td className="px-4 py-3">

@@ -30,6 +30,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     stockQty: newQty,
     inStock: newQty > 0,
     featured: body.featured ?? existing?.featured ?? false,
+    bundleEligible: body.bundleEligible !== undefined ? Boolean(body.bundleEligible) : (existing?.bundleEligible ?? false),
     active: newQty > 0,
     rating: existing?.rating ?? 0,
     reviewCount: existing?.reviewCount ?? 0,

@@ -214,6 +214,7 @@ export async function POST(req: NextRequest) {
         stockQty,
         inStock: stockQty > 0,
         featured: false,
+        bundleEligible: false,
         active: stockQty > 0,
         rating: 0,
         reviewCount: 0,

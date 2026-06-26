@@ -9,7 +9,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json();
-  const { name, brand, slug, price, salePrice, imageUrl, volume, stockQty, maxStock, active, startAt, endsAt } = body;
+  const { name, brand, slug, price, salePrice, imageUrl, volume, stockQty, maxStock, active, startAt, endsAt, productId } = body;
 
   if (!name || !price || !salePrice) {
     return NextResponse.json({ error: "name, price, salePrice required" }, { status: 400 });
@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
     active: active !== false,
     startAt: startAt || null,
     endsAt: endsAt || null,
-  });
+    productId: productId ?? null,
+  } as any);
 
   return NextResponse.json(deal, { status: 201 });
 }

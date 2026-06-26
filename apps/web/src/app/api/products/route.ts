@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
     stockQty: Number(body.stockQty) || 0,
     inStock: (Number(body.stockQty) || 0) > 0,
     featured: Boolean(body.featured),
+    bundleEligible: Boolean(body.bundleEligible),
     active: body.active !== false,
     rating: 0,
     reviewCount: 0,

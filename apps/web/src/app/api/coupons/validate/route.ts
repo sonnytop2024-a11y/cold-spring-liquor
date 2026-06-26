@@ -21,8 +21,12 @@ export async function POST(req: NextRequest) {
   if (coupon.maxUsage !== null && coupon.usageCount >= coupon.maxUsage) {
     return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
   }
+  // subtotal here is promoBaseSubtotal (regular-priced items only — flash & bundle excluded)
+  if (coupon.type !== "free_delivery" && subtotal <= 0) {
+    return NextResponse.json({ error: "This coupon doesn't apply — all items in your cart are already on Flash Sale or Bundle pricing." }, { status: 400 });
+  }
   if (subtotal < coupon.minOrder) {
-    return NextResponse.json({ error: `Minimum order of $${coupon.minOrder} required for this coupon.` }, { status: 400 });
+    return NextResponse.json({ error: `Minimum order of $${coupon.minOrder} required for this coupon (applies to regular-priced items only).` }, { status: 400 });
   }
 
   let discount = 0;

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Tag, Edit2, Trash2, Loader2, X, Check,
-  ToggleLeft, ToggleRight, AlertTriangle, Zap, Package,
+  ToggleLeft, ToggleRight, AlertTriangle, Zap, Package, Search, ChevronRight,
 } from "lucide-react";
 import { API } from "@/lib/api";
 
@@ -23,7 +23,13 @@ interface FlashDeal {
   price: number; salePrice: number; imageUrl: string | null;
   volume: string; stockQty: number; maxStock: number;
   active: boolean; startAt: string | null; endsAt: string | null;
-  createdAt: string;
+  createdAt: string; productId?: string;
+}
+
+interface InventoryProduct {
+  id: string; name: string; brand: string; category: string;
+  price: number; salePrice: number | null; imageUrl: string | null;
+  volume: string; stockQty: number; slug: string;
 }
 
 interface BundleTier {
@@ -179,103 +185,220 @@ function CouponModal({ coupon, onClose, onSave }: { coupon: Partial<Coupon> | nu
 
 // ─── Flash Deal Modal ─────────────────────────────────────────────────────────
 
-const FD_EMPTY: Partial<FlashDeal> = { name: "", brand: "", slug: "", price: 0, salePrice: 0, volume: "750ml", stockQty: 10, maxStock: 10, active: true, startAt: null, endsAt: null, imageUrl: null };
+const FD_EMPTY: Partial<FlashDeal> = { name: "", brand: "", slug: "", price: 0, salePrice: 0, volume: "750ml", stockQty: 10, maxStock: 10, active: true, startAt: null, endsAt: null, imageUrl: null, productId: undefined };
 
 function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | null; onClose: () => void; onSave: (d: any) => void }) {
   const isEdit = !!deal?.id;
   const [form, setForm] = useState<Partial<FlashDeal>>(deal ?? { ...FD_EMPTY });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showPicker, setShowPicker] = useState(!isEdit);
+
   function set(k: keyof FlashDeal, v: any) { setForm(f => ({ ...f, [k]: v })); }
   async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
 
+  const { data: products = [], isLoading: loadingProducts } = useQuery<InventoryProduct[]>({
+    queryKey: ["admin-products-picker"],
+    queryFn: async () => {
+      const r = await fetch(`${API}/admin/products`);
+      if (!r.ok) throw new Error("Failed");
+      const json = await r.json();
+      // API returns { products: [...], total: N } or array directly
+      return Array.isArray(json) ? json : (json.products ?? []);
+    },
+    staleTime: 60_000,
+  });
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return products.slice(0, 40);
+    return products.filter(p => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)).slice(0, 40);
+  }, [products, search]);
+
+  function selectProduct(p: InventoryProduct) {
+    setForm(f => ({
+      ...f,
+      productId: p.id,
+      name: p.name,
+      brand: p.brand,
+      volume: p.volume,
+      price: p.price,
+      imageUrl: p.imageUrl,
+      slug: p.slug,
+      stockQty: f.stockQty ?? 10,
+      maxStock: f.maxStock ?? 10,
+    }));
+    setShowPicker(false);
+    setSearch("");
+  }
+
   const pct = form.price && form.salePrice ? discountPct(form.price, form.salePrice) : 0;
+  const hasProduct = !!form.name;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b shrink-0">
           <h2 className="font-bold text-lg flex items-center gap-2">
             <Zap size={18} className="text-yellow-500" />
             {isEdit ? "Edit Flash Deal" : "New Flash Deal"}
           </h2>
           <button onClick={onClose}><X size={18} /></button>
         </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Product Name *</label>
-            <input value={form.name ?? ""} onChange={e => set("name", e.target.value)} placeholder="e.g. Jack Daniel's Old No. 7"
-              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Brand</label>
-              <input value={form.brand ?? ""} onChange={e => set("brand", e.target.value)} placeholder="e.g. Jack Daniel's"
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Volume</label>
-              <input value={form.volume ?? ""} onChange={e => set("volume", e.target.value)} placeholder="750ml"
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Original Price ($) *</label>
-              <input type="text" inputMode="decimal" min="0" step="0.01" value={form.price ?? ""} onChange={e => set("price", Number(e.target.value))}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Sale Price ($) *</label>
-              <input type="text" inputMode="decimal" min="0" step="0.01" value={form.salePrice ?? ""} onChange={e => set("salePrice", Number(e.target.value))}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Discount</label>
-              <div className="border rounded-xl px-3 py-2.5 text-sm bg-gray-50 font-bold text-green-600">
-                {pct > 0 ? `-${pct}%` : "—"}
+
+        <div className="overflow-y-auto flex-1">
+          {/* ── Product Picker ── */}
+          {showPicker ? (
+            <div className="p-5 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select a product from inventory</p>
+
+              {/* Search */}
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search by name, brand or category…"
+                  className="w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
               </div>
+
+              {/* Product Grid */}
+              {loadingProducts ? (
+                <div className="py-12 flex items-center justify-center gap-2 text-gray-400">
+                  <Loader2 size={20} className="animate-spin" /> Loading products…
+                </div>
+              ) : filtered.length === 0 ? (
+                <p className="text-center text-gray-400 py-10 text-sm">No products found</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5 max-h-[52vh] overflow-y-auto pr-1">
+                  {filtered.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => selectProduct(p)}
+                      className="flex items-center gap-3 p-3 rounded-xl border hover:border-yellow-400 hover:bg-yellow-50 transition-colors text-left group"
+                    >
+                      {/* Thumbnail */}
+                      <div className="w-14 h-14 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                        {p.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.imageUrl} alt="" className="w-full h-full object-contain p-1" />
+                        ) : (
+                          <Package size={22} className="text-gray-300" />
+                        )}
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-800 leading-tight line-clamp-2">{p.name}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{p.brand} · {p.volume}</p>
+                        <p className="text-xs font-semibold text-gray-700 mt-1">${p.price.toFixed(2)}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300 group-hover:text-yellow-500 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Current Stock</label>
-              <input type="text" inputMode="decimal" min="0" value={form.stockQty ?? ""} onChange={e => set("stockQty", Number(e.target.value))}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          ) : (
+            <div className="p-5 space-y-4">
+              {/* Selected Product Card */}
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-yellow-300 bg-yellow-50">
+                <div className="w-14 h-14 rounded-lg border bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                  {form.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={form.imageUrl} alt="" className="w-full h-full object-contain p-1" />
+                  ) : (
+                    <Package size={22} className="text-gray-300" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 text-sm leading-tight truncate">{form.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{form.brand} · {form.volume}</p>
+                  <p className="text-xs font-semibold text-gray-600 mt-0.5">Original: ${form.price?.toFixed(2)}</p>
+                </div>
+                <button
+                  onClick={() => setShowPicker(true)}
+                  className="text-xs font-semibold text-yellow-700 bg-white border border-yellow-300 px-3 py-1.5 rounded-lg hover:bg-yellow-100 transition-colors shrink-0"
+                >
+                  Change
+                </button>
+              </div>
+
+              {/* Sale Price + Discount */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Sale Price ($) *</label>
+                  <input
+                    autoFocus
+                    type="text" inputMode="decimal" min="0" step="0.01"
+                    value={form.salePrice ?? ""}
+                    onChange={e => set("salePrice", Number(e.target.value))}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Discount</label>
+                  <div className={`border rounded-xl px-3 py-2.5 text-sm font-bold ${pct > 0 ? "bg-green-50 text-green-600 border-green-200" : "bg-gray-50 text-gray-400"}`}>
+                    {pct > 0 ? `-${pct}%` : "—"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Flash Stock</label>
+                  <input type="text" inputMode="decimal" min="0" value={form.stockQty ?? ""} onChange={e => set("stockQty", Number(e.target.value))}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                  <p className="text-[11px] text-gray-400 mt-1">Available units for this deal</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Max Stock</label>
+                  <input type="text" inputMode="decimal" min="0" value={form.maxStock ?? ""} onChange={e => set("maxStock", Number(e.target.value))}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                  <p className="text-[11px] text-gray-400 mt-1">For progress bar display</p>
+                </div>
+              </div>
+
+              {/* Schedule */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Start (optional)</label>
+                  <input type="datetime-local" value={toLocalDatetimeInput(form.startAt ?? null)}
+                    onChange={e => set("startAt", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Ends At</label>
+                  <input type="datetime-local" value={toLocalDatetimeInput(form.endsAt ?? null)}
+                    onChange={e => set("endsAt", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                </div>
+              </div>
+
+              {/* Active toggle */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div onClick={() => set("active", !form.active)}>
+                  {form.active ? <ToggleRight size={28} className="text-green-500" /> : <ToggleLeft size={28} className="text-gray-300" />}
+                </div>
+                <span className="text-sm font-medium">{form.active ? "Active — visible on website" : "Inactive — hidden"}</span>
+              </label>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Max Stock</label>
-              <input type="text" inputMode="decimal" min="0" value={form.maxStock ?? ""} onChange={e => set("maxStock", Number(e.target.value))}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Start (optional)</label>
-              <input type="datetime-local" value={toLocalDatetimeInput(form.startAt ?? null)}
-                onChange={e => set("startAt", e.target.value ? new Date(e.target.value).toISOString() : null)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Ends At</label>
-              <input type="datetime-local" value={toLocalDatetimeInput(form.endsAt ?? null)}
-                onChange={e => set("endsAt", e.target.value ? new Date(e.target.value).toISOString() : null)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-          </div>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div onClick={() => set("active", !form.active)}>
-              {form.active ? <ToggleRight size={28} className="text-green-500" /> : <ToggleLeft size={28} className="text-gray-300" />}
-            </div>
-            <span className="text-sm font-medium">{form.active ? "Active — visible on website" : "Inactive — hidden"}</span>
-          </label>
+          )}
         </div>
-        <div className="flex gap-3 p-5 border-t">
+
+        {/* Footer */}
+        <div className="flex gap-3 p-5 border-t shrink-0">
           <button onClick={onClose} className="flex-1 border rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !form.name || !form.price || !form.salePrice}
-            className="flex-1 flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm">
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-            {isEdit ? "Save Changes" : "Create Deal"}
-          </button>
+          {!showPicker && (
+            <button onClick={handleSave} disabled={saving || !hasProduct || !form.salePrice}
+              className="flex-1 flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm">
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {isEdit ? "Save Changes" : "Create Deal"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -604,8 +727,20 @@ function FlashDealsTab() {
                 return (
                   <tr key={d.id} className="border-b last:border-0 hover:bg-gray-50">
                     <td className="px-5 py-3">
-                      <p className="font-semibold">{d.name}</p>
-                      <p className="text-xs text-gray-400">{d.brand} · {d.volume}</p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                          {d.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={d.imageUrl} alt="" className="w-full h-full object-contain p-0.5" />
+                          ) : (
+                            <Zap size={14} className="text-yellow-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-semibold">{d.name}</p>
+                          <p className="text-xs text-gray-400">{d.brand} · {d.volume}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-5 py-3">
                       <p className="font-bold text-green-600">${d.salePrice.toFixed(2)}</p>

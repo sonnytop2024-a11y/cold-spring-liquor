@@ -63,7 +63,7 @@ export interface MockProduct {
   price: number; salePrice: number | null; volume: string; abv: number;
   country: string; stockQty: number; inStock: boolean; featured: boolean;
   active: boolean; rating: number; reviewCount: number; description: string;
-  imageUrl: string | null;
+  imageUrl: string | null; bundleEligible: boolean;
 }
 
 export interface SavedAddress {

@@ -3,20 +3,13 @@
 import { useEffect, useState } from "react";
 import { useCartStore } from "@/store/cartStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
+import { calcDiscounts } from "@/lib/discountRules";
 import { formatCurrency } from "@/lib/utils";
 
 const TAX_RATE = 0.0825;
 
 interface BundleTier {
-  id: string; minQty: number; discountPct: number; label: string; sortOrder: number;
-}
-
-function calcBundlePct(totalQty: number, tiers: BundleTier[]): number {
-  const sorted = [...tiers].sort((a, b) => b.minQty - a.minQty);
-  for (const t of sorted) {
-    if (totalQty >= t.minQty) return t.discountPct / 100;
-  }
-  return 0;
+  id: string; minQty: number; discountPct: number; label: string; sortOrder: number; active?: boolean;
 }
 
 export function OrderSummary() {
@@ -32,23 +25,10 @@ export function OrderSummary() {
   }, []);
 
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
-
-  // Flash sale savings per item
-  const flashSavings = items.reduce((a, i) => {
-    if (i.product.salePrice != null && i.product.salePrice < i.product.price) {
-      return a + (i.product.price - i.product.salePrice) * i.quantity;
-    }
-    return a;
-  }, 0);
-
-  // Subtotal at effective (sale or regular) prices
-  const subtotal = items.reduce(
-    (a, i) => a + (i.product.salePrice ?? i.product.price) * i.quantity,
-    0,
+  const { subtotal, flashSavings, bundlePct, bundleDiscount } = calcDiscounts(
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    bundleTiers,
   );
-
-  const bundlePct = calcBundlePct(totalQty, bundleTiers);
-  const bundleDiscount = subtotal * bundlePct;
   const tax = subtotal * TAX_RATE;
   const total = Math.max(0, subtotal - bundleDiscount - promoDiscount + tax);
 

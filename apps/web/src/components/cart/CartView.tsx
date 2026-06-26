@@ -3,16 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Plus, Minus, Tag, Gift, Star, Truck } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/cartStore";
 import {
   formatCurrency,
   calcCartTotals,
-  calcBundleDiscount,
   calcPointsEarned,
   calcPointsValue,
   MIN_ORDER,
 } from "@/lib/utils";
+import { calcDiscounts } from "@/lib/discountRules";
 
 export function CartView() {
   const {
@@ -24,13 +24,16 @@ export function CartView() {
   const [couponInput, setCouponInput] = useState(couponCode ?? "");
   const [giftInput, setGiftInput] = useState(giftCardCode ?? "");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
+  useEffect(() => {
+    fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
+  }, []);
 
-  const subtotal = items.reduce(
-    (acc, i) => acc + (i.product.salePrice ?? i.product.price) * i.quantity,
-    0,
+  const { subtotal, flashSavings, bundleDiscount, bundleQty, promoBaseSubtotal } = calcDiscounts(
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    bundleTiers,
   );
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
-  const bundleDiscount = calcBundleDiscount(totalQty, subtotal);
   const rewardsDiscount = rewardsPointsToRedeem >= 100
     ? Math.floor(rewardsPointsToRedeem / 100) * 5
     : 0;
@@ -45,18 +48,21 @@ export function CartView() {
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponInput, subtotal }),
+        body: JSON.stringify({ code: couponInput, subtotal: promoBaseSubtotal }),
       });
       if (res.ok) {
-        const { discount } = await res.json();
+        const { discount, message } = await res.json();
         setCoupon(couponInput, discount);
+        const hasExcluded = flashSavings > 0 || bundleDiscount > 0;
+        if (hasExcluded) alert(message + " (applies to regular-priced items only)");
       } else {
+        const json = await res.json().catch(() => ({}));
         setCoupon(null, 0);
-        alert("Invalid or expired coupon code.");
+        alert(json.error ?? "Invalid or expired coupon code.");
       }
     } catch {
       // If API not ready, check for WELCOME10
-      if (couponInput === "WELCOME10" && subtotal >= 50) {
+      if (couponInput === "WELCOME10" && promoBaseSubtotal >= 50) {
         setCoupon(couponInput, 10);
       } else {
         alert("Invalid coupon code.");
@@ -111,21 +117,15 @@ export function CartView() {
           </div>
         </div>
 
-        {/* Bundle deal notice */}
-        {totalQty === 1 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
-            Add <strong>1 more bottle</strong> and save <strong>5%</strong> with our bundle deal!
+        {/* Bundle deal notice — only bundleEligible products qualify */}
+        {bundleDiscount > 0 && (
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-sm text-purple-700 font-medium">
+            📦 Bundle discount applied to {bundleQty} bundle-eligible bottle{bundleQty !== 1 ? "s" : ""}!
           </div>
         )}
-        {totalQty >= 2 && (
-          <div className="bg-brand-50 border border-brand-200 rounded-xl p-3 text-sm text-brand-700 font-medium">
-            🎉 Bundle deal active:{" "}
-            {totalQty >= 6 ? "15% OFF (6+ bottles)" : totalQty >= 3 ? "10% OFF (3+ bottles)" : "5% OFF (2+ bottles)"}
-            {totalQty < 6 && (
-              <span className="text-brand-500 font-normal">
-                {" "}· Add {(totalQty < 3 ? 3 : 6) - totalQty} more for an even bigger discount
-              </span>
-            )}
+        {flashSavings > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 font-medium">
+            ⚡ Flash Sale savings: -{formatCurrency(flashSavings)}
           </div>
         )}
 
@@ -253,9 +253,15 @@ export function CartView() {
               <span>{formatCurrency(subtotal)}</span>
             </div>
             {bundleDiscount > 0 && (
-              <div className="flex justify-between text-blue-600 font-medium">
-                <span>Bundle discount</span>
+              <div className="flex justify-between text-purple-600 font-medium">
+                <span>📦 Bundle discount</span>
                 <span>-{formatCurrency(bundleDiscount)}</span>
+              </div>
+            )}
+            {flashSavings > 0 && (
+              <div className="flex justify-between text-red-600 font-medium">
+                <span>⚡ Flash Sale savings</span>
+                <span>-{formatCurrency(flashSavings)}</span>
               </div>
             )}
             {couponDiscount > 0 && (

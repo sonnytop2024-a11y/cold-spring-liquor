@@ -5,6 +5,7 @@ import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, 
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
+import { calcDiscounts } from "@/lib/discountRules";
 import { useRouter } from "next/navigation";
 import { formatCurrency, MIN_ORDER } from "@/lib/utils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
@@ -326,19 +327,11 @@ export function CheckoutForm() {
   }, []);
 
   // Totals — delivery always FREE, minimum order $20
-  const subtotal = items.reduce((a, i) => a + (i.product.salePrice ?? i.product.price) * i.quantity, 0);
+  const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal } = calcDiscounts(
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    bundleTiers,
+  );
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
-  const flashSavings = items.reduce((a, i) => {
-    if (i.product.salePrice != null && i.product.salePrice < i.product.price)
-      return a + (i.product.price - i.product.salePrice) * i.quantity;
-    return a;
-  }, 0);
-  const bundlePct = (() => {
-    const sorted = [...bundleTiers].sort((a, b) => b.minQty - a.minQty);
-    for (const t of sorted) { if (totalQty >= t.minQty) return t.discountPct / 100; }
-    return 0;
-  })();
-  const bundleDiscount = subtotal * bundlePct;
   const tax = subtotal * TAX;
   const total = Math.max(0, subtotal - bundleDiscount - promoDiscount + tax);
   const pointsEarned = Math.floor(total * 10);
@@ -350,10 +343,14 @@ export function CheckoutForm() {
     if (!code) return;
     setApplyingPromo(true); setPromoError(""); setPromoMsg("");
     try {
-      const res = await fetch("/api/coupons/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotal: subtotal - bundleDiscount }) });
+      const res = await fetch("/api/coupons/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotal: promoBaseSubtotal }) });
       const data = await res.json();
       if (!res.ok) { setPromoError(data.error ?? "Invalid code"); setPromoDiscount(0); setPromoCode(null); clearPromo(); }
-      else { setPromoCode(code); setPromoDiscount(data.discount); setPromoMsg(data.message); setPromo(code, data.discount); }
+      else {
+        const hasExcluded = items.some(i => i.product.salePrice != null && i.product.salePrice < i.product.price) || items.some(i => i.product.bundleEligible);
+        const suffix = hasExcluded ? " (applies to regular-priced items only)" : "";
+        setPromoCode(code); setPromoDiscount(data.discount); setPromoMsg(data.message + suffix); setPromo(code, data.discount);
+      }
     } catch { setPromoError("Could not validate. Try: WELCOME10"); }
     finally { setApplyingPromo(false); }
   }
