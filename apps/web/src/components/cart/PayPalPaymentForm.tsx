@@ -63,45 +63,49 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
     // Clear container
     containerRef.current.innerHTML = "";
 
-    const buttons = window.paypal.Buttons({
-      style: { layout: "vertical", shape: "rect", label: "pay", height: 48 },
-      createOrder: async () => {
-        setError(null);
-        const res = await fetch("/api/paypal/create-order", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: total }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.id) throw new Error(data.error ?? "Failed to create order");
-        return data.id;
-      },
-      onApprove: async (data: { orderID: string }) => {
-        setCapturing(true);
-        try {
-          const res = await fetch("/api/paypal/capture-order", {
+    try {
+      const buttons = window.paypal.Buttons({
+        style: { layout: "vertical", shape: "rect", label: "pay", height: 48 },
+        createOrder: async () => {
+          setError(null);
+          const res = await fetch("/api/paypal/create-order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ paypalOrderId: data.orderID, orderPayload }),
+            body: JSON.stringify({ amount: total }),
           });
-          const order = await res.json();
-          if (!res.ok) throw new Error(order.error ?? "Capture failed");
-          onSuccess({ id: order.id, orderNumber: order.orderNumber, total: order.total });
-        } catch (e: unknown) {
-          setError(e instanceof Error ? e.message : "Payment failed. Please try again.");
+          const data = await res.json();
+          if (!res.ok || !data.id) throw new Error(data.error ?? "Failed to create order");
+          return data.id;
+        },
+        onApprove: async (data: { orderID: string }) => {
+          setCapturing(true);
+          try {
+            const res = await fetch("/api/paypal/capture-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ paypalOrderId: data.orderID, orderPayload }),
+            });
+            const order = await res.json();
+            if (!res.ok) throw new Error(order.error ?? "Capture failed");
+            onSuccess({ id: order.id, orderNumber: order.orderNumber, total: order.total });
+          } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : "Payment failed. Please try again.");
+            setCapturing(false);
+          }
+        },
+        onError: (err: unknown) => {
+          console.error("[PayPal] error:", err);
+          setError("PayPal encountered an error. Please try again.");
           setCapturing(false);
-        }
-      },
-      onError: (err: unknown) => {
-        console.error("[PayPal] error:", err);
-        setError("PayPal encountered an error. Please try again.");
-        setCapturing(false);
-      },
-      onCancel: () => setError(null),
-    });
+        },
+        onCancel: () => setError(null),
+      });
 
-    buttonsRef.current = buttons;
-    buttons.render(containerRef.current);
+      buttonsRef.current = buttons;
+      if (containerRef.current) buttons.render(containerRef.current);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to initialize PayPal buttons.");
+    }
   }, [sdkReady, total, orderPayload, onSuccess]);
 
   return (
