@@ -1,24 +1,36 @@
 import { NextResponse } from "next/server";
-import { dbGetActiveFlashDeals, dbGetAllFlashDeals } from "@/lib/db";
 import { supabaseServer } from "@/lib/supabase.server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  if (url.searchParams.has("debug")) {
-    const all = await dbGetAllFlashDeals();
+interface FlashDeal {
+  id: string; name: string; brand: string; slug: string;
+  price: number; salePrice: number; imageUrl: string | null;
+  volume: string; stockQty: number; maxStock: number;
+  active: boolean; startAt: string | null; endsAt: string | null;
+  createdAt: string; productId?: string | null;
+}
+
+export async function GET() {
+  const sb = supabaseServer();
+  if (!sb) return NextResponse.json([]);
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (sb as any).from("csl_settings").select("data").eq("id", 2).maybeSingle();
+    if (error || !data?.data) return NextResponse.json([]);
+
+    const map = data.data as Record<string, FlashDeal>;
     const now = new Date();
-    // Direct Supabase read to compare
-    const sb = supabaseServer();
-    let rawRow: unknown = null;
-    let rawError: unknown = null;
-    if (sb) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (sb as any).from("csl_settings").select("id,data").eq("id", 2).maybeSingle();
-      rawRow = data; rawError = error;
-    }
-    return NextResponse.json({ now: now.toISOString(), dbAll: all.length, rawRow, rawError });
+    const active = Object.values(map).filter(d => {
+      if (!d.active) return false;
+      if (d.startAt && new Date(d.startAt) > now) return false;
+      if (d.endsAt && new Date(d.endsAt) < now) return false;
+      return true;
+    });
+
+    return NextResponse.json(active);
+  } catch {
+    return NextResponse.json([]);
   }
-  return NextResponse.json(await dbGetActiveFlashDeals());
 }
