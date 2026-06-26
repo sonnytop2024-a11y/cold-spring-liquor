@@ -190,6 +190,45 @@ export async function dbResetSettings(): Promise<StoreSettings> {
   return store.resetSettings();
 }
 
+// ── Coupons (stored inside csl_settings.coupons to avoid needing a separate table) ──
+
+import type { MockCoupon } from "../app/api/_mock/store";
+
+async function dbLoadCouponMap(): Promise<Record<string, MockCoupon>> {
+  const settings = await dbGetSettings();
+  if (settings.coupons) return settings.coupons;
+  // First time: seed defaults from mock store into Supabase
+  const defaults: Record<string, MockCoupon> = {};
+  store.getAllCoupons().forEach(c => { defaults[c.id] = c; });
+  await dbSaveSettings({ coupons: defaults });
+  return defaults;
+}
+
+export async function dbGetAllCoupons(): Promise<MockCoupon[]> {
+  const map = await dbLoadCouponMap();
+  return Object.values(map).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function dbGetCouponByCode(code: string): Promise<MockCoupon | undefined> {
+  const map = await dbLoadCouponMap();
+  return Object.values(map).find(c => c.code.toUpperCase() === code.toUpperCase());
+}
+
+export async function dbSaveCoupon(coupon: MockCoupon): Promise<MockCoupon> {
+  const map = await dbLoadCouponMap();
+  map[coupon.id] = coupon;
+  await dbSaveSettings({ coupons: map });
+  return coupon;
+}
+
+export async function dbDeleteCoupon(id: string): Promise<boolean> {
+  const map = await dbLoadCouponMap();
+  if (!map[id]) return false;
+  delete map[id];
+  await dbSaveSettings({ coupons: map });
+  return true;
+}
+
 // ── Supabase REST fetch helpers (bypass JS client — guaranteed to work) ────────
 
 import type { MockUser } from "../app/api/_mock/store";

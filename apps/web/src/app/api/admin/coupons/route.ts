@@ -1,9 +1,10 @@
 import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetAllCoupons, dbGetCouponByCode, dbSaveCoupon } from "@/lib/db";
+import type { MockCoupon } from "../../_mock/store";
 
 export async function GET() {
-  return NextResponse.json(store.getAllCoupons());
+  return NextResponse.json(await dbGetAllCoupons());
 }
 
 export async function POST(req: NextRequest) {
@@ -14,10 +15,11 @@ export async function POST(req: NextRequest) {
   if (!code || !type || !value) return NextResponse.json({ error: "code, type, value required" }, { status: 400 });
   if (!["fixed", "percentage", "free_delivery"].includes(type)) return NextResponse.json({ error: "Invalid type" }, { status: 400 });
 
-  const existing = store.getCouponByCode(code);
+  const existing = await dbGetCouponByCode(code);
   if (existing) return NextResponse.json({ error: "Coupon code already exists" }, { status: 409 });
 
-  const coupon = store.createCoupon({
+  const coupon: MockCoupon = {
+    id: `c${Date.now()}`,
     code: code.toUpperCase().trim(),
     type, value: Number(value),
     label: label || `${type === "fixed" ? `$${value} off` : type === "percentage" ? `${value}% off` : "Free delivery"}`,
@@ -28,7 +30,10 @@ export async function POST(req: NextRequest) {
     endDate: endDate || null,
     categoryRestriction: categoryRestriction || null,
     active: active !== false,
-  });
+    usageCount: 0,
+    createdAt: new Date().toISOString(),
+  };
 
+  await dbSaveCoupon(coupon);
   return NextResponse.json(coupon, { status: 201 });
 }

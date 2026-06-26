@@ -203,6 +203,7 @@ export interface StoreSettings {
   msgArrivingSoon: string;
   msgArrived: string;
   updatedAt: string;
+  coupons?: Record<string, MockCoupon>;
 }
 
 interface StoreData {

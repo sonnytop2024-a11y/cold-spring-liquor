@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetCouponByCode } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const { code, subtotal } = await req.json();
   if (!code) return NextResponse.json({ error: "No coupon code provided." }, { status: 400 });
 
-  const coupon = store.getCouponByCode(code);
+  const coupon = await dbGetCouponByCode(code);
 
   if (!coupon || !coupon.active) {
     return NextResponse.json({ error: "Invalid or expired coupon code." }, { status: 400 });
