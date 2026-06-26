@@ -5,7 +5,7 @@ const BUNDLES = [
     qty: "2 Bottles",
     discount: "5% Off",
     pct: 5,
-    desc: "Mix & match any 2 bottles",
+    desc: "Mix & Match any 2 bottles",
     color: "from-blue-500 to-blue-600",
     emoji: "🍶🍶",
   },
