@@ -203,13 +203,14 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
     if (!showPicker) return;
     setLoadingProducts(true);
     setProductError(null);
-    fetch(`${API}/admin/products`)
+    // Use public products API — no admin auth needed, avoid 401 secret mismatch
+    fetch(`${API}/products?limit=1000&activeOnly=false`)
       .then(r => {
         if (!r.ok) throw new Error(`Server returned ${r.status}`);
         return r.json();
       })
       .then(json => {
-        const list: InventoryProduct[] = Array.isArray(json) ? json : (json.products ?? []);
+        const list: InventoryProduct[] = Array.isArray(json) ? json : (json.products ?? json.data ?? []);
         setProducts(list);
       })
       .catch(e => setProductError(String(e)))
