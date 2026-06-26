@@ -9,6 +9,10 @@ let _client: ReturnType<typeof createClient> | null = null;
 
 export function supabaseServer() {
   if (!URL || !KEY) return null;
-  if (!_client) _client = createClient(URL, KEY, { auth: { persistSession: false } });
+  if (!_client) _client = createClient(URL, KEY, {
+    auth: { persistSession: false },
+    // Disable Next.js fetch cache — Supabase data must always be fresh
+    global: { fetch: (url, opts = {}) => fetch(url, { ...opts as RequestInit, cache: "no-store" }) },
+  });
   return _client;
 }
