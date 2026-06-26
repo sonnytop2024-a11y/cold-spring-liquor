@@ -453,10 +453,10 @@ export function CheckoutForm() {
   // ── Payment method selection ────────────────────────────────────────────────
   if (paymentStep === "select") {
     return (
-      <div className="space-y-5">
-        <div className="bg-white border rounded-2xl p-6">
+      <div className="space-y-4">
+        <div className="bg-white border rounded-2xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="font-bold text-lg sm:text-xl">Choose Payment</h2>
+            <h2 className="font-bold text-base sm:text-lg">Choose Payment</h2>
             <span className="font-black text-xl sm:text-2xl text-gray-900">{formatCurrency(total)}</span>
           </div>
           <p className="text-xs text-gray-400 mb-5">Select how you'd like to pay</p>
@@ -569,7 +569,7 @@ export function CheckoutForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-4">
 
       {/* Reorder prefill notice */}
       {reorderFromOrder && (
@@ -593,11 +593,11 @@ export function CheckoutForm() {
       )}
 
       {/* Contact Info */}
-      <div className="bg-white border rounded-xl p-6">
-        <h2 className="font-bold text-lg mb-5 flex items-center gap-2">
-          <User size={18} className="text-brand-500" /> Contact Information
+      <div className="bg-white border rounded-xl p-4 sm:p-6">
+        <h2 className="font-bold text-base sm:text-lg mb-4 flex items-center gap-2">
+          <User size={16} className="text-brand-500" /> Contact Information
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="sm:col-span-2">
             <Field label="Full Name" value={name} onChange={setName} placeholder="John Smith" error={errors.name} />
           </div>
@@ -607,9 +607,9 @@ export function CheckoutForm() {
       </div>
 
       {/* Delivery Address */}
-      <div className="bg-white border rounded-xl p-6">
-        <h2 className="font-bold text-lg mb-5 flex items-center gap-2">
-          <MapPin size={18} className="text-brand-500" /> Delivery Address
+      <div className="bg-white border rounded-xl p-4 sm:p-6">
+        <h2 className="font-bold text-base sm:text-lg mb-4 flex items-center gap-2">
+          <MapPin size={16} className="text-brand-500" /> Delivery Address
         </h2>
         <AddressFields addr={delivery} onChange={(a) => { setDelivery(a); setZoneError(null); }} prefix="delivery" />
         {errors.street && <p className="text-red-500 text-xs mt-1">{errors.street}</p>}
@@ -624,9 +624,9 @@ export function CheckoutForm() {
       </div>
 
       {/* Billing Address */}
-      <div className="bg-white border rounded-xl p-6">
-        <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-          <BillingIcon size={18} className="text-brand-500" /> Billing Address
+      <div className="bg-white border rounded-xl p-4 sm:p-6">
+        <h2 className="font-bold text-base sm:text-lg mb-3 flex items-center gap-2">
+          <BillingIcon size={16} className="text-brand-500" /> Billing Address
         </h2>
         <label className="flex items-center gap-2.5 cursor-pointer mb-4">
           <input type="checkbox" checked={sameBilling} onChange={e => setSameBilling(e.target.checked)}
@@ -648,8 +648,8 @@ export function CheckoutForm() {
       </div>
 
       {/* Promo Code */}
-      <div className="bg-white border rounded-xl p-5">
-        <h2 className="font-bold text-base mb-4 flex items-center gap-2">
+      <div className="bg-white border rounded-xl p-4 sm:p-5">
+        <h2 className="font-bold text-sm sm:text-base mb-3 flex items-center gap-2">
           <Tag size={18} className="text-brand-500" /> Promo Code
           <span className="text-xs font-normal text-gray-400 ml-1">(optional)</span>
         </h2>
@@ -688,7 +688,7 @@ export function CheckoutForm() {
       </div>
 
       {/* Order Summary */}
-      <div className="bg-white border rounded-xl p-5">
+      <div className="bg-white border rounded-xl p-4 sm:p-5">
         <button type="button" onClick={() => setShowSummary(s => !s)}
           className="w-full flex items-center justify-between font-bold text-base">
           <span>Order Summary</span>
@@ -722,11 +722,11 @@ export function CheckoutForm() {
       </div>
 
       {/* Payment */}
-      <div className="bg-white border rounded-xl p-6">
-        <h2 className="font-bold text-base mb-5 flex items-center gap-2">
-          <CreditCard size={18} className="text-brand-500" /> Payment
+      <div className="bg-white border rounded-xl p-4 sm:p-6">
+        <h2 className="font-bold text-base mb-3 flex items-center gap-2">
+          <CreditCard size={16} className="text-brand-500" /> Payment
         </h2>
-        <div className="bg-gray-50 border border-dashed rounded-xl p-6 text-center text-gray-400 text-sm">
+        <div className="bg-gray-50 border border-dashed rounded-xl p-4 text-center text-gray-400 text-sm">
           Fill in your details above and click &ldquo;Place Order&rdquo; to enter payment.
           <p className="text-xs mt-2">Credit Card · Debit Card · Apple Pay · Google Pay</p>
         </div>
