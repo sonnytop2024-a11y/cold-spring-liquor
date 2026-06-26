@@ -2,10 +2,8 @@
 
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/utils";
-
-const CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? "";
 
 interface Props {
   total: number;
@@ -17,8 +15,26 @@ interface Props {
 export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [clientId, setClientId] = useState<string | null>(null);
 
-  if (!CLIENT_ID) {
+  // Load clientId from server at runtime to avoid build-time baking issues
+  useEffect(() => {
+    fetch("/api/paypal/config")
+      .then(r => r.json())
+      .then(d => setClientId(d.clientId ?? ""))
+      .catch(() => setClientId(""));
+  }, []);
+
+  if (clientId === null) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-gray-400">
+        <Loader2 size={28} className="animate-spin text-brand-500" />
+        <p className="text-sm">Loading PayPal…</p>
+      </div>
+    );
+  }
+
+  if (!clientId) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center text-sm text-amber-800">
         PayPal is not configured yet. Please contact support.
@@ -28,7 +44,7 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
 
   return (
     <PayPalScriptProvider options={{
-      clientId: CLIENT_ID,
+      clientId,
       currency: "USD",
       components: "buttons",
       enableFunding: "venmo",
@@ -91,7 +107,7 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
           )}
         </div>
 
-        {/* Trust */}
+        {/* Trust badges */}
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
             { icon: "🔒", label: "SSL Encrypted" },
