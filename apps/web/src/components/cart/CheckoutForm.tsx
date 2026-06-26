@@ -842,7 +842,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, onSuccess, onCan
         </div>
         <p className="text-xs text-gray-400 mb-4 sm:mb-5">Pay securely with Card or Klarna (buy now, pay later)</p>
 
-        <PaymentElement options={{ layout: "tabs" }} />
+        <PaymentElement options={{ layout: "tabs", wallets: { applePay: "always", googlePay: "auto" } }} />
 
         {payError && (
           <div className="mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center gap-2">
