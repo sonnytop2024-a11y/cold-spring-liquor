@@ -438,7 +438,29 @@ export function CheckoutForm() {
 
   if (clientSecret) {
     return (
-      <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
+      <Elements stripe={stripePromise} options={{
+        clientSecret,
+        appearance: {
+          theme: "stripe",
+          variables: {
+            colorPrimary: "#f97316",
+            colorBackground: "#ffffff",
+            colorText: "#111827",
+            colorDanger: "#ef4444",
+            fontFamily: "Inter, system-ui, sans-serif",
+            borderRadius: "12px",
+            spacingUnit: "4px",
+          },
+          rules: {
+            ".Input": { border: "1px solid #e5e7eb", boxShadow: "none", padding: "12px 16px" },
+            ".Input:focus": { border: "1px solid #f97316", boxShadow: "0 0 0 3px rgba(249,115,22,0.15)" },
+            ".Tab": { border: "2px solid #e5e7eb", borderRadius: "12px", padding: "12px 16px" },
+            ".Tab--selected": { border: "2px solid #f97316", backgroundColor: "#fff7ed" },
+            ".Tab:hover": { border: "2px solid #d1d5db" },
+            ".Label": { fontWeight: "500", fontSize: "14px" },
+          },
+        },
+      }}>
         <StripePaymentForm
           clientSecret={clientSecret}
           orderPayload={orderPayload!}
@@ -720,19 +742,56 @@ function StripePaymentForm({ clientSecret, orderPayload, total, onSuccess, onCan
   }
 
   return (
-    <form onSubmit={handlePay} className="space-y-4">
-      <PaymentElement />
-      {payError && <p className="text-red-500 text-sm">{payError}</p>}
-      <div className="flex gap-3 pt-2">
+    <form onSubmit={handlePay} className="space-y-5">
+      {/* Header */}
+      <div className="bg-white border rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <CreditCard size={20} className="text-brand-500" /> Payment
+          </h2>
+          <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+        </div>
+        <p className="text-xs text-gray-400 mb-5">Pay securely with Card or Klarna (buy now, pay later)</p>
+
+        <PaymentElement options={{ layout: "tabs" }} />
+
+        {payError && (
+          <div className="mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+            <AlertTriangle size={15} className="shrink-0" /> {payError}
+          </div>
+        )}
+      </div>
+
+      {/* Trust badges */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {[
+          { icon: "🔒", label: "SSL Encrypted" },
+          { icon: "✅", label: "Powered by Stripe" },
+          { icon: "🛡️", label: "Secure Checkout" },
+        ].map(({ icon, label }) => (
+          <div key={label} className="bg-gray-50 border rounded-xl py-2.5 px-2">
+            <p className="text-lg">{icon}</p>
+            <p className="text-[10px] font-semibold text-gray-500 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3">
         <button type="button" onClick={onCancel} disabled={paying}
-          className="flex-1 border border-gray-300 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
-          Back
+          className="flex-1 border-2 border-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+          ← Back
         </button>
         <button type="submit" disabled={paying || !stripe}
-          className="flex-[2] flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-brand-500/30">
-          {paying ? <><Loader2 size={18} className="animate-spin" />Processing...</> : `Pay ${formatCurrency(total)}`}
+          className="flex-[2] flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/25 text-base">
+          {paying
+            ? <><Loader2 size={18} className="animate-spin" /> Processing…</>
+            : <>Pay {formatCurrency(total)} →</>}
         </button>
       </div>
+
+      <p className="text-center text-xs text-gray-400">
+        🔒 Your payment is encrypted and secure. Must be 21+, valid ID checked at delivery.
+      </p>
     </form>
   );
 }

@@ -10,9 +10,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // convert dollars to cents
+      amount: Math.round(amount * 100),
       currency: "usd",
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ["card", "klarna"],
     });
     return NextResponse.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
