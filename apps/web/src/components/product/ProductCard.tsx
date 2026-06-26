@@ -15,6 +15,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const { items, addItem, updateQuantity, removeItem } = useCartStore();
   const [justAdded, setJustAdded] = useState(false);
   const [favorited, setFavorited] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     try {
@@ -64,7 +65,7 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* ── Image ────────────────────────────────────────────────── */}
       <div className="relative mx-2 mt-2 rounded-xl overflow-hidden aspect-square bg-gray-50">
         <Link href={`/products/${product.slug}`} className="absolute inset-0">
-          {product.imageUrl ? (
+          {product.imageUrl && !imgError ? (
             <Image
               src={product.imageUrl}
               alt={product.name}
@@ -72,6 +73,7 @@ export function ProductCard({ product }: ProductCardProps) {
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover rounded-xl group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
+              onError={() => setImgError(true)}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center relative overflow-hidden"
