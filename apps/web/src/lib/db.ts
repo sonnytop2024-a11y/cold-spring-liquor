@@ -229,17 +229,35 @@ export async function dbDeleteCoupon(id: string): Promise<boolean> {
   return true;
 }
 
-// ── Flash Deals (stored inside csl_settings.flashDeals) ──────────────────────
+// ── Flash Deals (stored in csl_settings row id=2, separate from main settings) ─
 
 import type { MockFlashDeal } from "../app/api/_mock/store";
 
+const FLASH_ROW_ID = 2;
+
 async function dbLoadFlashDealMap(): Promise<Record<string, MockFlashDeal>> {
-  const settings = await dbGetSettings();
-  if (settings.flashDeals) return settings.flashDeals as Record<string, MockFlashDeal>;
-  // First time: no seed defaults — start empty
-  const empty: Record<string, MockFlashDeal> = {};
-  await dbSaveSettings({ flashDeals: empty } as any);
-  return empty;
+  const t = tbl("csl_settings");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").eq("id", FLASH_ROW_ID).maybeSingle();
+      if (!error && data?.data) return data.data as Record<string, MockFlashDeal>;
+      if (error) console.error("[db] loadFlashDeals error:", error.message);
+    } catch (e) {
+      console.error("[db] loadFlashDeals exception:", e);
+    }
+  }
+  return {};
+}
+
+async function dbSaveFlashDealMap(map: Record<string, MockFlashDeal>): Promise<void> {
+  const t = tbl("csl_settings");
+  if (!t) return;
+  try {
+    const { error } = await t.upsert({ id: FLASH_ROW_ID, data: map }, { onConflict: "id" });
+    if (error) console.error("[db] saveFlashDeals error:", error.message);
+  } catch (e) {
+    console.error("[db] saveFlashDeals exception:", e);
+  }
 }
 
 export async function dbGetAllFlashDeals(): Promise<MockFlashDeal[]> {
@@ -261,7 +279,7 @@ export async function dbGetActiveFlashDeals(): Promise<MockFlashDeal[]> {
 export async function dbSaveFlashDeal(deal: MockFlashDeal): Promise<MockFlashDeal> {
   const map = await dbLoadFlashDealMap();
   map[deal.id] = deal;
-  await dbSaveSettings({ flashDeals: map } as any);
+  await dbSaveFlashDealMap(map);
   return deal;
 }
 
@@ -269,7 +287,7 @@ export async function dbDeleteFlashDeal(id: string): Promise<boolean> {
   const map = await dbLoadFlashDealMap();
   if (!map[id]) return false;
   delete map[id];
-  await dbSaveSettings({ flashDeals: map } as any);
+  await dbSaveFlashDealMap(map);
   return true;
 }
 
