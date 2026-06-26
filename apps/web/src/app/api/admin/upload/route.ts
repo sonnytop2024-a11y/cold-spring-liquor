@@ -1,4 +1,3 @@
-import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase.server";
 import sharp from "sharp";
@@ -78,7 +77,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   try {
     const { url } = await req.json();
     if (!url || typeof url !== "string") return NextResponse.json({ ok: true });

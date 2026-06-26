@@ -1,4 +1,3 @@
-import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetAllCoupons, dbGetCouponByCode, dbSaveCoupon } from "@/lib/db";
 import type { MockCoupon } from "../../_mock/store";
@@ -8,7 +7,6 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json();
   const { code, type, value, label, minOrder, maxUsage, usagePerCustomer, startDate, endDate, categoryRestriction, active } = body;
 

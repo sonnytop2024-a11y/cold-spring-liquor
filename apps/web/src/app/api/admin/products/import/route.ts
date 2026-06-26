@@ -1,4 +1,3 @@
-import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetAllProducts, dbSaveManyProducts } from "@/lib/db";
 import type { MockProduct } from "../../../_mock/store";
@@ -82,7 +81,6 @@ interface PreviewUpdated {
 }
 
 export async function POST(req: NextRequest) {
-  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const body = await req.json() as { rows: Record<string, unknown>[]; confirm?: boolean };
   const { rows, confirm = false } = body;
 

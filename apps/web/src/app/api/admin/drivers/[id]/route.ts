@@ -1,4 +1,3 @@
-import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../../_mock/store";
 import { dbGetAllOrders } from "@/lib/db";
@@ -27,7 +26,6 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const driver = store.getDriver(params.id);
   if (!driver) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -55,7 +53,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 // PATCH: partial update — used by driver app to toggle isOnline
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const authErr = requireAdminAuth(req); if (authErr) return authErr;
   const driver = store.getDriver(params.id);
   if (!driver) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await req.json();
