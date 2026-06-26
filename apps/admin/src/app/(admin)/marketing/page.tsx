@@ -214,8 +214,7 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
     if (!showPicker) return;
     setLoadingProducts(true);
     setProductError(null);
-    // Use public products API — no admin auth needed, avoid 401 secret mismatch
-    fetch(`${API}/products?limit=1000&activeOnly=false`)
+    fetch(`${API}/admin/products`)
       .then(r => {
         if (!r.ok) throw new Error(`Server returned ${r.status}`);
         return r.json();
