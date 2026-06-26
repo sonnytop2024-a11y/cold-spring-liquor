@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     startAt: startAt || null,
     endsAt: endsAt || null,
     productId: productId ?? null,
-  } as any);
+  });
 
   return NextResponse.json(deal, { status: 201 });
 }

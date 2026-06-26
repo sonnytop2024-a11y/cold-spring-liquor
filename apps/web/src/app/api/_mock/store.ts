@@ -143,6 +143,7 @@ export interface MockFlashDeal {
   startAt: string | null;
   endsAt: string | null;
   createdAt: string;
+  productId?: string | null;
 }
 
 export interface MockBundleTier {

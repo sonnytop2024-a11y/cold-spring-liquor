@@ -44,15 +44,6 @@ export function calcPointsValue(points: number): number {
   return 0;
 }
 
-// Bundle deal discount
-export function calcBundleDiscount(totalQty: number, subtotal: number): number {
-  let pct = 0;
-  if (totalQty >= 6) pct = 0.15;
-  else if (totalQty >= 3) pct = 0.10;
-  else if (totalQty >= 2) pct = 0.05;
-  return subtotal * pct;
-}
-
 // VIP tier
 export function getVipTier(totalSpend: number): "none" | "silver" | "gold" | "platinum" {
   if (totalSpend >= 3000) return "platinum";

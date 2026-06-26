@@ -74,13 +74,4 @@ export function calcDiscounts(
   return { subtotal, flashSavings, bundleQty, bundleSubtotal, bundlePct, bundleDiscount, promoBaseSubtotal };
 }
 
-/** Apply promo discount only to promoBaseSubtotal */
-export function calcPromoDiscount(
-  promoBaseSubtotal: number,
-  couponType: "fixed" | "percentage" | "free_delivery" | string,
-  couponValue: number,
-): number {
-  if (couponType === "fixed") return Math.min(couponValue, promoBaseSubtotal);
-  if (couponType === "percentage") return Math.round(promoBaseSubtotal * (couponValue / 100) * 100) / 100;
-  return 0; // free_delivery — $0 cash discount, handled separately
-}
+
