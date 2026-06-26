@@ -121,7 +121,7 @@ export function HeroSection() {
                   { value: "500+", label: "Products" },
                 ].map(({ value, label }, i) => (
                   <div key={label} className={i > 0 ? "xs:pl-6 xs:border-l xs:border-white/10" : ""}>
-                    <p className="text-xl xs:text-2xl md:text-3xl font-black text-white">{value}</p>
+                    <p className="text-xl xs:text-2xl md:text-3xl font-black text-white whitespace-nowrap">{value}</p>
                     <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5">{label}</p>
                   </div>
                 ))}
