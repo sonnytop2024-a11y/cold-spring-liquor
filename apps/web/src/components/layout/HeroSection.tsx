@@ -56,13 +56,13 @@ export function HeroSection() {
         />
 
         <div className="container-main relative z-10">
-          <div className="py-10 xs:py-12 sm:py-16 md:py-20 lg:py-28 max-w-2xl">
+          <div className="pt-6 xs:pt-8 pb-10 xs:pb-12 sm:py-16 md:py-20 lg:py-28 max-w-2xl">
             <div className="space-y-4 xs:space-y-5 sm:space-y-7">
 
               {/* Location pill */}
               <div className="inline-flex items-center gap-1.5 border border-white/15 bg-white/5 backdrop-blur-sm text-[10px] xs:text-xs font-bold uppercase tracking-widest px-3 xs:px-4 py-1.5 rounded-full">
                 <span className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-pulse flex-shrink-0" />
-                <span className="truncate">Leander · Cedar Park · TX Area</span>
+                <span className="truncate">Leander · Cedar Park · Liberty Hill, Texas</span>
               </div>
 
               {/* Headline */}
