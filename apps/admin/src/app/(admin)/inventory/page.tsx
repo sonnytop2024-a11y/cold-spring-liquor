@@ -680,99 +680,102 @@ export default function InventoryPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Product Management</h1>
-          <p className="text-gray-500 text-sm mt-0.5">
-            {products.length} products · {activeCount} active
-            {inactiveCount > 0 && <span className="text-red-500 ml-2">· {inactiveCount} inactive</span>}
-            {lowStock > 0 && <span className="text-amber-600 ml-2">· {lowStock} low stock</span>}
-          </p>
+      <div className="mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <div>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Product Management</h1>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              <span className="text-sm text-gray-500">{products.length} total</span>
+              <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                {activeCount} active
+              </span>
+              {inactiveCount > 0 && (
+                <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                  {inactiveCount} inactive
+                </span>
+              )}
+              {lowStock > 0 && (
+                <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  ⚠ {lowStock} low stock
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Primary action */}
+          <button
+            onClick={openAdd}
+            className="flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm w-full sm:w-auto"
+          >
+            <Plus size={16} /> Add Product
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Save pending category changes */}
+
+        {/* Secondary actions row */}
+        <div className="flex flex-wrap items-center gap-2">
           {Object.keys(pendingCats).length > 0 && (
             <button
               onClick={() => saveCatsMutation.mutate(pendingCats)}
               disabled={saveCatsMutation.isPending}
-              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm"
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white px-3 py-2 rounded-lg font-semibold text-xs transition-colors shadow-sm"
             >
-              <Check size={15} />
-              {saveCatsMutation.isPending
-                ? "Saving…"
-                : `Save ${Object.keys(pendingCats).length} Change${Object.keys(pendingCats).length > 1 ? "s" : ""}`}
+              <Check size={13} />
+              {saveCatsMutation.isPending ? "Saving…" : `Save ${Object.keys(pendingCats).length} Change${Object.keys(pendingCats).length > 1 ? "s" : ""}`}
             </button>
           )}
-
-          {/* Export */}
           <button
-            onClick={async () => {
-              setExporting(true);
-              await exportProductsCSV();
-              setExporting(false);
-            }}
+            onClick={async () => { setExporting(true); await exportProductsCSV(); setExporting(false); }}
             disabled={exporting}
-            className="flex items-center gap-2 border border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 disabled:opacity-60 text-gray-700 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors"
+            className="flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60 text-gray-600 px-3 py-2 rounded-lg font-medium text-xs transition-colors"
           >
-            <Download size={15} />
-            {exporting ? "Exporting…" : "Export CSV"}
+            <Download size={13} /> {exporting ? "Exporting…" : "Export CSV"}
           </button>
-
-          {/* Import */}
           <button
             onClick={() => setShowImport(true)}
-            className="flex items-center gap-2 border border-brand-400 hover:border-brand-500 bg-brand-50 hover:bg-brand-100 text-brand-700 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors"
+            className="flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 px-3 py-2 rounded-lg font-medium text-xs transition-colors"
           >
-            <Upload size={15} />
-            Import Products
-          </button>
-
-          {/* Add manually (existing — unchanged) */}
-          <button
-            onClick={openAdd}
-            className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm"
-          >
-            <Plus size={16} />
-            Add Product
+            <Upload size={13} /> Import
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border mb-4 p-4 flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="bg-white rounded-xl border mb-4 p-3 sm:p-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or brand..."
-            className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="Search by name or brand…"
+            className="w-full pl-8 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
-        <div className="relative">
-          <select
-            value={catFilter}
-            onChange={(e) => setCatFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none pr-8 capitalize"
-          >
-            <option value="">All Categories</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        </div>
-        <div className="relative">
-          <select
-            value={stockFilter}
-            onChange={(e) => setStockFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none pr-8"
-          >
-            <option value="">All Stock</option>
-            <option value="in">In Stock</option>
-            <option value="out">Out of Stock</option>
-          </select>
-          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <div className="flex gap-2">
+          <div className="relative flex-1 sm:flex-none">
+            <select
+              value={catFilter}
+              onChange={(e) => setCatFilter(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none pr-7 capitalize"
+            >
+              <option value="">All Categories</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+          <div className="relative flex-1 sm:flex-none">
+            <select
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none pr-7"
+            >
+              <option value="">All Stock</option>
+              <option value="in">In Stock</option>
+              <option value="out">Out of Stock</option>
+            </select>
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
         </div>
       </div>
 
