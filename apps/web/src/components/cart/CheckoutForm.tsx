@@ -317,10 +317,25 @@ export function CheckoutForm() {
   // Delivery timing — computed once per render (updates each page load)
   const timing = useMemo(() => getDeliveryTiming(), []);
 
+  // Bundle tiers — fetched once from store (admin-configurable)
+  const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; sortOrder: number }[]>([]);
+  useEffect(() => {
+    fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
+  }, []);
+
   // Totals — delivery always FREE, minimum order $20
   const subtotal = items.reduce((a, i) => a + (i.product.salePrice ?? i.product.price) * i.quantity, 0);
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
-  const bundlePct = totalQty >= 6 ? 0.15 : totalQty >= 3 ? 0.10 : totalQty >= 2 ? 0.05 : 0;
+  const flashSavings = items.reduce((a, i) => {
+    if (i.product.salePrice != null && i.product.salePrice < i.product.price)
+      return a + (i.product.price - i.product.salePrice) * i.quantity;
+    return a;
+  }, 0);
+  const bundlePct = (() => {
+    const sorted = [...bundleTiers].sort((a, b) => b.minQty - a.minQty);
+    for (const t of sorted) { if (totalQty >= t.minQty) return t.discountPct / 100; }
+    return 0;
+  })();
   const bundleDiscount = subtotal * bundlePct;
   const afterBundle = subtotal - bundleDiscount;
   const tax = (afterBundle - promoDiscount) * TAX;
@@ -575,8 +590,9 @@ export function CheckoutForm() {
         {showSummary && (
           <div className="mt-4 space-y-2 text-sm border-t pt-4">
             <div className="flex justify-between text-gray-600"><span>Subtotal ({totalQty} items)</span><span>{formatCurrency(subtotal)}</span></div>
-            {bundleDiscount > 0 && <div className="flex justify-between text-blue-600 font-medium"><span>Bundle discount ({Math.round(bundlePct * 100)}%)</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
-            {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>Promo ({promoCode})</span><span>-{formatCurrency(promoDiscount)}</span></div>}
+            {flashSavings > 0 && <div className="flex justify-between text-red-500 font-medium"><span>⚡ Flash Sale savings</span><span>-{formatCurrency(flashSavings)}</span></div>}
+            {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle discount ({Math.round(bundlePct * 100)}%)</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
+            {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo ({promoCode})</span><span>-{formatCurrency(promoDiscount)}</span></div>}
             <div className="flex justify-between font-bold text-green-600">
               <span>🚚 Delivery Fee</span>
               <span>FREE</span>
@@ -584,6 +600,11 @@ export function CheckoutForm() {
             <div className="flex justify-between text-green-600 font-bold"><span>💰 Tip</span><span>NOT Required</span></div>
             <div className="flex justify-between text-gray-600"><span>Tax (8.25%)</span><span>{formatCurrency(tax)}</span></div>
             <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span>{formatCurrency(total)}</span></div>
+            {(flashSavings + bundleDiscount + promoDiscount) > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-center">
+                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(flashSavings + bundleDiscount + promoDiscount)} on this order!</p>
+              </div>
+            )}
             <p className="text-xs text-center text-brand-600 font-medium pt-1">🏆 You&apos;ll earn <strong>{pointsEarned} CS Points</strong> on this order</p>
           </div>
         )}
