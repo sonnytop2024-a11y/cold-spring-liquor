@@ -12,6 +12,13 @@ interface ProductGridProps {
 
 const LIMIT = 20;
 
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  if (current <= 4) return [1, 2, 3, 4, 5, "...", total];
+  if (current >= total - 3) return [1, "...", total - 4, total - 3, total - 2, total - 1, total];
+  return [1, "...", current - 1, current, current + 1, "...", total];
+}
+
 export function ProductGrid({ searchParams }: ProductGridProps) {
   const page = Number(searchParams.page ?? 1);
 
@@ -93,13 +100,10 @@ export function ProductGrid({ searchParams }: ProductGridProps) {
             <ChevronLeft size={16} />
           </button>
 
-          {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-            const p = totalPages <= 7 ? i + 1 : (() => {
-              if (i === 0) return 1;
-              if (i === 6) return totalPages;
-              return Math.max(2, Math.min(totalPages - 1, page - 2 + i));
-            })();
-            return (
+          {getPageNumbers(page, totalPages).map((p, i) =>
+            p === "..." ? (
+              <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">…</span>
+            ) : (
               <button
                 key={p}
                 onClick={() => goToPage(p)}
@@ -111,8 +115,8 @@ export function ProductGrid({ searchParams }: ProductGridProps) {
               >
                 {p}
               </button>
-            );
-          })}
+            )
+          )}
 
           <button
             onClick={() => goToPage(page + 1)}
