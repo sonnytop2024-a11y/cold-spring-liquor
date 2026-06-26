@@ -74,8 +74,43 @@ export function ProductCard({ product }: ProductCardProps) {
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gray-50">
-              <span className="text-5xl opacity-20">🍾</span>
+            <div className="w-full h-full flex items-center justify-center relative overflow-hidden"
+              style={{ background: "linear-gradient(160deg,#1a1a1a,#2d2d2d)" }}>
+              {/* ambient glow */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-24 h-24 rounded-full animate-pulse-glow"
+                  style={{ background: "radial-gradient(circle, rgba(249,115,22,0.22) 0%, transparent 70%)" }} />
+              </div>
+              {/* shimmer sweep */}
+              <div className="absolute inset-0 pointer-events-none animate-shimmer"
+                style={{ background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%)" }} />
+              {/* floating bottle */}
+              <div className="relative z-10 animate-bottle-float">
+                <svg width="52" height="90" viewBox="0 0 58 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="22" y="2" width="14" height="9" rx="3" fill="#4b5563"/>
+                  <rect x="23" y="2" width="5" height="9" rx="1.5" fill="#6b7280" opacity="0.5"/>
+                  <rect x="24" y="10" width="10" height="15" fill="#374151"/>
+                  <path d="M24 25 Q14 34 13 45 L45 45 Q44 34 34 25 Z" fill="#374151"/>
+                  <rect x="13" y="45" width="32" height="47" rx="5" fill="#374151"/>
+                  <rect x="17" y="53" width="24" height="30" rx="3" fill="#111827" opacity="0.9"/>
+                  <rect x="17" y="53" width="24" height="3" rx="1.5" fill="#f97316" opacity="0.85"/>
+                  <rect x="21" y="60" width="16" height="2" rx="1" fill="#4b5563"/>
+                  <rect x="23" y="64" width="12" height="2" rx="1" fill="#374151"/>
+                  <rect x="21" y="68" width="16" height="1.5" rx="1" fill="#374151"/>
+                  <rect x="23" y="72" width="12" height="1.5" rx="1" fill="#374151"/>
+                  <rect x="18" y="47" width="3.5" height="38" rx="1.75" fill="white" opacity="0.1"/>
+                  <rect x="22" y="47" width="1.5" height="20" rx="0.75" fill="white" opacity="0.07"/>
+                  <rect x="13" y="90" width="32" height="2" rx="1" fill="#1f2937"/>
+                </svg>
+              </div>
+              {/* drop shadow under bottle */}
+              <div className="absolute bottom-3 w-8 h-2 rounded-full animate-bottle-shadow"
+                style={{ background: "radial-gradient(ellipse, rgba(0,0,0,0.5) 0%, transparent 70%)" }} />
+              {/* badge */}
+              <span className="absolute bottom-2 right-2 text-white font-bold rounded-full z-10"
+                style={{ background: "rgba(249,115,22,0.9)", fontSize: "8px", padding: "3px 7px", letterSpacing: "0.5px" }}>
+                PHOTO SOON
+              </span>
             </div>
           )}
         </Link>
