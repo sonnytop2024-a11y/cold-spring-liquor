@@ -11,7 +11,7 @@ import { API } from "@/lib/api";
 
 // ── Export helper (CSV generated in browser) ──────────────────────────────────
 async function exportProductsCSV() {
-  const res = await fetch(`${API}/products?limit=1000&activeOnly=false`);
+  const res = await fetch(`${API}/admin/products`);
   const json = await res.json();
   const products = (Array.isArray(json) ? json : (json.products ?? json.data ?? [])) as Record<string, unknown>[];
 
@@ -78,16 +78,14 @@ const EMPTY: Omit<Product, "id" | "slug"> = {
 };
 
 async function fetchProducts(search: string, category: string, stock: string) {
-  const params = new URLSearchParams({ limit: "1000", activeOnly: "false" });
+  const params = new URLSearchParams();
   if (search)   params.set("q", search);
   if (category) params.set("category", category);
-  // stock filter: "in" → activeOnly=true, "out" handled client-side below
-  if (stock === "in") params.set("activeOnly", "true");
-  const res = await fetch(`${API}/products?${params}`);
+  if (stock)    params.set("stock", stock); // "in" | "out" | "" = all
+  const res = await fetch(`${API}/admin/products?${params}`);
   if (!res.ok) throw new Error(`Failed to load products (${res.status})`);
   const data = await res.json();
-  let list = (Array.isArray(data) ? data : (data.products ?? data.data ?? [])) as Product[];
-  if (stock === "out") list = list.filter(p => p.stockQty <= 0);
+  const list = (Array.isArray(data) ? data : (data.products ?? data.data ?? [])) as Product[];
   return list;
 }
 
