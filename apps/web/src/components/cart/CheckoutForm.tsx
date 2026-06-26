@@ -456,23 +456,23 @@ export function CheckoutForm() {
       <div className="space-y-5">
         <div className="bg-white border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="font-bold text-xl">Choose Payment</h2>
-            <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+            <h2 className="font-bold text-lg sm:text-xl">Choose Payment</h2>
+            <span className="font-black text-xl sm:text-2xl text-gray-900">{formatCurrency(total)}</span>
           </div>
-          <p className="text-xs text-gray-400 mb-6">Select how you'd like to pay</p>
+          <p className="text-xs text-gray-400 mb-5">Select how you'd like to pay</p>
 
           <div className="space-y-3">
             {/* Card / Apple Pay / Klarna */}
             <button onClick={selectStripe} disabled={submitting}
-              className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-brand-400 rounded-2xl p-4 text-left transition-all group">
-              <div className="w-12 h-12 bg-gray-100 group-hover:bg-brand-50 rounded-xl flex items-center justify-center shrink-0 transition-colors">
-                <CreditCard size={22} className="text-gray-600 group-hover:text-brand-500" />
+              className="w-full flex items-center gap-3 border-2 border-gray-200 hover:border-brand-400 rounded-2xl p-4 text-left transition-all group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 group-hover:bg-brand-50 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                <CreditCard size={20} className="text-gray-600 group-hover:text-brand-500" />
               </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-900">Card · Apple Pay · Klarna</p>
-                <p className="text-xs text-gray-400 mt-0.5">Credit/debit, Apple Pay, Google Pay, or pay later</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-sm sm:text-base">Card · Apple Pay · Klarna</p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">Credit/debit, Apple Pay, Google Pay, or pay later</p>
               </div>
-              <div className="flex gap-1.5 shrink-0">
+              <div className="hidden sm:flex gap-1.5 shrink-0">
                 {["💳", "🍎", "K"].map(icon => (
                   <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-bold">{icon}</span>
                 ))}
@@ -481,15 +481,15 @@ export function CheckoutForm() {
 
             {/* PayPal / Venmo */}
             <button onClick={() => setPaymentStep("paypal")}
-              className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-[#0070BA] rounded-2xl p-4 text-left transition-all group">
-              <div className="w-12 h-12 bg-[#003087] rounded-xl flex items-center justify-center shrink-0">
-                <span className="text-white font-black text-lg">P</span>
+              className="w-full flex items-center gap-3 border-2 border-gray-200 hover:border-[#0070BA] rounded-2xl p-4 text-left transition-all group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#003087] rounded-xl flex items-center justify-center shrink-0">
+                <span className="text-white font-black text-base sm:text-lg">P</span>
               </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-900">PayPal · Venmo</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-sm sm:text-base">PayPal · Venmo</p>
                 <p className="text-xs text-gray-400 mt-0.5">Pay with your PayPal balance, bank, or Venmo</p>
               </div>
-              <div className="flex gap-1.5 shrink-0">
+              <div className="hidden sm:flex gap-1.5 shrink-0">
                 {["🅿️", "V"].map(icon => (
                   <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-sm font-bold">{icon}</span>
                 ))}
@@ -833,14 +833,14 @@ function StripePaymentForm({ clientSecret, orderPayload, total, onSuccess, onCan
   return (
     <form onSubmit={handlePay} className="space-y-5">
       {/* Header */}
-      <div className="bg-white border rounded-2xl p-6">
+      <div className="bg-white border rounded-2xl p-4 sm:p-6">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-bold text-lg flex items-center gap-2">
-            <CreditCard size={20} className="text-brand-500" /> Payment
+          <h2 className="font-bold text-base sm:text-lg flex items-center gap-2">
+            <CreditCard size={18} className="text-brand-500 shrink-0" /> Payment
           </h2>
-          <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+          <span className="font-black text-xl sm:text-2xl text-gray-900">{formatCurrency(total)}</span>
         </div>
-        <p className="text-xs text-gray-400 mb-5">Pay securely with Card or Klarna (buy now, pay later)</p>
+        <p className="text-xs text-gray-400 mb-4 sm:mb-5">Pay securely with Card or Klarna (buy now, pay later)</p>
 
         <PaymentElement options={{ layout: "tabs" }} />
 

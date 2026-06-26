@@ -35,12 +35,12 @@ export function PayPalPaymentForm({ total, orderPayload, onSuccess, onCancel }: 
       disableFunding: "credit,card,paylater",
     }}>
       <div className="space-y-5">
-        <div className="bg-white border rounded-2xl p-6">
+        <div className="bg-white border rounded-2xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="font-bold text-lg">PayPal / Venmo</h2>
-            <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+            <h2 className="font-bold text-base sm:text-lg">PayPal / Venmo</h2>
+            <span className="font-black text-xl sm:text-2xl text-gray-900">{formatCurrency(total)}</span>
           </div>
-          <p className="text-xs text-gray-400 mb-6">
+          <p className="text-xs text-gray-400 mb-5">
             Complete your payment securely via PayPal or Venmo
           </p>
 
