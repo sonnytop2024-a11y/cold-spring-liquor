@@ -436,7 +436,7 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
             <p className="text-xs text-gray-400 mt-1">
               Pick up at: 15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641
             </p>
-            <p className="text-xs text-green-600 font-medium mt-1">🏬 Pick Up In Store · 💚 5% Discount Applied</p>
+            <p className="text-xs text-green-600 font-medium mt-1">🏬 Pick Up In Store · 💚 10% Discount Applied</p>
           </>
         ) : (
           <>

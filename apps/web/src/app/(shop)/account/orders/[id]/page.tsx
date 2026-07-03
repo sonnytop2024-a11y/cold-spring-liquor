@@ -233,7 +233,7 @@ export default function OrderDetailPage() {
         )}
         {Number(order.pickupDiscount) > 0 && (
           <div className="flex justify-between text-sm text-green-600 font-medium">
-            <span>💚 Pick Up Discount (−5%)</span>
+            <span>💚 Pick Up Discount (−10%)</span>
             <span>-{formatCurrency(order.pickupDiscount)}</span>
           </div>
         )}

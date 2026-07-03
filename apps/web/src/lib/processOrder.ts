@@ -8,7 +8,7 @@ import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
 import { estimateDeliveryFromStoreAsync } from "./deliveryEstimate";
 import { calcDiscounts } from "./discountRules";
-import { validatePickupWindow } from "./pickupWindows";
+import { validatePickupWindow, calcPickupDiscount } from "./pickupWindows";
 import type { MockOrder } from "../app/api/_mock/store";
 
 export interface OrderInput {
@@ -69,8 +69,8 @@ export async function processOrder(
   const safeBundleDiscount = Math.round(bundleDiscount * 100) / 100;
 
   const isPickup = body.orderType === "pickup";
-  // Pick Up In Store: automatic 5% discount, tax computed on the discounted subtotal
-  const pickupDiscount = isPickup ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+  // Pick Up In Store: automatic discount, tax computed on the discounted subtotal
+  const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
   const tax = Math.round((subtotal - pickupDiscount) * TAX_RATE * 100) / 100;
   const total = Math.round(Math.max(0, subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax) * 100) / 100;
 
@@ -88,7 +88,7 @@ export async function processOrder(
     const PICKUP_WORDS = ["pickup", "pick up", "will call", "willcall", "in store", "instore", "store pickup", "n a", "none"];
     if (PICKUP_WORDS.some(w => streetLower.includes(w))) {
       return {
-        error: "Looking to pick up in store? Use our Pick Up checkout and save 5% — or enter a valid street address for delivery.",
+        error: "Looking to pick up in store? Use our Pick Up checkout and save 10% — or enter a valid street address for delivery.",
         status: 422,
       };
     }

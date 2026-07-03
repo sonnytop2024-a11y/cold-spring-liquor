@@ -107,7 +107,7 @@ function orderConfirmationHtml(order: MockOrder): string {
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:14px;padding:20px 24px;margin:24px 0;">
       <tr><td style="font-size:14px;color:#6b7280;padding:5px 0;">Subtotal</td><td style="font-size:14px;color:#374151;text-align:right;padding:5px 0;">${formatCurrency(order.subtotal)}</td></tr>
       ${discountRows}
-      ${(order.pickupDiscount ?? 0) > 0 ? `<tr><td style="font-size:14px;color:#059669;padding:5px 0;font-weight:600;">🏬 Pick Up Discount (−5%)</td><td style="font-size:14px;color:#059669;text-align:right;padding:5px 0;font-weight:600;">-${formatCurrency(order.pickupDiscount ?? 0)}</td></tr>` : ""}
+      ${(order.pickupDiscount ?? 0) > 0 ? `<tr><td style="font-size:14px;color:#059669;padding:5px 0;font-weight:600;">🏬 Pick Up Discount (−10%)</td><td style="font-size:14px;color:#059669;text-align:right;padding:5px 0;font-weight:600;">-${formatCurrency(order.pickupDiscount ?? 0)}</td></tr>` : ""}
       <tr><td style="font-size:14px;color:#6b7280;padding:5px 0;">Tax (8.25%)</td><td style="font-size:14px;color:#374151;text-align:right;padding:5px 0;">${formatCurrency(order.tax)}</td></tr>
       ${isPickup ? "" : `<tr><td style="font-size:14px;color:#059669;padding:5px 0;font-weight:600;">🚚 Delivery</td><td style="font-size:14px;color:#059669;text-align:right;padding:5px 0;font-weight:600;">FREE</td></tr>`}
       <tr><td colspan="2" style="padding:10px 0 0;"><div style="border-top:2px solid #e5e7eb;"></div></td></tr>

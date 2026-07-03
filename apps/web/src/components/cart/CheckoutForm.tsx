@@ -9,11 +9,12 @@ import { calcDiscounts } from "@/lib/discountRules";
 import { useRouter } from "next/navigation";
 import { formatCurrency, MIN_ORDER, calcPointsValue } from "@/lib/utils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
-import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, type PickupSlot } from "@/lib/pickupWindows";
+import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, calcPickupDiscount, PICKUP_DISCOUNT_LABEL, type PickupSlot } from "@/lib/pickupWindows";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { PayPalPaymentForm } from "./PayPalPaymentForm";
+import { FulfillmentSelector } from "./FulfillmentSelector";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -336,17 +337,38 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
   // Delivery address
   const [delivery, setDelivery] = useState<AddrForm>(BLANK_ADDR);
 
-  // Pick Up In Store — date + time window
-  const [pickupDay, setPickupDay] = useState(0); // days ahead: 0=today, 1=tomorrow, 2+=custom
-  const [customDate, setCustomDate] = useState("");
-  const [showCustomDate, setShowCustomDate] = useState(false);
+  // Pick Up In Store — date + time window (dropdowns)
+  const [pickupDay, setPickupDay] = useState(0); // days ahead: 0=today … 7
   const [pickupSlot, setPickupSlot] = useState<PickupSlot | null>(null);
-  const todayHasSlots = useMemo(() => isPickup && getPickupWindows(0).length > 0, [isPickup]);
-  // Default to the first day that actually has slots
+  // Days that are open AND have at least one valid window
+  const pickupDays = useMemo(() => {
+    if (!isPickup) return [] as { d: number; label: string }[];
+    const days: { d: number; label: string }[] = [];
+    for (let d = 0; d <= MAX_PICKUP_DAYS_AHEAD; d++) {
+      if (isPickupDayOpen(d) && getPickupWindows(d).length > 0) {
+        days.push({ d, label: pickupDateLabel(d) });
+      }
+    }
+    return days;
+  }, [isPickup]);
+  // Default to the first available day
   useEffect(() => {
-    if (isPickup && !todayHasSlots) setPickupDay(isPickupDayOpen(1) ? 1 : 2);
-  }, [isPickup, todayHasSlots]);
+    if (isPickup && pickupDays.length > 0 && !pickupDays.some(x => x.d === pickupDay)) {
+      setPickupDay(pickupDays[0].d);
+    }
+  }, [isPickup, pickupDays, pickupDay]);
   const pickupSlots = useMemo(() => (isPickup ? getPickupWindows(pickupDay) : []), [isPickup, pickupDay]);
+  // Auto-select the first window of the chosen day
+  useEffect(() => {
+    if (isPickup && pickupSlots.length > 0 && !pickupSlots.some(sl => sl.start === pickupSlot?.start)) {
+      setPickupSlot(pickupSlots[0]);
+    }
+  }, [isPickup, pickupSlots, pickupSlot]);
+
+  // Preserve typed contact info when switching Delivery ↔ Pick Up
+  function stashContact() {
+    try { sessionStorage.setItem("csl-checkout-contact", JSON.stringify({ name, email, phone })); } catch {}
+  }
 
 
   // Reorder prefill banner
@@ -416,6 +438,19 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Restore contact typed before switching Delivery ↔ Pick Up
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("csl-checkout-contact");
+      if (!raw) return;
+      const c = JSON.parse(raw);
+      if (c.name) setName(v => v || c.name);
+      if (c.email) setEmail(v => v || c.email);
+      if (c.phone) setPhone(v => v || c.phone);
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Read reorder prefill from localStorage (runs once on mount) ───────────
   const [reorderPrefill, setReorderPrefill] = useState<Record<string, any> | null>(null);
   useEffect(() => {
@@ -466,8 +501,8 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
   );
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
-  // Pick Up In Store: automatic 5% discount, tax on the discounted subtotal
-  const pickupDiscount = isPickup ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+  // Pick Up In Store: automatic discount, tax on the discounted subtotal
+  const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
   const tax = (subtotal - pickupDiscount) * TAX;
   // Re-cap gift card to what the order actually owes (guards against over-application when rewards added after gift card)
   const preGiftOwed = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - pickupDiscount + tax);
@@ -717,7 +752,7 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
             {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
             {rd.giftCardAmount > 0 && <div className="flex justify-between text-emerald-600 font-medium"><span>🎁 Gift Card ({giftCardCode})</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
             {isPickup ? (
-              <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
+              <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−{PICKUP_DISCOUNT_LABEL})</span><span>-{formatCurrency(pickupDiscount)}</span></div>
             ) : (
               <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
             )}
@@ -897,6 +932,9 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
     <form onSubmit={onSubmit} className="space-y-3">
       <CheckoutSteps current={1} />
 
+      {/* Delivery / Pick Up selector — always visible, sticky tabs on mobile */}
+      <FulfillmentSelector mode={mode} onBeforeSwitch={stashContact} />
+
       {/* Mobile order summary accordion */}
       <div className="lg:hidden bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
         <button type="button" onClick={() => setShowMobileSummary(s => !s)}
@@ -930,13 +968,11 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
               {isPickup ? (
                 <>
                   <div className="flex justify-between text-brand-600 font-medium"><span>🏬 Pick Up In Store</span><span>{pickupSlot ? pickupSlot.label : "—"}</span></div>
-                  <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
-                  <div className="text-right"><Link href="/checkout" className="text-[11px] font-bold text-gray-400 hover:text-brand-600 underline underline-offset-2">← Change to Delivery</Link></div>
+                  <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−{PICKUP_DISCOUNT_LABEL})</span><span>-{formatCurrency(pickupDiscount)}</span></div>
                 </>
               ) : (
                 <>
                   <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-                  <div className="text-right"><Link href="/checkout/pickup" className="text-[11px] font-bold text-brand-600 hover:text-brand-700 underline underline-offset-2">Change to Pick Up &amp; Save 5% →</Link></div>
                 </>
               )}
               <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(tax)}</span></div>
@@ -1021,90 +1057,63 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
         </div>
       </div>
 
-      {/* Pickup Date & Time */}
+      {/* Pickup Date & Time — dropdowns */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-2">
           <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">3</div>
           <Clock size={14} className="text-gray-400" />
-          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Select Pick Up Date &amp; Time</h2>
+          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Pick Up Time Window</h2>
         </div>
+        <p className="text-xs text-gray-400 mb-4">First available time is 30 minutes from now.</p>
 
-        {/* Day tabs */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          {[{ d: 0, t: "Today" }, { d: 1, t: "Tomorrow" }].map(({ d, t }) => {
-            const open = isPickupDayOpen(d) && (d !== 0 || todayHasSlots);
-            const sel = !showCustomDate && pickupDay === d;
-            return (
-              <button key={d} type="button" disabled={!open}
-                onClick={() => { setPickupDay(d); setShowCustomDate(false); setPickupSlot(null); }}
-                className={`rounded-xl border px-2 py-2.5 text-center transition-all ${sel ? "bg-brand-500 border-brand-500 text-white" : open ? "bg-white border-gray-200 text-gray-700 hover:border-brand-300" : "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"}`}>
-                <span className="block text-sm font-bold">{t}</span>
-                <span className={`block text-[10px] font-semibold mt-0.5 ${sel ? "text-white/80" : "text-gray-400"}`}>
-                  {open ? pickupDateLabel(d).replace(/^(Today|Tomorrow), /, "") : "Closed"}
-                </span>
-              </button>
-            );
-          })}
-          <button type="button"
-            onClick={() => { setShowCustomDate(true); setPickupSlot(null); }}
-            className={`rounded-xl border px-2 py-2.5 text-center transition-all ${showCustomDate ? "bg-brand-500 border-brand-500 text-white" : "bg-white border-gray-200 text-gray-700 hover:border-brand-300"}`}>
-            <span className="block text-sm font-bold">📅 Pick a Date</span>
-            <span className={`block text-[10px] font-semibold mt-0.5 ${showCustomDate ? "text-white/80" : "text-gray-400"}`}>up to {MAX_PICKUP_DAYS_AHEAD} days</span>
-          </button>
-        </div>
-
-        {/* Custom date input */}
-        {showCustomDate && (
-          <input
-            type="date"
-            value={customDate}
-            min={new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10)}
-            max={new Date(Date.now() + 86400000 * MAX_PICKUP_DAYS_AHEAD).toISOString().slice(0, 10)}
-            onChange={e => {
-              setCustomDate(e.target.value);
-              setPickupSlot(null);
-              if (e.target.value) {
-                const diff = Math.round((new Date(e.target.value + "T12:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86400000);
-                setPickupDay(Math.min(Math.max(diff, 0), MAX_PICKUP_DAYS_AHEAD));
-              }
-            }}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-500 mb-4"
-          />
-        )}
-
-        {/* Time slots */}
-        {pickupSlots.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {pickupSlots.map(slot => {
-              const sel = pickupSlot?.start === slot.start;
-              return (
-                <button key={slot.start} type="button"
-                  onClick={() => { setPickupSlot(slot); setErrors(e => { const { pickupSlot: _drop, ...rest } = e; return rest; }); }}
-                  className={`rounded-xl border px-2 py-2.5 text-xs font-semibold text-center transition-all ${sel ? "bg-orange-50 border-brand-500 text-brand-600 ring-1 ring-brand-500" : "bg-white border-gray-200 text-gray-600 hover:border-brand-300"}`}>
-                  {slot.label}
-                </button>
-              );
-            })}
+        {pickupDays.length === 0 ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+            No pickup windows available right now — please check back tomorrow. (We're closed on Sunday.)
           </div>
         ) : (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-            {showCustomDate && !customDate
-              ? "Choose a date above to see available pickup times."
-              : "No pickup windows available for this day — please choose another date. (We're closed on Sunday.)"}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Date</label>
+              <select
+                value={pickupDay}
+                onChange={e => { setPickupDay(Number(e.target.value)); setPickupSlot(null); }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
+              >
+                {pickupDays.map(({ d, label }) => (
+                  <option key={d} value={d}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Time Window</label>
+              <select
+                value={pickupSlot?.start ?? ""}
+                onChange={e => {
+                  const slot = pickupSlots.find(sl => sl.start === e.target.value) ?? null;
+                  setPickupSlot(slot);
+                  setErrors(er => { const { pickupSlot: _drop, ...rest } = er; return rest; });
+                }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
+              >
+                {pickupSlots.map(slot => (
+                  <option key={slot.start} value={slot.start}>{slot.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
         {errors.pickupSlot && <p className="text-red-500 text-xs mt-2" data-error="1">{errors.pickupSlot}</p>}
-        <p className="text-xs text-gray-400 mt-3">Windows are 1 hour · earliest pickup is 30 minutes from now · we hold your order for 7 days post pickup date</p>
-      </div>
 
-      {/* Pickup Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3.5 text-sm text-blue-900">
-        <p className="font-bold text-xs uppercase tracking-wide mb-1.5">🪪 What to bring when you pick up</p>
-        <ul className="text-xs leading-relaxed text-blue-800 space-y-0.5">
-          <li>✓ A valid government-issued photo ID</li>
-          <li>✓ The person picking up must be <strong>21 or older</strong></li>
-          <li>✓ Name on the ID should match the order</li>
-        </ul>
+        {/* Pick Up Instructions */}
+        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5">
+          <p className="font-bold text-xs uppercase tracking-wide mb-1.5 text-amber-800">🪪 Pick Up Instructions</p>
+          <ul className="text-xs leading-relaxed text-amber-800 space-y-0.5">
+            <li>✓ Bring a valid government-issued photo ID.</li>
+            <li>✓ Customer must be <strong>21+</strong> to pick up.</li>
+            <li>✓ The name on ID should match the order.</li>
+          </ul>
+          <p className="text-[11px] text-amber-600 mt-1.5">We will hold your order for 7 days post pickup date.</p>
+        </div>
       </div>
       </>
       )}
@@ -1239,13 +1248,11 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
               {isPickup ? (
                 <>
                   <div className="flex justify-between text-brand-600 font-medium"><span>🏬 Pick Up In Store</span><span>{pickupSlot ? pickupSlot.label : "—"}</span></div>
-                  <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
-                  <div className="text-right"><Link href="/checkout" className="text-[11px] font-bold text-gray-400 hover:text-brand-600 underline underline-offset-2">← Change to Delivery</Link></div>
+                  <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−{PICKUP_DISCOUNT_LABEL})</span><span>-{formatCurrency(pickupDiscount)}</span></div>
                 </>
               ) : (
                 <>
                   <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-                  <div className="text-right"><Link href="/checkout/pickup" className="text-[11px] font-bold text-brand-600 hover:text-brand-700 underline underline-offset-2">Change to Pick Up &amp; Save 5% →</Link></div>
                   <div className="flex justify-between text-green-600 font-medium"><span>💰 Tip</span><span>NOT Required</span></div>
                 </>
               )}
@@ -1524,7 +1531,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
               {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
               {rd.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
               {isPickup ? (
-                <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(rd.pickupDiscount ?? 0)}</span></div>
+                <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−{PICKUP_DISCOUNT_LABEL})</span><span>-{formatCurrency(rd.pickupDiscount ?? 0)}</span></div>
               ) : (
                 <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
               )}

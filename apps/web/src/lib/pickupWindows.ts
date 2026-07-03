@@ -16,6 +16,14 @@ const OPEN_HOUR = 10;
 const CLOSE_HOUR = 21;
 export const MAX_PICKUP_DAYS_AHEAD = 7;
 
+// Automatic discount for Pick Up In Store orders — single source of truth.
+// Displayed labels use PICKUP_DISCOUNT_LABEL so a rate change is a one-line edit.
+export const PICKUP_DISCOUNT_RATE = 0.10;
+export const PICKUP_DISCOUNT_LABEL = "10%";
+export function calcPickupDiscount(subtotal: number): number {
+  return Math.round(subtotal * PICKUP_DISCOUNT_RATE * 100) / 100;
+}
+
 // Convert a wall-clock Central time (expressed on a Date built from toLocaleString)
 // back to a real UTC instant.
 function centralToUtc(central: Date): Date {

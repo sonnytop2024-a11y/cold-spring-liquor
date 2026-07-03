@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useCartStore } from "@/store/cartStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
 import { calcDiscounts } from "@/lib/discountRules";
 import { formatCurrency, calcPointsValue } from "@/lib/utils";
+import { calcPickupDiscount, PICKUP_DISCOUNT_LABEL } from "@/lib/pickupWindows";
 
 const TAX_RATE = 0.0825;
 
@@ -32,8 +32,8 @@ export function OrderSummary({ mode = "delivery" }: { mode?: "delivery" | "picku
     bundleTiers,
   );
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
-  // Pick Up In Store: automatic 5% discount, tax on the discounted subtotal
-  const pickupDiscount = isPickup ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+  // Pick Up In Store: automatic discount, tax on the discounted subtotal
+  const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
   const tax = (subtotal - pickupDiscount) * TAX_RATE;
   const total = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax);
   const totalSavings = flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + giftCardAmount + pickupDiscount;
@@ -82,23 +82,10 @@ export function OrderSummary({ mode = "delivery" }: { mode?: "delivery" | "picku
           {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
           {giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card ({giftCardCode})</span><span>-{formatCurrency(giftCardAmount)}</span></div>}
           {isPickup ? (
-            <>
-              <div className="flex justify-between text-brand-600 font-medium"><span>🏬 Pick Up In Store</span><span className="font-bold">✓</span></div>
-              <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
-              <div className="text-right -mt-0.5">
-                <Link href="/checkout" className="text-xs font-bold text-gray-400 hover:text-brand-600 underline underline-offset-2 transition-colors">
-                  ← Change to Delivery
-                </Link>
-              </div>
-            </>
+            <div className="flex justify-between text-green-600 font-bold"><span>Pick Up Discount ({PICKUP_DISCOUNT_LABEL})</span><span>-{formatCurrency(pickupDiscount)}</span></div>
           ) : (
             <>
               <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-              <div className="text-right -mt-0.5">
-                <Link href="/checkout/pickup" className="text-xs font-bold text-brand-600 hover:text-brand-700 underline underline-offset-2 transition-colors">
-                  Change to Pick Up &amp; Save 5% →
-                </Link>
-              </div>
               <div className="flex justify-between text-green-600 font-medium"><span>💰 Driver Tip</span><span>NOT Required ✓</span></div>
             </>
           )}
@@ -110,6 +97,16 @@ export function OrderSummary({ mode = "delivery" }: { mode?: "delivery" | "picku
           <span className="font-bold text-gray-800">Total</span>
           <span className="font-black text-xl text-gray-900">{formatCurrency(total)}</span>
         </div>
+
+        {isPickup && (
+          <div className="mt-3 flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-3.5 py-2.5">
+            <span className="text-xl leading-none">🏬</span>
+            <div>
+              <p className="text-sm font-bold text-gray-900 leading-tight">Pick Up In Store</p>
+              <p className="text-xs font-bold text-brand-600">Save {PICKUP_DISCOUNT_LABEL} on your order!</p>
+            </div>
+          </div>
+        )}
 
         {totalSavings > 0 && (
           <div className="mt-3 bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-center">
