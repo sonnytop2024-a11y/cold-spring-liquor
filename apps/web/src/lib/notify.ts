@@ -25,20 +25,31 @@ async function sendTelegram(
   token?: string,
   chatId?: string,
 ): Promise<void> {
-  if (!token || !chatId) return;
+  // Settings first; fall back to env so a wiped settings row doesn't silence alerts
+  const botToken = token || process.env.TELEGRAM_BOT_TOKEN || "";
+  const chat = chatId || process.env.TELEGRAM_CHAT_ID || "";
+  if (!botToken || !chat) {
+    console.warn("[notify] Telegram not configured — set token/chat in Admin Settings or env");
+    return;
+  }
   const lines = (order.items as { name: string; quantity: number }[])
     .map(i => `  • ${i.name} ×${i.quantity}`)
     .join("\n");
+  const isPickup = order.orderType === "pickup";
+  const where = isPickup
+    ? `🏬 PICK UP IN STORE${order.pickupWindow ? ` — ${order.pickupWindow.dateLabel} · ${order.pickupWindow.label}` : ""}`
+    : `📍 ${(order.deliveryAddress as { street?: string })?.street ?? ""}`;
   const text =
-    `🛒 *New Order #${order.orderNumber}*\n\n` +
+    `🛒 New Order #${order.orderNumber}${isPickup ? " (PICK UP)" : ""}\n\n` +
     `${lines}\n\n` +
-    `💰 Total: *$${order.total.toFixed(2)}*\n` +
+    `💰 Total: $${order.total.toFixed(2)}\n` +
     `👤 ${order.customerName}  📞 ${order.customerPhone}\n` +
-    `📍 ${(order.deliveryAddress as { street?: string })?.street ?? ""}`;
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    where;
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
+    // Plain text — product names with * or _ used to break Markdown parsing (400 → silently dropped)
+    body: JSON.stringify({ chat_id: chat, text }),
     cache: "no-store",
   });
   if (!res.ok) {

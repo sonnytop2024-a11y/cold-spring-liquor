@@ -1088,10 +1088,16 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
             </button>
           )}
           {order.customerPhone && ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(order.status) && (
-            <a href={`tel:${order.customerPhone}`}
-              className="flex items-center gap-1.5 border text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
-              <Phone size={13} /> Call {order.customerPhone}
-            </a>
+            <>
+              <a href={`tel:${order.customerPhone}`}
+                className="flex items-center gap-1.5 border text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
+                <Phone size={13} /> Call
+              </a>
+              <a href={`sms:${order.customerPhone}`}
+                className="flex items-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
+                💬 Text
+              </a>
+            </>
           )}
 
           {/* Normal action button (not for driver_arrived) */}

@@ -224,17 +224,27 @@ export async function dbGetSettings(): Promise<StoreSettings> {
 }
 
 export async function dbSaveSettings(fields: Partial<StoreSettings>): Promise<StoreSettings> {
-  const current = await dbGetSettings();
-  const updated: StoreSettings = { ...current, ...fields, updatedAt: new Date().toISOString() };
-
   const t = tbl("csl_settings");
   if (t) {
     try {
+      // Read the CURRENT row directly. If the read fails we must NOT merge the
+      // patch into mock defaults and overwrite the row — that silently wipes
+      // real settings (this is how the Telegram token got erased).
+      const { data, error: readErr } = await t.select("data").eq("id", 1).maybeSingle();
+      if (readErr) {
+        console.error("[db] saveSettings aborted — could not read current row:", readErr.message);
+        throw new Error(`Settings read failed: ${readErr.message}`);
+      }
+      const current = (data?.data as StoreSettings) ?? store.getSettings();
+      const updated: StoreSettings = { ...current, ...fields, updatedAt: new Date().toISOString() };
       const { error } = await t.upsert({ id: 1, data: updated }, { onConflict: "id" });
       if (!error) return updated;
       console.error("[db] saveSettings error:", error.message);
+      throw new Error(`Settings save failed: ${error.message}`);
     } catch (e) {
-      console.error("[db] saveSettings exception:", e);
+      // Surface the failure to the caller instead of silently writing to the
+      // in-memory mock (which would report success but persist nothing)
+      throw e instanceof Error ? e : new Error(String(e));
     }
   }
   return store.saveSettings(fields);

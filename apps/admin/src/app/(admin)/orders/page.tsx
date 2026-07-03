@@ -96,6 +96,86 @@ async function adminUpdateOrder(orderId: string, data: Record<string, unknown>) 
   return r.json();
 }
 
+// ── Read-only Order Detail Modal — viewable at ANY status ───────────────────
+function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
+  const isPickup = order.orderType === "pickup";
+  const addr = order.deliveryAddress;
+  const paid = !!(order.stripePaymentIntentId || order.paypalOrderId) || order.paymentMethod === "gift_card";
+  const money = (n: any) => `$${Number(n ?? 0).toFixed(2)}`;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b px-5 py-4 flex items-center justify-between">
+          <div>
+            <p className="font-bold">Order {order.orderNumber}</p>
+            <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString()}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl leading-none px-2">×</button>
+        </div>
+        <div className="px-5 py-4 space-y-4 text-sm">
+          <div className="flex flex-wrap gap-2">
+            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>{String(order.status).replace(/_/g, " ")}</span>
+            {isPickup
+              ? <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-orange-100 text-orange-700">🏬 Pick Up In Store</span>
+              : <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-green-100 text-green-700">🚚 {order.deliveryType === "next-morning" ? "Next Morning" : "Same-Day"}</span>}
+            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${paid ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+              {paid ? "💳 Paid" : "💳 Unpaid"}{order.paymentMethod ? ` · ${order.paymentMethod}` : ""}
+            </span>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Customer</p>
+            <p className="font-medium">{order.customerName}</p>
+            <p className="text-gray-500">{order.customerEmail}</p>
+            {order.customerPhone && <a href={`tel:${order.customerPhone}`} className="text-brand-600 font-semibold">📞 {order.customerPhone}</a>}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{isPickup ? "Pick Up" : "Delivery Address"}</p>
+            {isPickup ? (
+              <>
+                {order.pickupWindow && <p className="font-medium text-orange-700">🕐 {order.pickupWindow.dateLabel} · {order.pickupWindow.label}</p>}
+                <p className="text-gray-500">Store: 15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641</p>
+                {order.pickedUpAt && <p className="text-green-600 text-xs mt-0.5">✅ Picked up {new Date(order.pickedUpAt).toLocaleString()}</p>}
+              </>
+            ) : addr ? (
+              <p>{addr.street}, {addr.city}, {addr.state} {addr.zip}</p>
+            ) : <p className="text-gray-400">—</p>}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Items ({order.items?.length ?? 0})</p>
+            <div className="space-y-1.5">
+              {order.items?.map((it: any, i: number) => (
+                <div key={i} className="flex justify-between gap-3">
+                  <span className="text-gray-700">{it.name} <span className="text-gray-400">×{it.quantity}</span></span>
+                  <span className="font-medium shrink-0">{money(it.price * it.quantity)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-3.5 space-y-1">
+            <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{money(order.subtotal)}</span></div>
+            {Number(order.bundleDiscount) > 0 && <div className="flex justify-between text-purple-600"><span>📦 Bundle</span><span>-{money(order.bundleDiscount)}</span></div>}
+            {Number(order.couponDiscount) > 0 && <div className="flex justify-between text-green-600"><span>🏷️ Coupon{order.couponCode ? ` (${order.couponCode})` : ""}</span><span>-{money(order.couponDiscount)}</span></div>}
+            {Number(order.rewardsDiscount) > 0 && <div className="flex justify-between text-purple-600"><span>🏆 Rewards</span><span>-{money(order.rewardsDiscount)}</span></div>}
+            {Number(order.giftCardAmount) > 0 && <div className="flex justify-between text-green-600"><span>🎁 Gift Card</span><span>-{money(order.giftCardAmount)}</span></div>}
+            {Number(order.pickupDiscount) > 0 && <div className="flex justify-between text-green-600 font-medium"><span>💚 Pick Up Discount</span><span>-{money(order.pickupDiscount)}</span></div>}
+            <div className="flex justify-between text-gray-500"><span>Tax</span><span>{money(order.tax)}</span></div>
+            <div className="flex justify-between font-bold text-base border-t pt-1.5 mt-1"><span>Total</span><span>{money(order.total)}</span></div>
+            {order.refundedAmount != null && <div className="flex justify-between text-red-600 font-medium"><span>↩️ Refunded</span><span>{money(order.refundedAmount)}</span></div>}
+          </div>
+
+          {order.adminNote && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-xs text-yellow-800">📝 {order.adminNote}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Cancel/Refund Modal ──────────────────────────────────────────────────────
 function CancelModal({ order, onClose, onConfirm }: { order: any; onClose: () => void; onConfirm: (data: any) => Promise<any> }) {
   const [reason, setReason] = useState("");
@@ -253,6 +333,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [cancelOrder, setCancelOrder] = useState<any>(null);
+  const [detailOrder, setDetailOrder] = useState<any>(null);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [creatingTest, setCreatingTest] = useState(false);
   const [showTestOrders, setShowTestOrders] = useState(false);
@@ -284,7 +365,7 @@ export default function OrdersPage() {
     queryFn: async () => { const r = await fetch(`${API}/admin/drivers`); return r.json(); },
     refetchInterval: 5_000,
   });
-  const DRIVERS = driversData.map((d: any) => ({ id: d.id, name: d.name, isOnline: d.isOnline, active: d.active }));
+  const DRIVERS = (Array.isArray(driversData) ? driversData : []).map((d: any) => ({ id: d.id, name: d.name, isOnline: d.isOnline, active: d.active }));
 
   const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ["admin-orders", statusFilter],
@@ -363,11 +444,18 @@ export default function OrdersPage() {
       orders: liveOrders.filter((o: any) => ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(o.status)),
     },
     {
+      key: "pickup",
+      label: "Ready for Pick Up",
+      emoji: "🛍️",
+      headerStyle: { background: "#fffbeb", borderColor: "#fcd34d", color: "#b45309" },
+      orders: liveOrders.filter((o: any) => o.status === "ready_for_pickup"),
+    },
+    {
       key: "done",
       label: "Completed Today",
       emoji: "✅",
       headerStyle: { background: "#f0fdf4", borderColor: "#86efac", color: "#16a34a" },
-      orders: liveOrders.filter((o: any) => o.status === "delivered" && new Date(o.updatedAt).toDateString() === today),
+      orders: liveOrders.filter((o: any) => ["delivered","picked_up"].includes(o.status) && new Date(o.updatedAt).toDateString() === today),
     },
     {
       key: "cancelled",
@@ -466,6 +554,10 @@ export default function OrdersPage() {
           <div className="shrink-0 flex flex-col items-end gap-1.5">
             <p className="font-bold text-sm">${Number(order.total).toFixed(2)}</p>
             <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setDetailOrder(order)} title="View full details"
+                className="text-[13px] border border-gray-200 hover:bg-gray-50 text-gray-500 px-2 py-1 rounded-lg">
+                👁
+              </button>
               {nextStatus && !isDone && (
                 <button onClick={() => updateMutation.mutate({ id: order.id, status: nextStatus })}
                   className="text-[11px] bg-brand-500 hover:bg-brand-600 text-white px-2 py-1 rounded-lg font-semibold transition-colors whitespace-nowrap">
@@ -749,6 +841,7 @@ export default function OrdersPage() {
 
   return (
     <div>
+      {detailOrder && <DetailModal order={detailOrder} onClose={() => setDetailOrder(null)} />}
       {cancelOrder && (
         <CancelModal order={cancelOrder} onClose={() => setCancelOrder(null)}
           onConfirm={data => adminUpdateMutation.mutateAsync({ id: cancelOrder.id, data })} />

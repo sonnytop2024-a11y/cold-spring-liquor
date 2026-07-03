@@ -11,8 +11,9 @@ try {
     const body = await req.json();
     const updated = await dbSaveSettings(body);
     return NextResponse.json(updated);
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Invalid request body";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
