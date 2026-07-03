@@ -72,11 +72,13 @@ export function getDeliveryTiming(now: Date = new Date()): DeliveryTiming {
     c.setHours(OPEN_HOUR, 30, 0, 0);
     const offset = c.getTime() - new Date(c.toLocaleString("en-US", { timeZone: "America/Chicago" })).getTime();
     const eta = new Date(c.getTime() + offset);
+    // Orders placed after midnight count as TODAY (same-day), delivered when we open.
+    // "Next morning" is reserved for orders placed after the 8:30 PM cutoff.
     return {
-      type: "next-morning",
+      type: "same-day",
       estimatedDelivery: eta,
       label: "Today by 10:30 AM",
-      message: "Our store is not open yet. Your order will be prepared and delivered by 10:30 AM.",
+      message: "Our store is not open yet. Your order will be prepared and delivered today by 10:30 AM.",
       isStoreClosed: true,
     };
   }

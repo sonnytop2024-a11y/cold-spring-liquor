@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetUserByEmail, dbCreateUser } from "@/lib/db";
+import { dbGetUserByEmail, dbGetUserById, dbCreateUser } from "@/lib/db";
 import { createSessionToken } from "@/lib/session";
 import type { MockUser } from "../../_mock/store";
 
@@ -55,6 +55,13 @@ export async function POST(req: NextRequest) {
   };
 
   await dbCreateUser(user);
+
+  // Verify the account actually persisted — a silent DB failure here would let
+  // the customer "sign up" without any record ever reaching the admin panel
+  const persisted = await dbGetUserById(user.id);
+  if (!persisted) {
+    return NextResponse.json({ error: "Account could not be created. Please try again." }, { status: 500 });
+  }
 
   const token = createSessionToken(user.id);
   const { passwordHash: _ph, ...safeUser } = user;

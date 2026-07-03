@@ -1087,10 +1087,10 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
               <Navigation size={13} /> Navigate
             </button>
           )}
-          {order.customerPhone && ["out_for_delivery","driver_arriving","driver_arrived"].includes(order.status) && (
+          {order.customerPhone && ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(order.status) && (
             <a href={`tel:${order.customerPhone}`}
               className="flex items-center gap-1.5 border text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
-              <Phone size={13} /> Call
+              <Phone size={13} /> Call {order.customerPhone}
             </a>
           )}
 

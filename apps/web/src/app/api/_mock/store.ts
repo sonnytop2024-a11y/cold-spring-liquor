@@ -30,6 +30,7 @@ export interface MockOrder {
   refundStatus?: string;
   refundedAt?: string;
   refundedAmount?: number;
+  inventoryRestocked?: boolean;
   paypalOrderId?: string;
   tax: number;
   total: number;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { dbGetOrder, dbUpdateOrder, dbGetUserById, dbSaveUser, dbGetGiftCard, dbSaveGiftCard } from "@/lib/db";
+import { dbGetOrder, dbUpdateOrder, dbGetUserById, dbSaveUser, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct } from "@/lib/db";
 import type { OrderStatus } from "../../../_mock/store";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
@@ -61,6 +61,22 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       console.error("[admin/orders] Stripe refund failed:", msg);
       return NextResponse.json({ error: `Refund failed: ${msg}` }, { status: 502 });
     }
+  }
+
+  // When cancelling → return the items to inventory (once)
+  if (status === "cancelled" && !order.inventoryRestocked) {
+    for (const item of order.items ?? []) {
+      try {
+        const product = item.productId ? await dbGetProduct(item.productId) : undefined;
+        if (product) {
+          const newQty = (product.stockQty ?? 0) + item.quantity;
+          await dbUpdateProduct(product.id, { stockQty: newQty, inStock: true });
+        }
+      } catch (e) {
+        console.error("[admin/orders] restock failed for", item.productId, e);
+      }
+    }
+    patch.inventoryRestocked = true;
   }
 
   // When cancelling (full or partial refund) → restore rewards points + gift card balance

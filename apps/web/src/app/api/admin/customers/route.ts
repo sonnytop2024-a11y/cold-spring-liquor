@@ -34,6 +34,42 @@ const search = req.nextUrl.searchParams.get("search")?.toLowerCase() ?? "";
     }
   }
 
+  // Guest purchasers (orders without a registered account) — group by email so
+  // every customer who placed an order shows up in the admin panel
+  const knownEmails = new Set(users.map((u: any) => (u.email ?? "").toLowerCase()).filter(Boolean));
+  const knownIds = new Set(users.map((u: any) => u.id));
+  const guestMap: Record<string, any> = {};
+  for (const o of orders) {
+    if (o.customerId && knownIds.has(o.customerId)) continue;
+    const email = (o.customerEmail ?? "").toLowerCase();
+    if (email && knownEmails.has(email)) continue;
+    const key = email || o.customerPhone || o.id;
+    if (!guestMap[key]) {
+      guestMap[key] = {
+        id: `guest_${key}`,
+        displayName: o.customerName || "Guest",
+        email: o.customerEmail || "—",
+        phone: o.customerPhone || "—",
+        dob: null,
+        deliveryAddress: o.deliveryAddress ?? null,
+        tier: "Guest",
+        points: 0,
+        createdAt: o.createdAt,
+        googleId: null,
+        isGuest: true,
+        orderCount: 0,
+        totalSpend: 0,
+        lastOrderAt: null as string | null,
+        rewards: { totalPoints: 0, totalSpend: 0, vipTier: "guest" },
+      };
+    }
+    const g = guestMap[key];
+    g.orderCount++;
+    if (o.status === "delivered") { g.totalSpend += o.total; g.rewards.totalSpend += o.total; }
+    if (!g.lastOrderAt || o.createdAt > g.lastOrderAt) g.lastOrderAt = o.createdAt;
+    if (o.createdAt < g.createdAt) g.createdAt = o.createdAt;
+  }
+
   let customers = users.map((u: any) => {
     const stats = statsMap[u.id] ?? { orderCount: 0, totalSpend: 0, lastOrderAt: null };
     return {
@@ -57,6 +93,9 @@ const search = req.nextUrl.searchParams.get("search")?.toLowerCase() ?? "";
       },
     };
   });
+
+  customers = customers.concat(Object.values(guestMap));
+  customers.sort((a: any, b: any) => (b.lastOrderAt ?? b.createdAt ?? "").localeCompare(a.lastOrderAt ?? a.createdAt ?? ""));
 
   if (search) {
     customers = customers.filter(

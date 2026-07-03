@@ -2,7 +2,7 @@
 import { store, createOrderNumber } from "../app/api/_mock/store";
 import { TAX_RATE } from "../app/api/_mock/data";
 import { getDeliveryTiming } from "./deliveryTiming";
-import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetGiftCard, dbSaveGiftCard } from "./db";
+import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct } from "./db";
 import { notifyNewOrder } from "./notify";
 import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
@@ -69,6 +69,23 @@ export async function processOrder(
   const safeBundleDiscount = Math.round(bundleDiscount * 100) / 100;
   const total = Math.round(Math.max(0, subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - giftCardAmount + tax) * 100) / 100;
 
+  // We are delivery-only. Reject placeholder/pickup addresses like "101 - Will Pick Up".
+  const street: string = (deliveryAddress?.street ?? "").trim();
+  const streetLower = street.toLowerCase().replace(/[^a-z ]/g, " ");
+  const PICKUP_WORDS = ["pickup", "pick up", "will call", "willcall", "in store", "instore", "store pickup", "n a", "none"];
+  if (PICKUP_WORDS.some(w => streetLower.includes(w))) {
+    return {
+      error: "We are a delivery-only service — in-store pickup is not available. Please enter a valid street address for delivery.",
+      status: 422,
+    };
+  }
+  if (!/^\d+\s+[A-Za-z]/.test(street)) {
+    return {
+      error: "Please provide a complete street address including your house or building number (e.g. 1221 Sonny Dr).",
+      status: 422,
+    };
+  }
+
   const { distanceMiles, etaMinutes } = await estimateDeliveryFromStoreAsync(deliveryAddress ?? {});
   if (distanceMiles > 10) {
     return {
@@ -104,9 +121,11 @@ export async function processOrder(
     deliveryAddress,
     billingAddress: billingAddressSameAsDelivery ? deliveryAddress : (billingAddress ?? deliveryAddress),
     billingAddressSameAsDelivery: billingAddressSameAsDelivery ?? true,
-    customerName: sessionUser?.name ?? customerName ?? "Guest",
-    customerEmail: sessionUser?.email ?? customerEmail ?? "",
-    customerPhone: sessionUser?.phone ?? customerPhone ?? "",
+    // Prefer non-empty values — a logged-in user with a blank profile phone
+    // must not wipe out the phone they typed at checkout
+    customerName: sessionUser?.name || customerName || "Guest",
+    customerEmail: sessionUser?.email || customerEmail || "",
+    customerPhone: sessionUser?.phone || customerPhone || "",
     customerId,
     driverId: null,
     distanceMiles,
@@ -114,11 +133,24 @@ export async function processOrder(
     createdAt: nowStr,
     updatedAt: nowStr,
     // same-day ETA is set only after admin/driver accepts (confirmed status)
-    // next-morning ETA is a fixed future date — set now so customer knows when to expect
-    estimatedDelivery: timing.type === "next-morning" ? timing.estimatedDelivery.toISOString() : null,
+    // next-morning / before-opening ETA is a fixed future time — set now so customer knows when to expect
+    estimatedDelivery: timing.type === "next-morning" || timing.isStoreClosed ? timing.estimatedDelivery.toISOString() : null,
   };
 
   await dbCreateOrder(order);
+
+  // Deduct inventory for each purchased item
+  for (const item of items) {
+    try {
+      const product = await dbGetProduct(item.productId);
+      if (product) {
+        const newQty = Math.max(0, (product.stockQty ?? 0) - item.quantity);
+        await dbUpdateProduct(product.id, { stockQty: newQty, inStock: newQty > 0 });
+      }
+    } catch (e) {
+      console.error("[processOrder] stock deduction failed for", item.productId, e);
+    }
+  }
   await notifyNewOrder(order).catch(() => {});
   sendOrderConfirmation(order).catch(() => {});
 
