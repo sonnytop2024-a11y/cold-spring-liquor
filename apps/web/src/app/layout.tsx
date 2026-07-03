@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer";
 import { AgeGateModal } from "@/components/auth/AgeGateModal";
 import { StickyBanner } from "@/components/layout/StickyBanner";
 import { WelcomeBonus } from "@/components/promotions/WelcomeBonus";
+import { CartSyncProvider } from "@/components/cart/CartSyncProvider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
@@ -18,6 +19,11 @@ export const metadata: Metadata = {
     "Premium liquor delivered FREE to your door in 10–30 minutes. No tip required. Serving Leander, Cedar Park & Liberty Hill, TX.",
   keywords:
     "liquor delivery Leander TX, free liquor delivery, Cedar Park liquor, Liberty Hill liquor, Cold Spring Liquor",
+  icons: {
+    icon: [{ url: "/Logo.PNG", type: "image/png" }],
+    shortcut: "/Logo.PNG",
+    apple: "/Logo.PNG",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -25,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${inter.variable} ${playfair.variable} ${montserrat.variable} font-sans bg-white text-gray-900`}>
         <Providers>
+          <CartSyncProvider />
           <AgeGateModal />
           <WelcomeBonus />
           <StickyBanner />

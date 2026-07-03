@@ -1,9 +1,8 @@
 export function RedeemTable() {
   const tiers = [
-    { points: 100, reward: "$5 Off", color: "bg-green-50 border-green-200" },
-    { points: 250, reward: "$15 Off", color: "bg-blue-50 border-blue-200" },
-    { points: 500, reward: "$35 Off", color: "bg-purple-50 border-purple-200" },
-    { points: 1000, reward: "$75 Off", color: "bg-amber-50 border-amber-200" },
+    { points: 250, reward: "$5 Off", color: "bg-green-50 border-green-200" },
+    { points: 500, reward: "$10 Off", color: "bg-blue-50 border-blue-200" },
+    { points: 1000, reward: "$20 Off", color: "bg-purple-50 border-purple-200" },
   ];
 
   return (
@@ -13,7 +12,7 @@ export function RedeemTable() {
         Cash in your CS Points directly at checkout — no minimums, no hassle.
       </p>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {tiers.map(({ points, reward, color }) => (
           <div
             key={points}

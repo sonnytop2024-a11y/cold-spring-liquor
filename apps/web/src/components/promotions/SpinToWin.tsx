@@ -4,13 +4,14 @@ import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 const PRIZES = [
-  { label: "$5 Credit", color: "#FF6B1A", probability: 0.15 },
-  { label: "10% Off", color: "#9333EA", probability: 0.2 },
-  { label: "15% Off", color: "#2563EB", probability: 0.15 },
-  { label: "Free Gift", color: "#16A34A", probability: 0.05 },
-  { label: "2x Points", color: "#D97706", probability: 0.2 },
-  { label: "Free Opener", color: "#DC2626", probability: 0.1 },
-  { label: "5% Off", color: "#0891B2", probability: 0.15 },
+  { label: "Whiskey\nApproved", emoji: "🥃", title: "Whiskey Approved.", subtitle: "You have excellent taste.", color: "#D97706", probability: 0.125 },
+  { label: "Wine Not?",         emoji: "🍷", title: "Wine Not?",          subtitle: "Tonight is your night.",          color: "#DC2626", probability: 0.125 },
+  { label: "Beer Happy!",       emoji: "🍺", title: "Beer Happy!",        subtitle: "Good vibes only.",                color: "#16A34A", probability: 0.125 },
+  { label: "Cocktail\nMode ON", emoji: "🍸", title: "Cocktail Mode: ON", subtitle: "Time to relax.",                  color: "#0891B2", probability: 0.125 },
+  { label: "Cheers,\nLegend!", emoji: "🥂",  title: "Cheers, Legend!",   subtitle: "You're the life of the party.",   color: "#9333EA", probability: 0.125 },
+  { label: "Good\nVibes!",      emoji: "🍾", title: "Pop the Good Vibes!", subtitle: "Smile, you're awesome.",         color: "#FF6B1A", probability: 0.125 },
+  { label: "Smooth\nDay",       emoji: "🧊", title: "On the Rocks? Never.", subtitle: "Today is going to be smooth.", color: "#2563EB", probability: 0.125 },
+  { label: "Sip &\nSmile",      emoji: "🍷", title: "Sip. Smile. Repeat.", subtitle: "Happiness served fresh.",       color: "#BE185D", probability: 0.125 },
 ];
 
 const SEGMENT_ANGLE = 360 / PRIZES.length;
@@ -21,7 +22,7 @@ export function SpinToWin() {
   const [visible, setVisible] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
-  const [prize, setPrize] = useState<string | null>(null);
+  const [prize, setPrize] = useState<{ emoji: string; title: string; subtitle: string } | null>(null);
   const [alreadySpun, setAlreadySpun] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -71,8 +72,13 @@ export function SpinToWin() {
       ctx.rotate((start + end) / 2);
       ctx.textAlign = "right";
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 11px Inter, sans-serif";
-      ctx.fillText(p.label, radius - 12, 4);
+      ctx.font = "bold 10px Inter, sans-serif";
+      const lines = p.label.split("\n");
+      const lineH = 13;
+      const offsetY = lines.length > 1 ? -(lineH / 2) : 4;
+      lines.forEach((line, li) => {
+        ctx.fillText(line, radius - 10, offsetY + li * lineH);
+      });
       ctx.restore();
     });
 
@@ -116,7 +122,7 @@ export function SpinToWin() {
         requestAnimationFrame(animate);
       } else {
         setSpinning(false);
-        setPrize(PRIZES[prizeIndex].label);
+        setPrize({ emoji: PRIZES[prizeIndex].emoji, title: PRIZES[prizeIndex].title, subtitle: PRIZES[prizeIndex].subtitle });
         localStorage.setItem(SPIN_KEY, "1");
         setAlreadySpun(true);
       }
@@ -145,9 +151,9 @@ export function SpinToWin() {
         <div className="text-3xl mb-2">🎡</div>
         <h2 className="font-heading text-2xl font-bold mb-1">Spin To Win!</h2>
         <p className="text-sm text-gray-500 mb-4">
-          {alreadySpun
-            ? "You already claimed your reward. Check your account!"
-            : "Welcome! Spin once for a chance to win an exclusive reward."}
+          {alreadySpun && !prize
+            ? "You already got your vibe! Come back anytime. 🥂"
+            : "Welcome! Give it a spin for your Cold Spring vibe."}
         </p>
 
         {/* Wheel with CSS pointer arrow at 12 o'clock (TOP) */}
@@ -180,9 +186,11 @@ export function SpinToWin() {
 
         {prize ? (
           <div className="mt-5 bg-brand-50 border-2 border-brand-300 rounded-xl p-4">
-            <p className="font-bold text-xl text-brand-700">🎉 You won: {prize}!</p>
-            <p className="text-xs text-gray-500 mt-1">
-              Your reward has been added to your account.
+            <p className="text-3xl mb-1">{prize.emoji}</p>
+            <p className="font-bold text-xl text-brand-700">{prize.title}</p>
+            <p className="text-sm text-gray-600 mt-1">{prize.subtitle}</p>
+            <p className="text-xs text-gray-400 mt-2">
+              Thanks for stopping by Cold Spring Liquor. Have an amazing day!
             </p>
           </div>
         ) : (
@@ -195,7 +203,7 @@ export function SpinToWin() {
           </button>
         )}
 
-        <p className="text-xs text-gray-400 mt-3">One-time reward · New customers only</p>
+        <p className="text-xs text-gray-400 mt-3">One-time spin · New visitors only</p>
       </div>
     </div>
   );

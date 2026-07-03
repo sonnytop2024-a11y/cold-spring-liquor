@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetActiveBundleTiers } from "@/lib/db";
 
 export async function GET() {
-  return NextResponse.json(store.getActiveBundleTiers());
+  return NextResponse.json(await dbGetActiveBundleTiers());
 }

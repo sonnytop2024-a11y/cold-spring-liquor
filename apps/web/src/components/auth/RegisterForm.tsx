@@ -132,10 +132,10 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="max-w-md mx-auto py-10 px-4">
-      <div className="bg-white rounded-2xl border shadow-sm p-8">
-        <div className="text-center mb-7">
-          <h1 className="font-heading text-2xl font-bold">Create Account</h1>
+    <div className="max-w-md mx-auto py-6 sm:py-10 px-3 sm:px-4">
+      <div className="bg-white rounded-2xl border shadow-sm p-5 sm:p-8">
+        <div className="text-center mb-5 sm:mb-7">
+          <h1 className="font-heading text-xl sm:text-2xl font-bold">Create Account</h1>
           <p className="text-gray-500 text-sm mt-1">Must be 21+ to register</p>
         </div>
 

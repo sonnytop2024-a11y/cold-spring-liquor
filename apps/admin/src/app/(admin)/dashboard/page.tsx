@@ -70,16 +70,23 @@ function BarChart({ data, valueKey, color = "bg-brand-400" }: {
   );
 }
 
-function KpiCard({ label, value, icon: Icon, bg, sub }: {
-  label: string; value: string | number; icon: any; bg: string; sub?: string;
+function KpiCard({ label, value, icon: Icon, bg, sub, alert }: {
+  label: string; value: string | number; icon: any; bg: string; sub?: string; alert?: boolean;
 }) {
   return (
-    <div className="bg-white border rounded-xl p-4 flex items-start gap-3">
+    <div className={`bg-white border rounded-xl p-4 flex items-start gap-3 relative overflow-hidden transition-all ${alert ? "border-red-300 shadow-md shadow-red-100 ring-2 ring-red-300 ring-offset-1" : ""}`}>
+      {alert && (
+        <span className="absolute top-2 right-2 flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+        </span>
+      )}
       <div className={`${bg} p-2.5 rounded-lg shrink-0`}><Icon size={17} /></div>
       <div className="min-w-0">
         <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-xl font-bold mt-0.5 truncate">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        <p className={`text-xl font-bold mt-0.5 truncate ${alert ? "text-red-600" : ""}`}>{value}</p>
+        {alert && <p className="text-[10px] text-red-500 font-semibold animate-pulse mt-0.5">⚠️ Needs attention</p>}
+        {!alert && sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
     </div>
   );
@@ -141,7 +148,7 @@ export default function DashboardPage() {
   const kpis = [
     { label: "Total Orders", value: d.totalOrders ?? 0, icon: ShoppingBag, bg: "bg-blue-50 text-blue-700" },
     { label: "Completed", value: d.completedOrders ?? 0, icon: CheckCircle, bg: "bg-green-50 text-green-700", sub: d.revenue ? `Revenue: ${fmt(d.revenue)}` : undefined },
-    { label: "Pending", value: d.pendingOrders ?? 0, icon: Clock, bg: "bg-yellow-50 text-yellow-700" },
+    { label: "Pending", value: d.pendingOrders ?? 0, icon: Clock, bg: "bg-yellow-50 text-yellow-700", alert: (d.pendingOrders ?? 0) > 0 },
     { label: "In Delivery", value: d.inDeliveryOrders ?? 0, icon: Truck, bg: "bg-orange-50 text-orange-700" },
     { label: "Cancelled", value: d.cancelledOrders ?? 0, icon: XCircle, bg: "bg-red-50 text-red-700" },
     { label: "Revenue", value: d.revenue != null ? fmt(d.revenue) : "$0.00", icon: DollarSign, bg: "bg-emerald-50 text-emerald-700" },
@@ -168,9 +175,10 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-          <button onClick={() => refetch()}
-            className="flex items-center gap-1 border rounded-lg px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
-            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} /> Refresh
+          <button onClick={() => refetch()} disabled={isLoading}
+            className={`flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${isLoading ? "bg-brand-50 border-brand-200 text-brand-600 cursor-wait" : "text-gray-600 hover:bg-gray-50 hover:border-gray-300"}`}>
+            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            {isLoading ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>

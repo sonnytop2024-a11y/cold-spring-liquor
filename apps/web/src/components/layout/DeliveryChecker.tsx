@@ -80,7 +80,7 @@ export function DeliveryChecker() {
 
   // Load Google Places Autocomplete if key available
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!key || window.google?.maps?.places) return;
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
@@ -185,19 +185,19 @@ export function DeliveryChecker() {
   }
 
   return (
-    <section id="delivery-check" className="bg-gradient-to-r from-green-600 to-green-700 py-10">
+    <section id="delivery-check" className="bg-gradient-to-r from-green-600 to-green-700 py-5">
       <div className="container-main text-center text-white">
-        <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1 text-sm font-semibold mb-3">
+        <div className="inline-flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-0.5 text-xs font-semibold mb-2">
           🚚 FREE Delivery — No Tip, No Hidden Fees
         </div>
-        <h2 className="font-heading text-2xl md:text-3xl font-bold mb-1">
+        <h2 className="font-heading text-lg md:text-xl font-bold mb-0.5">
           Do We Deliver to Your Area?
         </h2>
-        <p className="text-green-100 mb-2">
+        <p className="text-green-100 text-sm mb-0.5">
           We serve <strong>Leander</strong>, <strong>Cedar Park</strong>, and{" "}
           <strong>Liberty Hill</strong> within 10 miles of our store
         </p>
-        <p className="text-green-200 text-sm mb-6">
+        <p className="text-green-200 text-xs mb-3">
           15609 Ronald Reagan Blvd, Leander, TX 78641
         </p>
 
@@ -274,7 +274,7 @@ export function DeliveryChecker() {
         )}
 
         {/* Area pills */}
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
           {SERVED_AREAS.map((city) => (
             <button
               key={city}
@@ -282,13 +282,13 @@ export function DeliveryChecker() {
                 setAddress(`${city}, TX`);
                 setStatus("idle");
               }}
-              className="bg-white/20 border border-white/30 hover:bg-white/30 text-white text-sm font-medium px-4 py-1.5 rounded-full transition-colors"
+              className="bg-white/20 border border-white/30 hover:bg-white/30 text-white text-xs font-medium px-3 py-1 rounded-full transition-colors"
             >
               ✓ {city}, TX
             </button>
           ))}
         </div>
-        <p className="text-green-200 text-xs mt-3">
+        <p className="text-green-200 text-xs mt-2">
           Click a city above or start typing your address for suggestions
         </p>
       </div>

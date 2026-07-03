@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { ProductCard } from "./ProductCard";
 import { fetchProducts } from "@/lib/api/products";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,35 +19,37 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
   return [1, "...", current - 1, current, current + 1, "...", total];
 }
 
-export function ProductGrid({ searchParams }: ProductGridProps) {
-  const page = Number(searchParams.page ?? 1);
+export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridProps) {
+  const currentParams = useSearchParams();
+  const router = useRouter();
+
+  const category  = currentParams.get("category")  ?? undefined;
+  const brand     = currentParams.get("brand")      ?? undefined;
+  const q         = currentParams.get("q")          ?? undefined;
+  const sale      = currentParams.get("sale")       === "true";
+  const featured  = currentParams.get("featured")   === "true";
+  const flashdeal = currentParams.get("flashdeal")  === "true";
+  const bundle    = currentParams.get("bundle")     === "true";
+  const minPrice  = currentParams.get("minPrice")   ? Number(currentParams.get("minPrice"))  : undefined;
+  const maxPrice  = currentParams.get("maxPrice")   ? Number(currentParams.get("maxPrice"))  : undefined;
+  const page      = Number(currentParams.get("page") ?? 1);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["products", searchParams],
+    queryKey: ["products", { category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, page }],
     queryFn: () =>
-      fetchProducts({
-        category: searchParams.category,
-        brand: searchParams.brand,
-        q: searchParams.q,
-        sale: searchParams.sale === "true",
-        featured: searchParams.featured === "true",
-        minPrice: searchParams.minPrice ? Number(searchParams.minPrice) : undefined,
-        maxPrice: searchParams.maxPrice ? Number(searchParams.maxPrice) : undefined,
-        page,
-        limit: LIMIT,
-      }),
+      fetchProducts({ category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, page, limit: LIMIT }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
-
-  const router = useRouter();
-  const currentParams = useSearchParams();
 
   function goToPage(p: number) {
     const params = new URLSearchParams(currentParams.toString());
     params.set("page", String(p));
-    router.push(`/products?${params.toString()}`);
+    router.replace(`/products?${params.toString()}`);
   }
 
-  if (isLoading) {
+  // First load — no previous data yet, show skeleton
+  if (isLoading && !data) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
         {Array.from({ length: LIMIT }).map((_, i) => (
@@ -80,10 +82,6 @@ export function ProductGrid({ searchParams }: ProductGridProps) {
 
   return (
     <div>
-      <p className="text-xs text-gray-400 mb-3">
-        {data.total} product{data.total !== 1 ? "s" : ""}
-      </p>
-
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
         {data.products.map((product) => (
           <ProductCard key={product.id} product={product} />

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetSettings, dbSaveSettings, dbResetSettings } from "@/lib/db";
 
-export async function GET() {
-  const settings = await dbGetSettings();
+export async function GET(req: NextRequest) {
+const settings = await dbGetSettings();
   return NextResponse.json(settings);
 }
 
 export async function PUT(req: NextRequest) {
-  try {
+try {
     const body = await req.json();
     const updated = await dbSaveSettings(body);
     return NextResponse.json(updated);
@@ -16,7 +16,7 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function DELETE() {
-  const reset = await dbResetSettings();
+export async function DELETE(req: NextRequest) {
+const reset = await dbResetSettings();
   return NextResponse.json(reset);
 }

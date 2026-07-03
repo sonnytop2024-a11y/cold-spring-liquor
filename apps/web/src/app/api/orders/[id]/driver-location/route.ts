@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../../_mock/store";
-import { dbGetOrder } from "@/lib/db";
+import { dbGetOrder, dbGetDriver } from "@/lib/db";
 import { STORE_LAT, STORE_LNG } from "../../../_mock/data";
 
 const ACTIVE_DELIVERY = [
@@ -32,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const order = await dbGetOrder(params.id);
   if (!order || !ACTIVE_DELIVERY.includes(order.status)) return NextResponse.json(null);
 
-  const driver = order.driverId ? store.getDriver(order.driverId) : null;
+  const driver = order.driverId ? await dbGetDriver(order.driverId) : null;
   const dest = guessDestCoords(order.deliveryAddress?.city);
 
   let lat: number;

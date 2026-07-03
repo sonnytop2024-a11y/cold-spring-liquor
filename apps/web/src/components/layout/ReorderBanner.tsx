@@ -196,7 +196,7 @@ export function ReorderBanner() {
                 Welcome back, {user?.name?.split(" ")[0]}! 👋 Order again in 1 tap
               </p>
               <p className="text-xs text-gray-500 truncate">
-                Last order #{lastDelivered.orderNumber} · {itemCount} item{itemCount !== 1 ? "s" : ""} · {formatCurrency(lastDelivered.total)} · {orderDate}
+                Last order #{lastDelivered.orderNumber} · {itemCount} item{itemCount !== 1 ? "s" : ""} · {formatCurrency(lastDelivered.subtotal ?? lastDelivered.total)} · {orderDate}
               </p>
             </div>
           </div>

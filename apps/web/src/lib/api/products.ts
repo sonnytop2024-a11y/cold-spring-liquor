@@ -11,6 +11,8 @@ interface FetchProductsParams {
   q?: string;
   featured?: boolean;
   sale?: boolean;
+  flashdeal?: boolean;
+  bundle?: boolean;
   limit?: number;
   page?: number;
 }

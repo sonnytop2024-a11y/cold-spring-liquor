@@ -8,7 +8,13 @@ import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 export function ProductSearch() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [value, setValue] = useState(searchParams.get("q") ?? "");
+  const urlQ = searchParams.get("q") ?? "";
+  const [value, setValue] = useState(urlQ);
+
+  // Sync local input when URL q param changes (e.g. category pill clears it)
+  useEffect(() => {
+    setValue(urlQ);
+  }, [urlQ]);
 
   const push = useDebouncedCallback((q: string) => {
     const params = new URLSearchParams(searchParams.toString());

@@ -18,7 +18,7 @@ async function getAllUsers(): Promise<any[]> {
 }
 
 export async function GET(req: NextRequest) {
-  const search = req.nextUrl.searchParams.get("search")?.toLowerCase() ?? "";
+const search = req.nextUrl.searchParams.get("search")?.toLowerCase() ?? "";
 
   const [users, orders] = await Promise.all([getAllUsers(), dbGetAllOrders()]);
 

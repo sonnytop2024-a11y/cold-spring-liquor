@@ -3,20 +3,83 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ShoppingCart, User, Search, Menu, X, Gift, LogOut, ChevronDown, Star, Package } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 
-const NAV = [
+const NAV_LEFT = [
   { href: "/products", label: "Shop All" },
-  { href: "/products?category=whiskey", label: "Whiskey" },
-  { href: "/products?category=wine", label: "Wine" },
-  { href: "/products?category=beer", label: "Beer" },
-  { href: "/products?sale=true", label: "Deals", highlight: true },
+];
+const NAV_RIGHT = [
+  { href: "/products?flashdeal=true", label: "Deals", highlight: true },
   { href: "/rewards", label: "Rewards", highlight: true },
 ];
+const NAV_MOBILE = [
+  { href: "/products", label: "Shop All" },
+  { href: "/products?flashdeal=true", label: "Deals", highlight: true },
+  { href: "/rewards", label: "Rewards", highlight: true },
+];
+
+function HeaderSearchInner({ mobile = false }: { mobile?: boolean }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
+
+  // Clear/sync input whenever URL search params change
+  useEffect(() => {
+    setQ(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = q.trim();
+    if (trimmed) router.push(`/products?q=${encodeURIComponent(trimmed)}`);
+    else router.push("/products");
+  }
+  return (
+    <form onSubmit={handleSubmit} className={mobile ? "w-full" : "flex-1 mx-3 max-w-xl"}>
+      <div className="relative flex items-center">
+        <input
+          type="text"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="What can we help you find today?"
+          className="w-full h-10 pl-4 pr-11 rounded-full text-gray-800 placeholder-gray-400 bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-400 transition-all"
+          style={{ fontSize: "16px" }}
+        />
+        <button
+          type="submit"
+          className="absolute right-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+          style={{ background: "#f97316" }}
+          aria-label="Search"
+        >
+          <Search size={15} className="text-white" />
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function HeaderSearch({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <Suspense fallback={
+      <form className={mobile ? "w-full" : "flex-1 mx-3 max-w-xl"}>
+        <div className="relative flex items-center">
+          <input placeholder="What can we help you find today?" readOnly
+            className="w-full h-10 pl-4 pr-11 rounded-full text-gray-800 placeholder-gray-400 bg-white border border-gray-200"
+            style={{ fontSize: "16px" }} />
+          <span className="absolute right-1 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#f97316" }}>
+            <Search size={15} className="text-white" />
+          </span>
+        </div>
+      </form>
+    }>
+      <HeaderSearchInner mobile={mobile} />
+    </Suspense>
+  );
+}
 
 function AccountMenu() {
   const { user, isLoggedIn, logout } = useAuthStore();
@@ -130,7 +193,7 @@ export function Header() {
           borderBottom: "1px solid rgba(255,255,255,0.07)",
         }}
       >
-        <div className="container-main flex items-center justify-between h-[60px] xs:h-[76px]">
+        <div className="container-main flex items-center justify-between h-[60px] xs:h-[68px] md:h-[76px]">
           {/* Logo */}
           <Link href="/" className="flex flex-row items-center gap-1.5 xs:gap-2 shrink-0 group">
             <Image
@@ -157,19 +220,19 @@ export function Header() {
             </div>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {NAV.map(({ href, label, highlight }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`text-sm font-medium px-3.5 py-2 rounded-lg transition-all ${
-                  highlight
-                    ? "font-bold hover:bg-brand-500/15"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
-                style={highlight ? { color: "#f97316" } : undefined}
-              >
+          {/* Desktop nav + Search bar */}
+          <nav className="hidden md:flex items-center flex-1 min-w-0 mx-2">
+            {NAV_LEFT.map(({ href, label }) => (
+              <Link key={href} href={href}
+                className="text-sm font-medium px-3.5 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all shrink-0">
+                {label}
+              </Link>
+            ))}
+            <HeaderSearch />
+            {NAV_RIGHT.map(({ href, label, highlight }) => (
+              <Link key={href} href={href}
+                className={`text-sm font-bold px-3.5 py-2 rounded-lg transition-all shrink-0 hover:bg-brand-500/15`}
+                style={{ color: "#f97316" }}>
                 {label}
               </Link>
             ))}
@@ -179,10 +242,6 @@ export function Header() {
           <div className="flex items-center gap-1">
             <AccountMenu />
 
-            <Link href="/products"
-              className="p-2.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors hidden sm:block">
-              <Search size={18} />
-            </Link>
             <Link href="/gift-cards"
               className="p-2.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors hidden lg:block"
               title="Gift Cards">
@@ -224,11 +283,43 @@ export function Header() {
           </div>
         </div>
 
+        {/* July 4th banner — mobile only */}
+        <div className="md:hidden w-full relative" style={{ isolation: "isolate" }}>
+          {/* Full banner image, natural ratio, no cropping */}
+          <Image
+            src="/july4-banner.jpg"
+            alt="Happy July 4th – Independence Day"
+            width={2376}
+            height={398}
+            className="w-full h-auto block"
+            priority
+          />
+          {/* CSS firework bursts on right side */}
+          <div className="absolute pointer-events-none" style={{ right: "8%", top: "15%", zIndex: 2 }}>
+            <div className="animate-fw1" style={{ width: 28, height: 28, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,200,50,0.9) 0%, rgba(255,80,80,0.5) 40%, transparent 70%)" }} />
+          </div>
+          <div className="absolute pointer-events-none" style={{ right: "3%", top: "40%", zIndex: 2 }}>
+            <div className="animate-fw2" style={{ width: 22, height: 22, borderRadius: "50%", background: "radial-gradient(circle, rgba(200,220,255,0.9) 0%, rgba(80,120,255,0.5) 40%, transparent 70%)" }} />
+          </div>
+          <div className="absolute pointer-events-none" style={{ right: "15%", top: "50%", zIndex: 2 }}>
+            <div className="animate-fw3" style={{ width: 18, height: 18, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,100,100,0.4) 40%, transparent 70%)" }} />
+          </div>
+          {/* Patriotic color-cycling border top & bottom */}
+          <div className="absolute top-0 left-0 right-0 animate-patriot-border" style={{ height: 3, zIndex: 3 }} />
+          <div className="absolute bottom-0 left-0 right-0 animate-patriot-border" style={{ height: 3, zIndex: 3, animationDelay: "0.8s" }} />
+        </div>
+
+        {/* Mobile search bar — always visible below header row */}
+        <div className="md:hidden px-3 pt-2 pb-3 overflow-hidden">
+          <HeaderSearch mobile />
+        </div>
+
         {/* Mobile menu */}
         {menuOpen && (
           <div style={{ background: "#111111", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
             <nav className="container-main py-4 flex flex-col gap-1 text-sm">
-              {NAV.map(({ href, label, highlight }) => (
+              {/* nav links only — search bar is always visible above */}
+              {NAV_MOBILE.map(({ href, label, highlight }) => (
                 <Link key={href} href={href} onClick={() => setMenuOpen(false)}
                   className={`px-3 py-2.5 rounded-lg font-medium transition-colors ${highlight ? "text-brand-400 hover:bg-brand-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"}`}>
                   {label}

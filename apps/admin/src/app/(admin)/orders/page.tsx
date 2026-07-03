@@ -1,9 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, MapPin, User, ChevronRight, Package, X, Edit2, XCircle, RefreshCw, Loader2, Plus, Minus } from "lucide-react";
+import { Clock, MapPin, User, ChevronRight, Package, X, Edit2, XCircle, RefreshCw, Loader2, Plus, Minus, FlaskConical } from "lucide-react";
 import { API } from "@/lib/api";
+
+// ─── Audio alert (persistent ctx — required by iOS/Safari) ───────────────────
+let _adminAudioCtx: AudioContext | null = null;
+function getAdminAudioCtx(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const ACtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!ACtx) return null;
+  if (!_adminAudioCtx) _adminAudioCtx = new ACtx();
+  return _adminAudioCtx;
+}
+function unlockAdminAudio() {
+  const ctx = getAdminAudioCtx();
+  if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+}
+async function playAdminAlertSound() {
+  try {
+    const ctx = getAdminAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === "suspended") await ctx.resume();
+    const freqs = [660, 880, 1100];
+    freqs.forEach((freq, i) => {
+      const t = i * 0.28;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const comp = ctx.createDynamicsCompressor();
+      osc.connect(gain); gain.connect(comp); comp.connect(ctx.destination);
+      osc.type = "square";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + t + 0.02);
+      gain.gain.setValueAtTime(1.0, ctx.currentTime + t + 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.26);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.28);
+    });
+  } catch {}
+}
 
 const STATUS_COLORS: Record<string, string> = {
   pending:           "bg-yellow-100 text-yellow-700",
@@ -49,16 +86,24 @@ async function adminUpdateOrder(orderId: string, data: Record<string, unknown>) 
 }
 
 // ── Cancel/Refund Modal ──────────────────────────────────────────────────────
-function CancelModal({ order, onClose, onConfirm }: { order: any; onClose: () => void; onConfirm: (data: any) => void }) {
+function CancelModal({ order, onClose, onConfirm }: { order: any; onClose: () => void; onConfirm: (data: any) => Promise<any> }) {
   const [reason, setReason] = useState("");
   const [refund, setRefund] = useState<"none"|"full"|"partial">("full");
   const [partial, setPartial] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit() {
     setLoading(true);
-    await onConfirm({ status: "cancelled", cancelReason: reason, refundType: refund, refundAmount: refund === "partial" ? Number(partial) : refund === "full" ? order.total : 0 });
-    setLoading(false);
+    setError("");
+    try {
+      const result = await onConfirm({ status: "cancelled", cancelReason: reason, refundType: refund, refundAmount: refund === "partial" ? Number(partial) : refund === "full" ? order.total : 0 });
+      if (result?.error) setError(result.error);
+    } catch (e: any) {
+      setError(e?.message ?? "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -96,11 +141,17 @@ function CancelModal({ order, onClose, onConfirm }: { order: any; onClose: () =>
             )}
           </div>
         </div>
+        {error && (
+          <div className="mx-5 mb-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-3 py-2">
+            ⚠️ {error}
+          </div>
+        )}
         <div className="flex gap-3 p-5 border-t">
           <button onClick={onClose} className="flex-1 border rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50">Back</button>
           <button onClick={handleSubmit} disabled={loading}
             className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm">
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />} Confirm Cancel
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />}
+            {loading ? (refund !== "none" ? "Processing Refund…" : "Cancelling…") : "Confirm Cancel"}
           </button>
         </div>
       </div>
@@ -192,8 +243,30 @@ export default function OrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [cancelOrder, setCancelOrder] = useState<any>(null);
   const [editOrder, setEditOrder] = useState<any>(null);
+  const [creatingTest, setCreatingTest] = useState(false);
+  const [showTestOrders, setShowTestOrders] = useState(false);
+  const prevPendingIdsRef = useRef<Set<string>>(new Set<string>());
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-orders"] });
+
+  // Unlock AudioContext on first interaction (required by iOS Safari)
+  useEffect(() => {
+    const unlock = () => { unlockAdminAudio(); document.removeEventListener("touchstart", unlock); document.removeEventListener("click", unlock); };
+    document.addEventListener("touchstart", unlock, { once: true, passive: true });
+    document.addEventListener("click", unlock, { once: true });
+    return () => { document.removeEventListener("touchstart", unlock); document.removeEventListener("click", unlock); };
+  }, []);
+
+  async function createTestOrder() {
+    setCreatingTest(true);
+    try {
+      const r = await fetch(`${API}/admin/test-order`, { method: "POST" });
+      if (!r.ok) throw new Error("Failed");
+      invalidate();
+    } finally {
+      setCreatingTest(false);
+    }
+  }
 
   const { data: driversData = [] } = useQuery({
     queryKey: ["admin-drivers"],
@@ -237,7 +310,24 @@ export default function OrdersPage() {
 
   const today = new Date().toDateString();
   const onlineDrivers = DRIVERS.filter((d: any) => d.isOnline && d.active);
-  const pendingOrders = orders.filter((o: any) => o.status === "pending");
+
+  const isTest = (o: any) => String(o.orderNumber ?? "").startsWith("TEST-");
+  const liveOrders = orders.filter((o: any) => !isTest(o));
+  const testOrders = orders.filter(isTest);
+
+  const pendingOrders = liveOrders.filter((o: any) => o.status === "pending");
+
+  // Play alert when a genuinely new live pending order arrives
+  useEffect(() => {
+    const currentIds = new Set<string>(pendingOrders.map((o: any) => String(o.id)));
+    if (prevPendingIdsRef.current.size > 0) {
+      for (const id of currentIds) {
+        if (!prevPendingIdsRef.current.has(id)) { playAdminAlertSound(); break; }
+      }
+    }
+    prevPendingIdsRef.current = currentIds;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOrders.map((o: any) => o.id).join(",")]);
 
   const SECTIONS = [
     {
@@ -245,55 +335,63 @@ export default function OrdersPage() {
       label: "New Orders",
       emoji: "🔴",
       headerStyle: { background: "#fef2f2", borderColor: "#fca5a5", color: "#dc2626" },
-      orders: orders.filter((o: any) => o.status === "pending"),
+      orders: liveOrders.filter((o: any) => o.status === "pending"),
     },
     {
       key: "confirmed",
       label: "Confirmed & Preparing",
       emoji: "🔵",
       headerStyle: { background: "#eff6ff", borderColor: "#93c5fd", color: "#2563eb" },
-      orders: orders.filter((o: any) => ["confirmed","preparing"].includes(o.status)),
+      orders: liveOrders.filter((o: any) => ["confirmed","preparing"].includes(o.status)),
     },
     {
       key: "delivery",
       label: "Out for Delivery",
       emoji: "🚗",
       headerStyle: { background: "#fff7ed", borderColor: "#fdba74", color: "#ea580c" },
-      orders: orders.filter((o: any) => ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(o.status)),
+      orders: liveOrders.filter((o: any) => ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(o.status)),
     },
     {
       key: "done",
       label: "Completed Today",
       emoji: "✅",
       headerStyle: { background: "#f0fdf4", borderColor: "#86efac", color: "#16a34a" },
-      orders: orders.filter((o: any) => o.status === "delivered" && new Date(o.updatedAt).toDateString() === today),
+      orders: liveOrders.filter((o: any) => o.status === "delivered" && new Date(o.updatedAt).toDateString() === today),
     },
     {
       key: "cancelled",
       label: "Cancelled / Failed",
       emoji: "❌",
       headerStyle: { background: "#f9fafb", borderColor: "#d1d5db", color: "#6b7280" },
-      orders: orders.filter((o: any) => ["cancelled","failed_delivery","refunded"].includes(o.status)),
+      orders: liveOrders.filter((o: any) => ["cancelled","failed_delivery","refunded"].includes(o.status)),
     },
   ];
 
-  const todayCompleted = orders.filter((o: any) => o.status === "delivered" && new Date(o.updatedAt).toDateString() === today);
-  const inDelivery = orders.filter((o: any) => ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(o.status));
+  const todayCompleted = liveOrders.filter((o: any) => o.status === "delivered" && new Date(o.updatedAt).toDateString() === today);
+  const inDelivery = liveOrders.filter((o: any) => ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(o.status));
 
   function renderOrder(order: any) {
     const isExpanded = expandedId === order.id;
     const nextStatus = NEXT_STATUS[order.status];
     const isDone = ["delivered","failed_delivery","cancelled","refunded"].includes(order.status);
 
+    const STATUS_LABELS: Record<string, string> = {
+      pending: "New", confirmed: "Confirmed", preparing: "Preparing",
+      driver_assigned: "Driver Assigned", driver_at_store: "At Store",
+      out_for_delivery: "On the Way", driver_arriving: "Arriving",
+      driver_arrived: "Arrived", delivered: "Delivered",
+      failed_delivery: "Failed", cancelled: "Cancelled", refunded: "Refunded",
+    };
+
     return (
-      <div key={order.id} className={`bg-white rounded-xl border transition-all ${isDone ? "opacity-75" : ""}`}>
-        <div className="p-4 flex items-start justify-between gap-4 cursor-pointer hover:bg-gray-50 rounded-xl"
+      <div key={order.id} className={`bg-white rounded-xl border transition-all ${isDone ? "opacity-60" : ""}`}>
+        <div className="p-3 sm:p-4 flex items-start justify-between gap-3 cursor-pointer hover:bg-gray-50 rounded-xl"
           onClick={() => setExpandedId(isExpanded ? null : order.id)}>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <p className="font-bold text-sm">{order.orderNumber}</p>
-              <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>
-                {order.status.replace(/_/g, " ")}
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>
+                {STATUS_LABELS[order.status] ?? order.status}
               </span>
               {order.deliveryType === "next-morning" ? (
                 <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700 border border-amber-200">
@@ -310,8 +408,17 @@ export default function OrdersPage() {
                 </span>
               )}
               {order.refundType && order.refundType !== "none" && (
-                <span className="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  order.refundStatus === "succeeded" ? "bg-green-100 text-green-700" :
+                  order.refundStatus === "failed"    ? "bg-red-100 text-red-700" :
+                  order.refundStatus === "pending"   ? "bg-yellow-100 text-yellow-700" :
+                  "bg-gray-100 text-gray-600"
+                }`}>
                   💰 {order.refundType} refund
+                  {order.refundStatus === "succeeded" && order.refundedAmount != null && ` · $${Number(order.refundedAmount).toFixed(2)} refunded`}
+                  {order.refundStatus === "failed"    && " · FAILED"}
+                  {order.refundStatus === "pending"   && " · pending"}
+                  {!order.refundStatus && " · pending"}
                 </span>
               )}
             </div>
@@ -325,22 +432,22 @@ export default function OrdersPage() {
               )}
             </div>
           </div>
-          <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-            <p className="font-bold">${Number(order.total).toFixed(2)}</p>
-            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+          <div className="shrink-0 flex flex-col items-end gap-1.5">
+            <p className="font-bold text-sm">${Number(order.total).toFixed(2)}</p>
+            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
               {nextStatus && !isDone && (
                 <button onClick={() => updateMutation.mutate({ id: order.id, status: nextStatus })}
-                  className="text-xs bg-brand-500 hover:bg-brand-600 text-white px-2.5 py-1 rounded-lg font-medium transition-colors">
-                  → {nextStatus.replace(/_/g, " ")}
+                  className="text-[11px] bg-brand-500 hover:bg-brand-600 text-white px-2 py-1 rounded-lg font-semibold transition-colors whitespace-nowrap">
+                  {STATUS_LABELS[nextStatus] ?? nextStatus} →
                 </button>
               )}
               {!isDone && (
                 <button onClick={() => setCancelOrder(order)}
-                  className="text-xs text-red-600 border border-red-200 hover:bg-red-50 px-2 py-1 rounded-lg font-medium">
-                  Cancel
+                  className="text-[11px] text-red-500 border border-red-200 hover:bg-red-50 px-1.5 py-1 rounded-lg">
+                  ✕
                 </button>
               )}
-              <ChevronRight size={14} className={`text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+              <ChevronRight size={13} className={`text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
             </div>
           </div>
         </div>
@@ -399,11 +506,45 @@ export default function OrdersPage() {
             <div className="bg-gray-50 border rounded-xl p-3 space-y-1.5 text-sm">
               <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Financial Breakdown</p>
               <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>${Number(order.subtotal).toFixed(2)}</span></div>
-              {Number(order.bundleDiscount) > 0 && <div className="flex justify-between text-blue-600"><span>Bundle Discount</span><span>-${Number(order.bundleDiscount).toFixed(2)}</span></div>}
-              {Number(order.couponDiscount) > 0 && <div className="flex justify-between text-green-600"><span>Promo ({order.couponCode})</span><span>-${Number(order.couponDiscount).toFixed(2)}</span></div>}
+              {Number(order.bundleDiscount) > 0 && <div className="flex justify-between text-blue-600"><span>📦 Bundle Discount</span><span>-${Number(order.bundleDiscount).toFixed(2)}</span></div>}
+              {Number(order.couponDiscount) > 0 && <div className="flex justify-between text-green-600"><span>🏷️ Promo ({order.couponCode})</span><span>-${Number(order.couponDiscount).toFixed(2)}</span></div>}
+              {Number(order.rewardsDiscount) > 0 && <div className="flex justify-between text-purple-600"><span>🏆 Rewards ({order.rewardsPointsToRedeem} pts)</span><span>-${Number(order.rewardsDiscount).toFixed(2)}</span></div>}
+              {Number(order.giftCardAmount) > 0 && <div className="flex justify-between text-emerald-600"><span>🎁 Gift Card ({order.giftCardCode})</span><span>-${Number(order.giftCardAmount).toFixed(2)}</span></div>}
               <div className="flex justify-between text-green-600"><span>Delivery Fee</span><span>FREE</span></div>
               <div className="flex justify-between text-gray-600"><span>Tax (8.25%)</span><span>${Number(order.tax).toFixed(2)}</span></div>
               <div className="flex justify-between font-bold border-t pt-1.5"><span>Order Total</span><span>${Number(order.total).toFixed(2)}</span></div>
+              {/* Payment method */}
+              <div className="border-t pt-2 mt-1">
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span className="font-semibold uppercase tracking-wide">Payment</span>
+                  <span className="font-medium text-gray-700 text-right">
+                    {(() => {
+                      const gc = Number(order.giftCardAmount) > 0;
+                      const fullGift = order.paymentMethod === "gift_card" || (gc && Number(order.total) === 0);
+                      const partialGift = gc && Number(order.total) > 0;
+                      if (order.paymentMethod === "paypal") {
+                        return "🅿️ PayPal" + (order.paypalOrderId ? ` · ${order.paypalOrderId.slice(0,12)}…` : "");
+                      }
+                      if (fullGift) {
+                        return `🎁 Gift Card · $${Number(order.giftCardAmount).toFixed(2)} (full)`;
+                      }
+                      if (partialGift) {
+                        const cardAmt = Number(order.total);
+                        return (
+                          <span className="flex flex-col items-end gap-0.5">
+                            <span>🎁 Gift Card · ${Number(order.giftCardAmount).toFixed(2)}</span>
+                            <span>💳 Card (Stripe) · ${cardAmt.toFixed(2)}</span>
+                          </span>
+                        );
+                      }
+                      if (order.paymentMethod === "stripe" || !order.paymentMethod) {
+                        return "💳 Card (Stripe)" + (order.stripePaymentIntentId ? ` · ${order.stripePaymentIntentId.slice(3,15)}…` : "");
+                      }
+                      return order.paymentMethod;
+                    })()}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {order.deliveryAddress && (
@@ -586,43 +727,54 @@ export default function OrdersPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold">Orders & Deliveries</h1>
-          <p className="text-gray-500 text-sm">
-            {orders.length} total ·{" "}
-            <span className={onlineDrivers.length > 0 ? "text-green-600 font-medium" : "text-red-500 font-medium"}>
-              {onlineDrivers.length} driver{onlineDrivers.length !== 1 ? "s" : ""} online
-            </span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => refetch()} className="flex items-center gap-1.5 text-sm text-gray-500 border rounded-lg px-3 py-2 hover:bg-gray-50">
-            <RefreshCw size={14} />
-          </button>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="">All Sections</option>
-            {Object.keys(STATUS_COLORS).map(s => (
-              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Today's Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        {[
-          { label: "New Orders", value: pendingOrders.length, color: "#dc2626", bg: "#fef2f2", emoji: "🔴" },
-          { label: "In Delivery", value: inDelivery.length, color: "#ea580c", bg: "#fff7ed", emoji: "🚗" },
-          { label: "Completed Today", value: todayCompleted.length, color: "#16a34a", bg: "#f0fdf4", emoji: "✅" },
-          { label: "Drivers Online", value: onlineDrivers.length, color: onlineDrivers.length > 0 ? "#2563eb" : "#dc2626", bg: onlineDrivers.length > 0 ? "#eff6ff" : "#fef2f2", emoji: "👤" },
-        ].map(({ label, value, color, bg, emoji }) => (
-          <div key={label} className="rounded-xl border p-4 text-center" style={{ background: bg, borderColor: `${color}40` }}>
-            <p className="text-2xl font-black" style={{ color }}>{emoji} {value}</p>
-            <p className="text-xs text-gray-500 font-medium mt-0.5">{label}</p>
+      <div className="mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+          <div>
+            <h1 className="text-lg sm:text-2xl font-bold">Orders</h1>
+            <p className="text-gray-500 text-xs sm:text-sm">
+              {orders.length} total ·{" "}
+              <span className={onlineDrivers.length > 0 ? "text-green-600 font-medium" : "text-red-500 font-medium"}>
+                {onlineDrivers.length} driver{onlineDrivers.length !== 1 ? "s" : ""} online
+              </span>
+            </p>
           </div>
-        ))}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={createTestOrder}
+              disabled={creatingTest}
+              title="Create a test order (103 E Market St, Leander TX) — skips payment"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-dashed border-amber-400 text-amber-600 rounded-lg hover:bg-amber-50 disabled:opacity-50"
+            >
+              {creatingTest ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />}
+              Test Order
+            </button>
+            <button onClick={() => refetch()} className="p-2 text-gray-500 border rounded-lg hover:bg-gray-50">
+              <RefreshCw size={14} />
+            </button>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              className="flex-1 sm:flex-none border rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">All Orders</option>
+              {Object.keys(STATUS_COLORS).map(s => (
+                <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-3">
+          {[
+            { label: "New", value: pendingOrders.length, color: "#dc2626", bg: "#fef2f2", emoji: "🔴" },
+            { label: "Delivering", value: inDelivery.length, color: "#ea580c", bg: "#fff7ed", emoji: "🚗" },
+            { label: "Done Today", value: todayCompleted.length, color: "#16a34a", bg: "#f0fdf4", emoji: "✅" },
+            { label: "Online", value: onlineDrivers.length, color: onlineDrivers.length > 0 ? "#2563eb" : "#dc2626", bg: onlineDrivers.length > 0 ? "#eff6ff" : "#fef2f2", emoji: "👤" },
+          ].map(({ label, value, color, bg, emoji }) => (
+            <div key={label} className="rounded-xl border p-2 sm:p-4 text-center" style={{ background: bg, borderColor: `${color}40` }}>
+              <p className="text-base sm:text-2xl font-black" style={{ color }}>{emoji} {value}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
@@ -640,20 +792,38 @@ export default function OrdersPage() {
             if (section.orders.length === 0) return null;
             return (
               <div key={section.key} className="mb-4">
-                {/* Section header */}
                 <div className="flex items-center gap-2 rounded-xl border px-4 py-2.5 mb-2" style={section.headerStyle}>
                   <span className="font-bold text-sm">{section.emoji} {section.label}</span>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/60">
                     {section.orders.length}
                   </span>
                 </div>
-                {/* Section orders */}
                 <div className="space-y-2 pl-2 border-l-2 ml-2" style={{ borderColor: section.headerStyle.borderColor }}>
                   {section.orders.map((order: any) => renderOrder(order))}
                 </div>
               </div>
             );
           })}
+
+          {/* Test Orders — collapsed by default, shown only when test orders exist */}
+          {testOrders.length > 0 && (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowTestOrders(v => !v)}
+                className="w-full flex items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <FlaskConical size={14} />
+                <span className="font-semibold text-sm">Test Orders</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{testOrders.length}</span>
+                <span className="ml-auto text-xs">{showTestOrders ? "▲ Hide" : "▼ Show"}</span>
+              </button>
+              {showTestOrders && (
+                <div className="space-y-2 pl-2 border-l-2 border-dashed border-gray-200 ml-2 mt-2">
+                  {testOrders.map((order: any) => renderOrder(order))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

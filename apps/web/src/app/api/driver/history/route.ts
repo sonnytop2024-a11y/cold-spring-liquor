@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const periodOrders = delivered.filter(o => new Date(o.updatedAt) >= start);
     return {
       deliveries: periodOrders.length,
-      amount: +periodOrders.reduce((a, o) => a + o.total, 0).toFixed(2),
+      amount: +periodOrders.reduce((a, o) => a + (o.subtotal ?? o.total), 0).toFixed(2),
     };
   }
 
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     month: periodStats("month"),
     total: {
       deliveries: delivered.length,
-      amount: +delivered.reduce((a, o) => a + o.total, 0).toFixed(2),
+      amount: +delivered.reduce((a, o) => a + (o.subtotal ?? o.total), 0).toFixed(2),
     },
     orders: delivered.slice(0, 50).map(o => {
       const { masked, city } = maskAddress(o.deliveryAddress);
@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
         deliveryCity: city,
         createdAt: o.createdAt,
         updatedAt: o.updatedAt,
+        subtotal: o.subtotal,
         total: o.total,
         items: o.items,
         status: o.status,

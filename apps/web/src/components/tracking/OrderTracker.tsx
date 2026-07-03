@@ -224,7 +224,7 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
                 ⚡ Same-Day Delivery
               </span>
             )}
-            {order.estimatedDelivery && (
+            {order.estimatedDelivery ? (
               <span className="flex items-center gap-1 text-sm text-gray-500">
                 <Clock size={13} />
                 {order.deliveryType === "next-morning"
@@ -232,7 +232,12 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
                   : `ETA: ${new Date(order.estimatedDelivery).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} or sooner`
                 }
               </span>
-            )}
+            ) : order.status === "pending" && order.deliveryType === "same-day" ? (
+              <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
+                Confirming your order — ETA will appear once accepted
+              </span>
+            ) : null}
           </div>
         )}
 

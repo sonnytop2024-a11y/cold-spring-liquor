@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetAllFlashDeals, dbSaveFlashDeal } from "@/lib/db";
 
-export async function GET() {
-  return NextResponse.json(await dbGetAllFlashDeals());
+export async function GET(req: NextRequest) {
+return NextResponse.json(await dbGetAllFlashDeals());
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+const body = await req.json();
   const { name, brand, slug, price, salePrice, imageUrl, volume, stockQty, maxStock, active, startAt, endsAt, productId } = body;
 
   if (!name || !price || !salePrice) {

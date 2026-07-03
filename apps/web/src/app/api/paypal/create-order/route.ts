@@ -38,13 +38,20 @@ export async function POST(req: NextRequest) {
         intent: "CAPTURE",
         purchase_units: [
           {
-            amount: {
-              currency_code: "USD",
-              value: amount.toFixed(2),
-            },
-            description: "Cold Spring Liquor order",
+            amount: { currency_code: "USD", value: amount.toFixed(2) },
+            description: "Cold Spring Liquor — Alcohol Delivery",
           },
         ],
+        payment_source: {
+          paypal: {
+            experience_context: {
+              payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED",
+              brand_name: "Cold Spring Liquor",
+              locale: "en-US",
+              user_action: "PAY_NOW",
+            },
+          },
+        },
       }),
       cache: "no-store",
     });

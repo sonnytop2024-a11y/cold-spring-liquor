@@ -392,20 +392,29 @@ export function LoginForm() {
   ];
 
   return (
-    <div className="max-w-md mx-auto py-12 px-4">
-      <div className="bg-white rounded-2xl border shadow-sm p-8">
-        <div className="text-center mb-7">
-          <div className="flex justify-center mb-4">
-            <Image
-              src="/logo-full-transparent.png"
-              alt="Cold Spring Liquor"
-              width={144}
-              height={156}
-              className="w-[110px] sm:w-[144px] object-contain"
-              priority
-            />
+    <div className="max-w-md mx-auto py-6 sm:py-12 px-3 sm:px-4">
+      <div className="bg-white rounded-2xl border shadow-sm p-5 sm:p-8">
+        <div className="text-center mb-5 sm:mb-7">
+          <div className="flex justify-center mb-3 sm:mb-4">
+            <div style={{
+              background: "radial-gradient(ellipse at 50% 40%, #1a1208 0%, #0d0d0d 55%, #050505 100%)",
+              borderRadius: "16px",
+              padding: "12px 16px 10px",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,200,80,0.08)",
+              display: "inline-block",
+            }}>
+              <Image
+                src="/logo-full-transparent.png"
+                alt="Cold Spring Liquor"
+                width={200}
+                height={217}
+                className="w-[110px] sm:w-[160px] object-contain"
+                priority
+                style={{ imageRendering: "auto" }}
+              />
+            </div>
           </div>
-          <h1 className="font-heading text-2xl font-bold">Sign In / Sign Up</h1>
+          <h1 className="font-heading text-xl sm:text-2xl font-bold">Sign In / Sign Up</h1>
           <p className="text-gray-500 text-sm mt-1">Welcome to Cold Spring Liquor</p>
         </div>
 

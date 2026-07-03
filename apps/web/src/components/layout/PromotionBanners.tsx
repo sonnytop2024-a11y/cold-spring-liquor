@@ -44,7 +44,7 @@ export function PromotionBanners() {
             </p>
             <h2 className="font-heading text-3xl md:text-4xl font-black text-white">Current Promotions</h2>
           </div>
-          <Link href="/products?sale=true" className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold" style={{ color: "#f97316" }}>
+          <Link href="/products?flashdeal=true" className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold" style={{ color: "#f97316" }}>
             View All Deals →
           </Link>
         </div>

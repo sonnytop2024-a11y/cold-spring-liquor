@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Star, Crown, Gift, Users } from "lucide-react";
 
 const PERKS = [
-  { icon: Star, label: "CS Rewards Club", sub: "Earn 10 pts per $1 spent", href: "/rewards", color: "#a855f7" },
+  { icon: Star, label: "CS Rewards Club", sub: "Earn 1 pt per $1 · 250 pts = $5 off", href: "/rewards", color: "#a855f7" },
   { icon: Crown, label: "VIP Tiers", sub: "Silver · Gold · Platinum", href: "/rewards", color: "#f59e0b" },
   { icon: Gift, label: "Birthday Reward", sub: "$15 credit on your birthday", href: "/account", color: "#ec4899" },
   { icon: Users, label: "Refer a Friend", sub: "Both get $10 off", href: "/rewards/referral", color: "#22c55e" },

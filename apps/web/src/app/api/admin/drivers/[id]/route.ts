@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../../_mock/store";
+import { dbGetDriver, dbSaveDriver, dbDeleteDriver } from "@/lib/db";
 import { dbGetAllOrders } from "@/lib/db";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const driver = store.getDriver(params.id);
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+const driver = await dbGetDriver(params.id);
   if (!driver) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const allOrders = await dbGetAllOrders();
@@ -19,55 +19,58 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({
     ...safe,
     currentOrder: activeOrder ?? null,
-    orders: orders.slice(0, 20), // last 20
+    orders: orders.slice(0, 20),
     todayDeliveries: todayOrders.filter(o => o.status === "delivered").length,
     todayEarnings: todayOrders.filter(o => o.status === "delivered").reduce((a, o) => a + o.total, 0),
   });
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const driver = store.getDriver(params.id);
+const driver = await dbGetDriver(params.id);
   if (!driver) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
   const { name, phone, email, username, pin, active } = body;
 
-  const fields: Partial<typeof driver> = {};
-  if (name !== undefined) fields.name = name;
-  if (phone !== undefined) fields.phone = phone;
-  if (email !== undefined) fields.email = email;
-  if (username !== undefined) fields.username = username;
-  if (active !== undefined) fields.active = active;
+  const updated = { ...driver };
+  if (name !== undefined) updated.name = name;
+  if (phone !== undefined) updated.phone = phone;
+  if (email !== undefined) updated.email = email;
+  if (username !== undefined) updated.username = username;
+  if (active !== undefined) updated.active = active;
   if (pin !== undefined) {
     if (pin.length !== 4 || !/^\d+$/.test(pin)) {
       return NextResponse.json({ error: "PIN must be exactly 4 digits" }, { status: 400 });
     }
-    fields.pin = pin;
+    updated.pin = pin;
+    updated.passwordHash = Buffer.from(pin).toString("base64");
   }
 
-  const updated = store.updateDriver(params.id, fields);
-  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { passwordHash: _ph2, ...safe } = updated;
-  return NextResponse.json(safe);
-}
-
-// PATCH: partial update — used by driver app to toggle isOnline
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const driver = store.getDriver(params.id);
-  if (!driver) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const body = await req.json();
-  const fields: Record<string, unknown> = {};
-  if (body.isOnline !== undefined) fields.isOnline = Boolean(body.isOnline);
-  if (body.active !== undefined) fields.active = Boolean(body.active);
-  if (body.currentOrderId !== undefined) fields.currentOrderId = body.currentOrderId;
-  const updated = store.updateDriver(params.id, fields);
-  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  await dbSaveDriver(updated);
   const { passwordHash: _ph, ...safe } = updated;
   return NextResponse.json(safe);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const deleted = store.deleteDriver(params.id);
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+const driver = await dbGetDriver(params.id);
+  if (!driver) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const body = await req.json();
+  const updated = { ...driver };
+  if (body.isOnline !== undefined) updated.isOnline = Boolean(body.isOnline);
+  if (body.active !== undefined) updated.active = Boolean(body.active);
+  if (body.currentOrderId !== undefined) updated.currentOrderId = body.currentOrderId;
+  if (body.lat !== undefined) updated.lat = body.lat;
+  if (body.lng !== undefined) updated.lng = body.lng;
+  if (body.locationUpdatedAt !== undefined) updated.locationUpdatedAt = body.locationUpdatedAt;
+
+  await dbSaveDriver(updated);
+  const { passwordHash: _ph, ...safe } = updated;
+  return NextResponse.json(safe);
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+const deleted = await dbDeleteDriver(params.id);
   if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

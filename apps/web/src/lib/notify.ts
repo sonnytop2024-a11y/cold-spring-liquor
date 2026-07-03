@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { dbGetSettings } from "./db";
+import { dbGetSettings, dbGetDriverPushSubs } from "./db";
 import type { MockOrder } from "../app/api/_mock/store";
 
 const VAPID_PUBLIC  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY  ?? "";
@@ -7,10 +7,16 @@ const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY ?? "";
 const VAPID_EMAIL   = "mailto:sonnytop2024@gmail.com";
 
 export async function notifyNewOrder(order: MockOrder): Promise<void> {
-  const settings = await dbGetSettings();
+  const [settings, driverSubs] = await Promise.all([
+    dbGetSettings(),
+    dbGetDriverPushSubs(),
+  ]);
   await Promise.allSettled([
     sendTelegram(order, settings.telegramBotToken, settings.telegramChatId),
     sendPush(order, settings.pushSubscription ?? null),
+    ...Object.values(driverSubs).map((sub) =>
+      sendPush(order, sub as Record<string, unknown>, "/dashboard")
+    ),
   ]);
 }
 
@@ -29,25 +35,29 @@ async function sendTelegram(
     `💰 Total: *$${order.total.toFixed(2)}*\n` +
     `👤 ${order.customerName}  📞 ${order.customerPhone}\n` +
     `📍 ${(order.deliveryAddress as { street?: string })?.street ?? ""}`;
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
     cache: "no-store",
-  }).catch(() => {});
+  });
+  if (!res.ok) {
+    console.error("[notify] Telegram error:", await res.text().catch(() => ""));
+  }
 }
 
 async function sendPush(
   order: MockOrder,
   sub: Record<string, unknown> | null,
+  url = "/orders",
 ): Promise<void> {
   if (!sub || !VAPID_PUBLIC || !VAPID_PRIVATE) return;
   try {
     webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
     const payload = JSON.stringify({
-      title: `New Order #${order.orderNumber}`,
+      title: `🔔 New Order #${order.orderNumber}`,
       body: `$${order.total.toFixed(2)} — ${order.customerName}`,
-      url: "/orders",
+      url,
     });
     await webpush.sendNotification(sub as unknown as Parameters<typeof webpush.sendNotification>[0], payload);
   } catch {

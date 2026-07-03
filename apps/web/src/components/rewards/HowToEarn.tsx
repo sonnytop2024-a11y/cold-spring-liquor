@@ -2,9 +2,9 @@ export function HowToEarn() {
   const examples = [
     { spend: "$50", points: "50", value: null },
     { spend: "$100", points: "100", value: null },
-    { spend: "$250", points: "250", value: "$15 Off" },
-    { spend: "$500", points: "500", value: "$35 Off" },
-    { spend: "$1,000", points: "1,000", value: "$75 Off" },
+    { spend: "$250", points: "250", value: "$5 Off" },
+    { spend: "$500", points: "500", value: "$10 Off" },
+    { spend: "$1,000", points: "1,000", value: "$20 Off" },
   ];
 
   return (

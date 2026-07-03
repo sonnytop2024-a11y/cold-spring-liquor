@@ -37,10 +37,9 @@ export function calcPointsEarned(subtotal: number): number {
 }
 
 export function calcPointsValue(points: number): number {
-  if (points >= 1000) return 75;
-  if (points >= 500) return 35;
-  if (points >= 250) return 15;
-  if (points >= 100) return 5;
+  if (points >= 1000) return 20;
+  if (points >= 500) return 10;
+  if (points >= 250) return 5;
   return 0;
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbCreateOrder } from "@/lib/db";
+import { processOrder } from "@/lib/processOrder";
 
 const BASE =
   process.env.PAYPAL_ENV === "sandbox"
@@ -19,41 +19,56 @@ async function getAccessToken(): Promise<string> {
     cache: "no-store",
   });
   const data = await res.json();
+  if (!data.access_token) throw new Error(`PayPal auth failed: ${JSON.stringify(data)}`);
   return data.access_token as string;
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const { paypalOrderId, orderPayload } = await req.json();
-    if (!paypalOrderId || !orderPayload) {
-      return NextResponse.json({ error: "Missing data" }, { status: 400 });
-    }
+  const { paypalOrderId, orderPayload } = await req.json();
+  if (!paypalOrderId || !orderPayload) {
+    return NextResponse.json({ error: "Missing data" }, { status: 400 });
+  }
 
-    // Capture PayPal payment
+  try {
+    // 1. Get access token
     const token = await getAccessToken();
+
+    // 2. Capture PayPal payment
     const captureRes = await fetch(`${BASE}/v2/checkout/orders/${paypalOrderId}/capture`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        Prefer: "return=representation",
       },
       cache: "no-store",
     });
     const captureData = await captureRes.json();
+
     if (captureData.status !== "COMPLETED") {
-      return NextResponse.json({ error: "Payment not completed" }, { status: 400 });
+      const detail = captureData.details?.[0]?.description ?? captureData.message ?? "Payment not completed";
+      console.error("[paypal] capture failed:", JSON.stringify(captureData));
+      return NextResponse.json({ error: detail }, { status: 400 });
     }
 
-    // Create order in DB
-    const order = await dbCreateOrder({
-      ...orderPayload,
-      paymentMethod: "paypal",
-      paypalOrderId,
-    });
+    // Reject eChecks — they are "COMPLETED" at order level but "PENDING" at capture level
+    const captureUnit = captureData.purchase_units?.[0]?.payments?.captures?.[0];
+    if (captureUnit?.status === "PENDING") {
+      const reason = captureUnit?.status_details?.reason ?? "ECHECK";
+      console.error("[paypal] capture pending:", reason);
+      return NextResponse.json({
+        error: "Sorry, eCheck payments are not accepted. Please use PayPal balance, debit, or credit card.",
+      }, { status: 400 });
+    }
 
-    return NextResponse.json(order);
-  } catch (err) {
-    console.error("[paypal] capture-order error:", err);
-    return NextResponse.json({ error: "Failed to capture payment" }, { status: 500 });
+    // 3. Create order using shared logic (points, email, notifications, gift card)
+    const sessionToken = req.cookies.get("csl-session")?.value ?? null;
+    const result = await processOrder({ ...orderPayload, paymentMethod: "paypal", paypalOrderId }, sessionToken);
+
+    if (result.error) return NextResponse.json({ error: result.error }, { status: result.status ?? 400 });
+    return NextResponse.json(result.order, { status: 201 });
+  } catch (err: any) {
+    console.error("[paypal] capture-order error:", err?.message ?? err);
+    return NextResponse.json({ error: err?.message ?? "Failed to capture payment" }, { status: 500 });
   }
 }

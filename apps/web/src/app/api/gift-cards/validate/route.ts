@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbGetGiftCard } from "@/lib/db";
 
-const DEMO_CARDS: Record<string, number> = {
-  "GIFT-DEMO-TEST": 50,
-  "GIFT-ABCD-EFGH": 25,
-  "GIFT-TEST-1234": 100,
-};
+async function lookupCode(code: string) {
+  if (!code) return null;
+  const card = await dbGetGiftCard(code.toUpperCase());
+  if (!card || card.status === "redeemed" || card.remainingBalance <= 0) return null;
+  return card;
+}
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code") ?? "";
-  const balance = DEMO_CARDS[code.toUpperCase()];
-  if (balance) return NextResponse.json({ valid: true, balance });
+  const card = await lookupCode(code);
+  if (card) return NextResponse.json({ valid: true, balance: card.remainingBalance });
   return NextResponse.json({ valid: false, balance: 0 });
 }
 
-// CartView sends POST — support both
 export async function POST(req: NextRequest) {
   const { code } = await req.json();
-  const balance = DEMO_CARDS[(code ?? "").toUpperCase()];
-  if (balance) return NextResponse.json({ valid: true, balance });
+  const card = await lookupCode(code);
+  if (card) return NextResponse.json({ valid: true, balance: card.remainingBalance });
   return NextResponse.json({ valid: false, balance: 0 }, { status: 400 });
 }

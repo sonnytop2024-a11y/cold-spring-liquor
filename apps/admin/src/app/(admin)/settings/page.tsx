@@ -114,18 +114,29 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: Rea
   );
 }
 
-function playTestSound() {
+let _settingsAudioCtx: AudioContext | null = null;
+async function playTestSound() {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    [0, 0.18, 0.36].forEach(t => {
+    const ACtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!ACtx) return;
+    if (!_settingsAudioCtx) _settingsAudioCtx = new ACtx();
+    const ctx = _settingsAudioCtx;
+    if (ctx.state === "suspended") await ctx.resume();
+    const freqs = [660, 880, 1100];
+    freqs.forEach((freq, i) => {
+      const t = i * 0.28;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+      const comp = ctx.createDynamicsCompressor();
+      osc.connect(gain); gain.connect(comp); comp.connect(ctx.destination);
+      osc.type = "square";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + t + 0.02);
+      gain.gain.setValueAtTime(1.0, ctx.currentTime + t + 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.26);
       osc.start(ctx.currentTime + t);
-      osc.stop(ctx.currentTime + t + 0.15);
+      osc.stop(ctx.currentTime + t + 0.28);
     });
   } catch {}
 }
@@ -133,6 +144,7 @@ function playTestSound() {
 export default function SettingsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("store");
+  const [mobileDetail, setMobileDetail] = useState(false);
   const [form, setForm] = useState<Settings | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [resetConfirm, setResetConfirm] = useState(false);
@@ -275,12 +287,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-4 max-w-5xl">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-lg sm:text-2xl font-bold">Settings</h1>
+          <p className="text-xs text-gray-500">
             Last updated: {form.updatedAt ? new Date(form.updatedAt).toLocaleString() : "Never"}
           </p>
         </div>
@@ -288,21 +300,21 @@ export default function SettingsPage() {
           {!resetConfirm ? (
             <button
               onClick={() => setResetConfirm(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              <RotateCcw size={14} /> Reset to Defaults
+              <RotateCcw size={13} /> Reset
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-red-600 font-medium">Reset all settings?</span>
-              <button onClick={() => resetMutation.mutate()} className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600">Yes, Reset</button>
-              <button onClick={() => setResetConfirm(false)} className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">Cancel</button>
+              <span className="text-xs text-red-600 font-medium">Reset all?</span>
+              <button onClick={() => resetMutation.mutate()} className="px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600">Yes</button>
+              <button onClick={() => setResetConfirm(false)} className="px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50">No</button>
             </div>
           )}
           <button
             onClick={() => form && saveMutation.mutate(form)}
             disabled={saveStatus === "saving"}
-            className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors text-white ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors text-white ${
               saveStatus === "saving" ? "bg-gray-400 cursor-wait" :
               saveStatus === "saved" ? "bg-green-500" :
               saveStatus === "error" ? "bg-red-500" :
@@ -318,29 +330,43 @@ export default function SettingsPage() {
 
       {/* Save banner */}
       {saveStatus === "saved" && (
-        <div className="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
-          <CheckCircle size={16} />
-          <span>Settings saved successfully and will take effect immediately.</span>
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-3 py-2.5 text-xs sm:text-sm">
+          <CheckCircle size={14} />
+          <span>Settings saved successfully.</span>
         </div>
       )}
       {saveStatus === "error" && (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-          <AlertCircle size={16} />
-          <span>Failed to save settings. Please try again.</span>
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 py-2.5 text-xs sm:text-sm">
+          <AlertCircle size={14} />
+          <span>Failed to save. Please try again.</span>
         </div>
       )}
 
-      <div className="flex gap-6">
-        {/* Sidebar tabs */}
-        <nav className="w-48 shrink-0 space-y-0.5">
+      {/* ── Layout: mobile = master-detail, desktop = sidebar + content ── */}
+
+      {/* Mobile nav list (hidden when detail is open or on desktop) */}
+      <nav className={`md:hidden bg-white rounded-2xl border divide-y overflow-hidden ${mobileDetail ? "hidden" : "block"}`}>
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => { setTab(id); setMobileDetail(true); }}
+            className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${tab === id ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+              <Icon size={15} />
+            </div>
+            <span className="flex-1 text-sm font-medium text-gray-800">{label}</span>
+            <ChevronRight size={15} className="text-gray-400" />
+          </button>
+        ))}
+      </nav>
+
+      {/* Desktop sidebar + content, plus mobile detail view */}
+      <div className="md:flex md:gap-6">
+        {/* Desktop sidebar */}
+        <nav className="hidden md:block md:w-48 md:shrink-0 md:space-y-0.5">
           {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
+            <button key={id} onClick={() => setTab(id)}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
                 tab === id ? "bg-brand-500 text-white" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
+              }`}>
               <Icon size={15} />
               <span>{label}</span>
               {tab !== id && <ChevronRight size={12} className="ml-auto text-gray-400" />}
@@ -348,8 +374,14 @@ export default function SettingsPage() {
           ))}
         </nav>
 
-        {/* Content */}
-        <div className="flex-1 space-y-4">
+        {/* Content area — hidden on mobile until a section is tapped */}
+        <div className={`flex-1 space-y-4 ${mobileDetail ? "block" : "hidden md:block"}`}>
+          {/* Mobile back button */}
+          <button onClick={() => setMobileDetail(false)}
+            className="md:hidden flex items-center gap-1.5 text-sm text-brand-600 font-medium mb-1">
+            <ChevronRight size={14} className="rotate-180" />
+            {TABS.find(t => t.id === tab)?.label ?? "Settings"}
+          </button>
 
           {/* ── STORE INFO ─────────────────────────────────────── */}
           {tab === "store" && (
@@ -932,3 +964,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

@@ -65,22 +65,91 @@ function calcAge(dob: string): number {
   return age;
 }
 
-// Alert beeps via Web Audio API
-function playAlertSound() {
+// ─── Audio: persistent context (iOS requires resume() after user gesture) ────
+let _audioCtx: AudioContext | null = null;
+function getAudioCtx(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const ACtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!ACtx) return null;
+  if (!_audioCtx) _audioCtx = new ACtx();
+  return _audioCtx;
+}
+function unlockAudio() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+}
+// Driver alert: "delivery ring" — ding-dong-ding chime × 2, distinct from admin's beeps
+async function playAlertSound() {
   try {
-    const ACtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!ACtx) return;
-    const ctx = new ACtx();
-    [0, 0.35, 0.7].forEach(t => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = "sine"; osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.7, ctx.currentTime + t);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.3);
-      osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.35);
-    });
-  } catch { /* browser may block autoplay — silently ignore */ }
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === "suspended") await ctx.resume();
+
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -3;
+    comp.ratio.value = 3;
+    comp.attack.value = 0;
+    comp.release.value = 0.1;
+    comp.connect(ctx.destination);
+
+    // Bell tone helper: sine + 2nd harmonic = bell/chime quality
+    function bell(freq: number, startTime: number, dur: number, vol = 1.0) {
+      [1, 2.76].forEach((ratio, idx) => {
+        const osc = ctx!.createOscillator();
+        const g = ctx!.createGain();
+        osc.connect(g); g.connect(comp);
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const v = idx === 0 ? vol : vol * 0.4;
+        g.gain.setValueAtTime(0, startTime);
+        g.gain.linearRampToValueAtTime(v, startTime + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+        osc.start(startTime);
+        osc.stop(startTime + dur);
+      });
+    }
+
+    const now = ctx.currentTime;
+    // Round 1: G5 → E5 → G5 (ding-dong-ding)
+    bell(784, now + 0.00, 0.55, 1.0);   // G5
+    bell(659, now + 0.28, 0.55, 1.0);   // E5
+    bell(784, now + 0.56, 0.55, 1.0);   // G5
+    // Round 2 (after 1.4s gap)
+    bell(784, now + 1.40, 0.55, 1.0);
+    bell(659, now + 1.68, 0.55, 1.0);
+    bell(784, now + 1.96, 0.55, 1.0);
+  } catch {}
+}
+
+// iOS Safari keep-alive: a permanent near-silent oscillator prevents AudioContext
+// from being auto-suspended. Must be started inside a user gesture.
+let _keepAliveNode: OscillatorNode | null = null;
+function startKeepAlive() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx || _keepAliveNode) return;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime); // inaudible
+    gain.connect(ctx.destination);
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(1, ctx.currentTime); // 1 Hz — silent
+    osc.connect(gain);
+    osc.start();
+    _keepAliveNode = osc;
+  } catch {}
+}
+function stopKeepAlive() {
+  try { _keepAliveNode?.stop(); } catch {}
+  _keepAliveNode = null;
+}
+
+let _alertInterval: ReturnType<typeof setInterval> | null = null;
+function startAlertLoop() {
+  playAlertSound();
+  _alertInterval = setInterval(playAlertSound, 2200);
+}
+function stopAlertLoop() {
+  if (_alertInterval) { clearInterval(_alertInterval); _alertInterval = null; }
 }
 
 async function updateStatus(orderId: string, status: string, extra?: Record<string, unknown>) {
@@ -218,8 +287,8 @@ function NewOrderAlert({
         <div className="px-4 pb-2 space-y-2">
           <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Order Total</span>
-              <span className="font-bold">${Number(order.total).toFixed(2)}</span>
+              <span className="text-gray-500">Items Value</span>
+              <span className="font-bold">${Number(order.subtotal ?? order.total).toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Items</span>
@@ -881,27 +950,63 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
         isArrived ? "border-amber-400 ring-2 ring-amber-200" :
         order.status === "driver_arriving" ? "border-yellow-400 ring-2 ring-yellow-200" : ""
       }`}>
+        {/* Delivery step progress bar */}
+        {(() => {
+          const steps = [
+            { key: "driver_assigned", label: "To Store" },
+            { key: "driver_at_store", label: "Pickup" },
+            { key: "out_for_delivery", label: "En Route" },
+            { key: "driver_arriving", label: "Arriving" },
+            { key: "driver_arrived", label: "At Door" },
+            { key: "delivered", label: "Done" },
+          ];
+          const stepKeys = steps.map(s => s.key);
+          const currentIdx = stepKeys.indexOf(order.status);
+          if (currentIdx === -1) return null;
+          return (
+            <div className="px-3 pt-3 pb-1">
+              <div className="flex items-center gap-0.5">
+                {steps.map((step, i) => {
+                  const done = i < currentIdx;
+                  const active = i === currentIdx;
+                  return (
+                    <div key={step.key} className="flex-1 flex flex-col items-center gap-0.5">
+                      <div className={`h-1.5 w-full rounded-full ${done ? "bg-brand-500" : active ? "bg-brand-400" : "bg-gray-200"}`} />
+                      {active && (
+                        <span className="text-[9px] font-bold text-brand-600 whitespace-nowrap">{step.label}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Header row */}
-        <div className="px-4 pt-4 pb-2 flex items-start justify-between cursor-pointer"
+        <div className="px-3 pt-2 pb-2 flex items-start justify-between cursor-pointer"
           onClick={() => setExpanded(!expanded)}>
-          <div>
-            <p className="font-bold text-sm">#{order.orderNumber}</p>
-            <p className="text-xs text-gray-500">{order.customerName}</p>
-            {order.deliveryType === "next-morning" ? (
-              <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                🌅 Next Morning — Not Urgent
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-sm">#{order.orderNumber}</p>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[order.status] ?? ""}`}>
+                {STATUS_LABEL[order.status] ?? order.status}
               </span>
-            ) : (
-              <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                ⚡ Same-Day
-              </span>
-            )}
+              {order.deliveryType === "next-morning" ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  🌅 Morning
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                  ⚡ Now
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">{order.customerName}</p>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[order.status] ?? ""}`}>
-              {STATUS_LABEL[order.status] ?? order.status}
-            </span>
-            <p className="font-bold text-sm">${Number(order.total).toFixed(2)}</p>
+          <div className="flex flex-col items-end gap-0.5 shrink-0 ml-2">
+            <p className="font-bold text-base">${Number(order.subtotal ?? order.total).toFixed(2)}</p>
+            <ChevronRight size={14} className={`text-gray-400 transition-transform ${expanded ? "rotate-90" : ""}`} />
           </div>
         </div>
 
@@ -949,7 +1054,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
               </div>
             ))}
             <div className="border-t pt-1 mt-1 flex justify-between text-xs font-bold text-gray-800">
-              <span>Total</span><span>${Number(order.total).toFixed(2)}</span>
+              <span>Items Value</span><span>${Number(order.subtotal ?? order.total).toFixed(2)}</span>
             </div>
           </div>
         )}
@@ -1034,7 +1139,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
 }
 
 // ─── Login Form ───────────────────────────────────────────────────────────────
-function DriverLogin({ onLogin }: { onLogin: (driver: { id: string; name: string }) => void }) {
+function DriverLogin({ onLogin }: { onLogin: (driver: { id: string; name: string; token: string }) => void }) {
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -1051,7 +1156,7 @@ function DriverLogin({ onLogin }: { onLogin: (driver: { id: string; name: string
       });
       const data = await r.json();
       if (!r.ok) { setError(data.error ?? "Login failed"); return; }
-      onLogin({ id: data.driver.id, name: data.driver.name });
+      onLogin({ id: data.driver.id, name: data.driver.name, token: data.token ?? "" });
     } catch {
       setError("Cannot connect to server");
     } finally {
@@ -1103,7 +1208,8 @@ function DriverLogin({ onLogin }: { onLogin: (driver: { id: string; name: string
 function useGPSPosting(
   driverId: string | null,
   isOnline: boolean,
-  onLocation?: (lat: number, lng: number) => void
+  onLocation?: (lat: number, lng: number) => void,
+  token?: string | null,
 ) {
   const onLocationRef = useRef(onLocation);
   onLocationRef.current = onLocation;
@@ -1132,7 +1238,7 @@ function useGPSPosting(
         onLocationRef.current?.(lat, lng);
         fetch("/api/driver/location", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(token ? { "x-driver-token": token } : {}) },
           body: JSON.stringify({ driverId, lat, lng }),
         }).catch(() => {});
       },
@@ -1146,7 +1252,7 @@ function useGPSPosting(
       if (!loc) return;
       fetch("/api/driver/location", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { "x-driver-token": token } : {}) },
         body: JSON.stringify({ driverId, lat: loc.lat, lng: loc.lng }),
       }).catch(() => {});
     }, 8_000);
@@ -1216,7 +1322,7 @@ function HistoryTab({ driverId }: { driverId: string }) {
                 </div>
                 <div className="text-right">
                   {delivered && (
-                    <p className="font-semibold text-sm">${Number(order.total).toFixed(2)}</p>
+                    <p className="font-semibold text-sm">${Number(order.subtotal ?? order.total).toFixed(2)}</p>
                   )}
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     delivered ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
@@ -1259,24 +1365,61 @@ function GPSRequiredScreen({ onRetry }: { onRetry: () => void }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 function DashboardContent() {
-  const [driver, setDriver] = useState<{ id: string; name: string } | null>(null);
+  const [driver, setDriver] = useState<{ id: string; name: string; token?: string } | null>(null);
   const [online, setOnline] = useState(false);
   const [togglingOnline, setTogglingOnline] = useState(false);
   const [tab, setTab] = useState<"available" | "active" | "today" | "history">("available");
   const [alertOrder, setAlertOrder] = useState<any>(null);
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"idle" | "checking" | "granted" | "denied">("idle");
-  const prevOrderIdsRef = useRef<Set<string>>(new Set());
+  const prevOrderIdsRef = useRef<Set<string> | null>(null); // null = first fetch not done yet
   const qc = useQueryClient();
 
+  // Unlock AudioContext on first user touch (required by iOS Safari)
   useEffect(() => {
-    const saved = sessionStorage.getItem("csl-driver-session");
-    if (saved) {
-      try { setDriver(JSON.parse(saved)); } catch {}
-    }
+    const unlock = () => { unlockAudio(); document.removeEventListener("touchstart", unlock); document.removeEventListener("click", unlock); };
+    document.addEventListener("touchstart", unlock, { once: true, passive: true });
+    document.addEventListener("click", unlock, { once: true });
+    return () => { document.removeEventListener("touchstart", unlock); document.removeEventListener("click", unlock); };
   }, []);
 
-  useGPSPosting(driver?.id ?? null, online, (lat, lng) => setDriverLoc({ lat, lng }));
+  // Restore driver session + sync isOnline from server on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("csl-driver-session");
+    if (!saved) return;
+    try {
+      const d = JSON.parse(saved);
+      setDriver(d);
+      // Restore online status from server (survives screen lock / page reload)
+      fetch(`/api/admin/drivers/${d.id}`)
+        .then(r => r.json())
+        .then(data => { if (data.isOnline) setOnline(true); })
+        .catch(() => {});
+    } catch {}
+  }, []);
+
+  // Re-sync online status + restart keep-alive when page becomes visible again
+  useEffect(() => {
+    function onVisible() {
+      if (document.hidden || !driver?.id) return;
+      // iOS kills AudioContext when backgrounded — recreate keep-alive
+      // Note: visibilitychange is NOT a user gesture on iOS, so we can only
+      // attempt resume (may be blocked). Driver must tap screen to fully re-unlock.
+      const ctx = getAudioCtx();
+      if (ctx?.state === "suspended") ctx.resume().catch(() => {});
+      stopKeepAlive();
+      startKeepAlive();
+      fetch(`/api/admin/drivers/${driver.id}`)
+        .then(r => r.json())
+        .then(data => { setOnline(!!data.isOnline); })
+        .catch(() => {});
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [driver?.id]);
+
+
+  useGPSPosting(driver?.id ?? null, online, (lat, lng) => setDriverLoc({ lat, lng }), driver?.token ?? null);
 
   // Request GPS immediately on login — block app if denied.
   // Use maximumAge: 60000 so iOS returns a cached fix instantly rather than
@@ -1302,12 +1445,12 @@ function DashboardContent() {
   }, [driver?.id]);
 
   function handleLogin(d: { id: string; name: string }) {
-    sessionStorage.setItem("csl-driver-session", JSON.stringify(d));
+    localStorage.setItem("csl-driver-session", JSON.stringify(d));
     setDriver(d);
   }
 
   function handleLogout() {
-    sessionStorage.removeItem("csl-driver-session");
+    localStorage.removeItem("csl-driver-session");
     if (driver?.id && online) {
       fetch(`/api/admin/drivers/${driver.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -1318,17 +1461,55 @@ function DashboardContent() {
     setOnline(false);
   }
 
+  async function registerDriverPush(driverId: string) {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (Notification.permission === "denied") return;
+    try {
+      const keyRes = await fetch("/api/driver/vapid-key");
+      if (!keyRes.ok) return;
+      const { publicKey } = await keyRes.json();
+      if (!publicKey) return;
+
+      const padding = "=".repeat((4 - (publicKey.length % 4)) % 4);
+      const base64 = (publicKey + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const raw = window.atob(base64);
+      const arr = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+
+      const perm = Notification.permission === "granted"
+        ? "granted"
+        : await Notification.requestPermission();
+      if (perm !== "granted") return;
+
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      const sub = existing ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr });
+      await fetch("/api/driver/push-subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId, subscription: sub }),
+      });
+    } catch {}
+  }
+
   async function toggleOnline() {
     if (!driver) return;
-    setTogglingOnline(true);
     const next = !online;
+    // Must be synchronous inside user gesture for iOS Safari
+    unlockAudio();
+    if (next) startKeepAlive(); else stopKeepAlive();
+    setTogglingOnline(true);
     try {
       await fetch(`/api/admin/drivers/${driver.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isOnline: next }),
       });
       setOnline(next);
-      if (next) setTab("available");
+      if (next) {
+        setTab("available");
+        registerDriverPush(driver.id).catch(() => {});
+      }
     } finally {
       setTogglingOnline(false);
     }
@@ -1352,17 +1533,26 @@ function DashboardContent() {
 
   // Detect new incoming orders and show alert
   useEffect(() => {
-    if (!online || newOrders.length === 0) return;
+    if (!online) {
+      prevOrderIdsRef.current = null; // reset when going offline
+      return;
+    }
     const currentIds = new Set(newOrders.map((o: any) => o.id as string));
-    if (prevOrderIdsRef.current.size > 0) {
-      for (const id of currentIds) {
-        if (!prevOrderIdsRef.current.has(id) && !alertOrder) {
-          const incoming = newOrders.find((o: any) => o.id === id);
-          if (incoming) {
-            setAlertOrder(incoming);
-            playAlertSound();
-            break;
-          }
+
+    if (prevOrderIdsRef.current === null) {
+      // First fetch while online — record existing orders silently, no alert
+      prevOrderIdsRef.current = currentIds;
+      return;
+    }
+
+    // Subsequent fetches — alert on genuinely new order IDs
+    for (const id of currentIds) {
+      if (!prevOrderIdsRef.current.has(id) && !alertOrder) {
+        const incoming = newOrders.find((o: any) => o.id === id);
+        if (incoming) {
+          setAlertOrder(incoming);
+          startAlertLoop();
+          break;
         }
       }
     }
@@ -1381,8 +1571,8 @@ function DashboardContent() {
   );
 
   const TABS: { key: "available" | "active" | "today" | "history"; label: string; count: number }[] = [
-    { key: "available", label: "Available", count: online ? newOrders.length : 0 },
-    { key: "active",    label: "Active",    count: myActive.length },
+    { key: "available", label: "New",       count: online ? newOrders.length : 0 },
+    { key: "active",    label: "My Orders", count: myActive.length },
     { key: "today",     label: "Today",     count: completedToday.length },
     { key: "history",   label: "History",   count: 0 },
   ];
@@ -1396,70 +1586,82 @@ function DashboardContent() {
           driverId={driver.id}
           driverLoc={driverLoc}
           onAccept={() => {
+            stopAlertLoop();
             setAlertOrder(null);
             qc.invalidateQueries({ queryKey: ["driver-deliveries"] });
             setTab("active");
           }}
-          onDecline={() => setAlertOrder(null)}
+          onDecline={() => { stopAlertLoop(); setAlertOrder(null); }}
         />
       )}
 
       {/* Sticky Header */}
-      <header className="bg-gray-900 text-white px-4 pt-4 pb-3 sticky top-0 z-30">
-        <div className="flex items-center justify-between mb-2">
+      <header className="bg-gray-900 text-white px-4 pt-safe pt-3 pb-2 sticky top-0 z-30 shadow-lg">
+        {/* Top row: name + controls */}
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-xs"
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-black text-[11px] shrink-0"
               style={{ background: "linear-gradient(135deg, #f97316, #ea580c)" }}>
               CSL
             </div>
             <div>
               <p className="font-bold text-sm leading-tight">{driver.name}</p>
-              <p className="text-gray-400 text-[10px]">Cold Spring Liquor · Driver</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {driverLoc ? (
+                  <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" /> GPS Active
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-gray-500">Getting GPS…</span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={toggleOnline} disabled={togglingOnline}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                 online
-                  ? "bg-green-500 text-white shadow-lg shadow-green-900/30"
+                  ? "bg-green-500 text-white shadow-lg shadow-green-900/40"
                   : "bg-gray-700 text-gray-300 hover:bg-gray-600"
               }`}>
-              {togglingOnline ? <Loader2 size={11} className="animate-spin" /> : online ? <Wifi size={11} /> : <WifiOff size={11} />}
+              {togglingOnline ? <Loader2 size={12} className="animate-spin" /> : online ? <Wifi size={12} /> : <WifiOff size={12} />}
               {online ? "Online" : "Go Online"}
             </button>
-            <button onClick={handleLogout}
-              className="text-gray-500 hover:text-white text-[11px] transition-colors px-1.5 py-1">
-              Sign Out
+            <button onClick={handleLogout} className="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-gray-800">
+              <X size={14} />
             </button>
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Stats — only when online */}
         {online && (
-          <div className="grid grid-cols-2 gap-2 mb-2.5">
+          <div className="grid grid-cols-3 gap-2 mb-3">
             {[
-              { label: "Deliveries Today", value: String(earnings.deliveries) },
-              { label: "Sales Today", value: `$${Number(earnings.today).toFixed(2)}` },
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-gray-800 rounded-lg py-2 text-center">
+              { label: "Today", value: String(earnings.deliveries), unit: "deliveries" },
+              { label: "Sales", value: `$${Number(earnings.today).toFixed(2)}`, unit: "today" },
+              { label: "Active", value: String(myActive.length), unit: "orders" },
+            ].map(({ label, value, unit }) => (
+              <div key={label} className="bg-gray-800 rounded-xl py-2 px-2 text-center">
                 <p className="font-black text-sm text-white">{value}</p>
-                <p className="text-[10px] text-gray-400">{label}</p>
+                <p className="text-[10px] text-gray-500">{unit}</p>
               </div>
             ))}
           </div>
         )}
 
         {/* Tab bar */}
-        <div className="flex gap-0.5 bg-gray-800 rounded-xl p-1">
+        <div className="flex gap-1 bg-gray-800 rounded-xl p-1">
           {TABS.map(({ key, label, count }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`flex-1 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${
-                tab === key ? "bg-gray-700 text-white" : "text-gray-400 hover:text-gray-200"
+              className={`flex-1 flex items-center justify-center gap-1 py-2 text-[11px] font-semibold rounded-lg transition-all ${
+                tab === key ? "bg-white text-gray-900 shadow" : "text-gray-400 hover:text-gray-200"
               }`}>
               {label}
               {count > 0 && (
-                <span className={`ml-1 text-[10px] font-black px-1 rounded-full ${
-                  key === "available" ? "bg-brand-500 text-white" : "bg-gray-600 text-gray-200"
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                  tab === key
+                    ? (key === "available" ? "bg-brand-500 text-white" : "bg-gray-200 text-gray-700")
+                    : "bg-gray-600 text-white"
                 }`}>
                   {count}
                 </span>
@@ -1562,7 +1764,7 @@ function DashboardContent() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-sm">${Number(order.total).toFixed(2)}</p>
+                      <p className="font-semibold text-sm">${Number(order.subtotal ?? order.total).toFixed(2)}</p>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">
                         ✓ Done
                       </span>

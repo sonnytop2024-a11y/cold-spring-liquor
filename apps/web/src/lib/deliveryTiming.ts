@@ -30,7 +30,7 @@ function nextOpenMorning(from: Date): Date {
   // Work in Central Time
   const central = new Date(from.toLocaleString("en-US", { timeZone: "America/Chicago" }));
   central.setDate(central.getDate() + 1);
-  central.setHours(OPEN_HOUR, 0, 0, 0);
+  central.setHours(OPEN_HOUR, 30, 0, 0); // 10:00 open + 30 min → ETA 10:30 AM
   while (!isOpenDay(central.getDay())) {
     central.setDate(central.getDate() + 1);
   }
@@ -67,13 +67,16 @@ export function getDeliveryTiming(now: Date = new Date()): DeliveryTiming {
 
   // Store not yet open (before 10 AM on a weekday)
   if (isOpenDay(day) && mins < openMins) {
-    const eta = new Date(now);
-    eta.setHours(OPEN_HOUR, 0, 0, 0);
+    // Build 10:30 AM Central Time correctly (same approach as nextOpenMorning)
+    const c = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
+    c.setHours(OPEN_HOUR, 30, 0, 0);
+    const offset = c.getTime() - new Date(c.toLocaleString("en-US", { timeZone: "America/Chicago" })).getTime();
+    const eta = new Date(c.getTime() + offset);
     return {
       type: "next-morning",
       estimatedDelivery: eta,
-      label: "Today when we open at 10 AM",
-      message: "Our store is not open yet. Your order will be prepared when we open at 10:00 AM.",
+      label: "Today by 10:30 AM",
+      message: "Our store is not open yet. Your order will be prepared and delivered by 10:30 AM.",
       isStoreClosed: true,
     };
   }

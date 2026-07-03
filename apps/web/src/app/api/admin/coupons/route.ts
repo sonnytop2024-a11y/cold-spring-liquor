@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetAllCoupons, dbGetCouponByCode, dbSaveCoupon } from "@/lib/db";
 import type { MockCoupon } from "../../_mock/store";
 
-export async function GET() {
-  return NextResponse.json(await dbGetAllCoupons());
+export async function GET(req: NextRequest) {
+return NextResponse.json(await dbGetAllCoupons());
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+const body = await req.json();
   const { code, type, value, label, minOrder, maxUsage, usagePerCustomer, startDate, endDate, categoryRestriction, active } = body;
 
   if (!code || !type || !value) return NextResponse.json({ error: "code, type, value required" }, { status: 400 });

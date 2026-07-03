@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Tag, Edit2, Trash2, Loader2, X, Check,
   ToggleLeft, ToggleRight, AlertTriangle, Zap, Package, Search, ChevronRight,
+  Image as ImageIcon, GripVertical, ExternalLink,
 } from "lucide-react";
 import { API } from "@/lib/api";
 
@@ -336,7 +337,7 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-gray-800 leading-tight line-clamp-2">{p.name}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{p.brand} · {p.volume}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{p.brand}</p>
                         <p className="text-xs font-semibold text-gray-700 mt-1">${p.price.toFixed(2)}</p>
                       </div>
                       <ChevronRight size={14} className="text-gray-300 group-hover:text-yellow-500 shrink-0" />
@@ -359,7 +360,7 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900 text-sm leading-tight truncate">{form.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{form.brand} · {form.volume}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{form.brand}</p>
                   <p className="text-xs font-semibold text-gray-600 mt-0.5">Original: ${form.price?.toFixed(2)}</p>
                 </div>
                 <button
@@ -590,7 +591,7 @@ function CouponsTab() {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {[
           { label: "Total", value: coupons.length, color: "bg-blue-50 text-blue-700" },
           { label: "Active", value: coupons.filter(c => c.active).length, color: "bg-green-50 text-green-700" },
@@ -604,70 +605,58 @@ function CouponsTab() {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
-        <div className="px-5 py-3 border-b bg-gray-50 text-sm font-semibold">All Coupons</div>
+      <div className="space-y-2">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
         ) : coupons.length === 0 ? (
-          <div className="p-12 text-center text-gray-400"><Tag size={32} className="mx-auto mb-2 opacity-30" /><p>No coupons yet.</p></div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-xs text-gray-500 uppercase tracking-wide">
-                <th className="text-left px-5 py-3 font-semibold">Code</th>
-                <th className="text-left px-5 py-3 font-semibold">Type</th>
-                <th className="text-left px-5 py-3 font-semibold">Value</th>
-                <th className="text-left px-5 py-3 font-semibold">Min Order</th>
-                <th className="text-left px-5 py-3 font-semibold">Usage</th>
-                <th className="text-left px-5 py-3 font-semibold">Validity</th>
-                <th className="text-left px-5 py-3 font-semibold">Status</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {coupons.map(c => {
-                const expired = isExpired(c.endDate);
-                return (
-                  <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-5 py-3">
-                      <span className="font-mono font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded">{c.code}</span>
-                      {c.label && <p className="text-xs text-gray-400 mt-0.5">{c.label}</p>}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${typeColors[c.type]}`}>{TYPE_LABELS[c.type]}</span>
-                    </td>
-                    <td className="px-5 py-3 font-semibold">
-                      {c.type === "free_delivery" ? "Free" : c.type === "fixed" ? `$${c.value}` : `${c.value}%`}
-                    </td>
-                    <td className="px-5 py-3 text-gray-600">{c.minOrder > 0 ? `$${c.minOrder}` : "None"}</td>
-                    <td className="px-5 py-3 text-gray-600">{c.usageCount}{c.maxUsage ? ` / ${c.maxUsage}` : ""} uses</td>
-                    <td className="px-5 py-3 text-xs text-gray-500">
-                      {c.startDate || c.endDate ? (
-                        <div>
-                          {c.startDate && <p>From: {fmtDate(c.startDate)}</p>}
-                          {c.endDate && <p className={expired ? "text-red-500 font-medium" : ""}>{expired ? "Expired: " : "Until: "}{fmtDate(c.endDate)}</p>}
-                        </div>
-                      ) : <span className="text-gray-400">No expiry</span>}
-                    </td>
-                    <td className="px-5 py-3">
-                      <button onClick={() => toggleM.mutate({ id: c.id, active: !c.active })}
-                        className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full border transition-colors ${c.active && !expired ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
-                        {c.active && !expired ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-                        {c.active && !expired ? "Active" : expired ? "Expired" : "Inactive"}
-                      </button>
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => { setEditCoupon(c); setShowModal(true); }} className="text-gray-400 hover:text-brand-600 p-1.5 rounded-lg hover:bg-brand-50"><Edit2 size={14} /></button>
-                        <button onClick={() => setDeleteId(c.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400"><Tag size={32} className="mx-auto mb-2 opacity-30" /><p>No coupons yet.</p></div>
+        ) : coupons.map(c => {
+          const expired = isExpired(c.endDate);
+          const isActive = c.active && !expired;
+          const valueStr = c.type === "free_delivery" ? "Free Delivery" : c.type === "fixed" ? `$${c.value} off` : `${c.value}% off`;
+          return (
+            <div key={c.id} className={`bg-white rounded-xl border p-4 flex items-center gap-3 ${expired ? "opacity-70" : ""}`}>
+              {/* Code badge */}
+              <div className="shrink-0 flex flex-col items-center justify-center bg-brand-50 rounded-xl px-3 py-2 min-w-[72px] text-center">
+                <span className="font-mono font-black text-brand-700 text-sm leading-tight">{c.code}</span>
+                <span className={`text-[11px] font-bold mt-0.5 ${c.type === "fixed" ? "text-green-600" : c.type === "percentage" ? "text-blue-600" : "text-purple-600"}`}>{valueStr}</span>
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                {c.label && <p className="text-sm font-semibold text-gray-800 truncate">{c.label}</p>}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                  {c.minOrder > 0 && <span className="text-xs text-gray-500">Min ${c.minOrder}</span>}
+                  <span className="text-xs text-gray-500">{c.usageCount}{c.maxUsage ? `/${c.maxUsage}` : ""} uses</span>
+                  {c.endDate && (
+                    <span className={`text-xs ${expired ? "text-red-500 font-medium" : "text-gray-400"}`}>
+                      {expired ? "Expired " : "Until "}{fmtDate(c.endDate)}
+                    </span>
+                  )}
+                  {!c.endDate && !c.startDate && <span className="text-xs text-gray-400">No expiry</span>}
+                </div>
+              </div>
+
+              {/* Right controls */}
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <button onClick={() => toggleM.mutate({ id: c.id, active: !c.active })}
+                  className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${isActive ? "bg-green-50 text-green-700 border-green-200" : expired ? "bg-red-50 text-red-600 border-red-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                  {isActive ? <ToggleRight size={13} /> : <ToggleLeft size={13} />}
+                  {isActive ? "Active" : expired ? "Expired" : "Off"}
+                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => { setEditCoupon(c); setShowModal(true); }}
+                    className="text-gray-400 hover:text-brand-600 p-1.5 rounded-lg hover:bg-brand-50"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button onClick={() => setDeleteId(c.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -751,91 +740,69 @@ function FlashDealsTab() {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
-        <div className="px-5 py-3 border-b bg-gray-50 text-sm font-semibold">All Flash Deals</div>
+      <div className="space-y-2">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
         ) : deals.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
             <Zap size={32} className="mx-auto mb-2 opacity-30" />
             <p>No flash deals yet. Create your first!</p>
           </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-xs text-gray-500 uppercase tracking-wide">
-                <th className="text-left px-5 py-3 font-semibold">Product</th>
-                <th className="text-left px-5 py-3 font-semibold">Price</th>
-                <th className="text-left px-5 py-3 font-semibold">Discount</th>
-                <th className="text-left px-5 py-3 font-semibold">Stock</th>
-                <th className="text-left px-5 py-3 font-semibold">Schedule</th>
-                <th className="text-left px-5 py-3 font-semibold">Status</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {deals.map(d => {
-                const expired = isExpired(d.endsAt);
-                const live = d.active && !expired && (!d.startAt || new Date(d.startAt) <= now);
-                const pct = discountPct(d.price, d.salePrice);
-                const stockPct = d.maxStock > 0 ? Math.round((d.stockQty / d.maxStock) * 100) : 100;
-                return (
-                  <tr key={d.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
-                          {d.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={d.imageUrl} alt="" className="w-full h-full object-contain p-0.5" />
-                          ) : (
-                            <Zap size={14} className="text-yellow-400" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-semibold">{d.name}</p>
-                          <p className="text-xs text-gray-400">{d.brand} · {d.volume}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">
-                      <p className="font-bold text-green-600">${d.salePrice.toFixed(2)}</p>
-                      <p className="text-xs text-gray-400 line-through">${d.price.toFixed(2)}</p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">-{pct}%</span>
-                    </td>
-                    <td className="px-5 py-3">
-                      <p className="text-sm font-medium">{d.stockQty} / {d.maxStock}</p>
-                      <div className="w-16 h-1.5 bg-gray-200 rounded-full mt-1">
-                        <div className={`h-full rounded-full ${stockPct > 50 ? "bg-green-500" : stockPct > 20 ? "bg-yellow-500" : "bg-red-500"}`}
-                          style={{ width: `${stockPct}%` }} />
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-gray-500">
-                      {d.startAt && <p>Start: {fmtDateTime(d.startAt)}</p>}
-                      {d.endsAt
-                        ? <p className={expired ? "text-red-500 font-medium" : ""}>{expired ? "Ended: " : "Ends: "}{fmtDateTime(d.endsAt)}</p>
-                        : <p className="text-gray-400">No end date</p>}
-                    </td>
-                    <td className="px-5 py-3">
-                      <button onClick={() => toggleM.mutate({ id: d.id, active: !d.active })}
-                        className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full border transition-colors ${live ? "bg-green-50 text-green-700 border-green-200" : expired ? "bg-red-50 text-red-600 border-red-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
-                        {live ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-                        {live ? "Live" : expired ? "Expired" : "Off"}
-                      </button>
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => { setEditDeal(d); setShowModal(true); }} className="text-gray-400 hover:text-yellow-600 p-1.5 rounded-lg hover:bg-yellow-50"><Edit2 size={14} /></button>
-                        <button onClick={() => setDeleteId(d.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+        ) : deals.map(d => {
+          const expired = isExpired(d.endsAt);
+          const live = d.active && !expired && (!d.startAt || new Date(d.startAt) <= now);
+          const pct = discountPct(d.price, d.salePrice);
+          const stockPct = d.maxStock > 0 ? Math.round((d.stockQty / d.maxStock) * 100) : 100;
+          return (
+            <div key={d.id} className={`bg-white rounded-xl border p-4 flex items-center gap-3 ${expired ? "opacity-70" : ""}`}>
+              {/* Thumbnail */}
+              <div className="w-12 h-12 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                {d.imageUrl
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={d.imageUrl} alt="" className="w-full h-full object-contain p-0.5" />
+                  : <Zap size={16} className="text-yellow-400" />}
+              </div>
+
+              {/* Main info */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm leading-tight truncate">{d.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{d.brand}</p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className="font-bold text-green-600 text-sm">${d.salePrice.toFixed(2)}</span>
+                  <span className="text-xs text-gray-400 line-through">${d.price.toFixed(2)}</span>
+                  <span className="bg-red-100 text-red-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full">-{pct}%</span>
+                </div>
+                {/* Stock bar */}
+                <div className="flex items-center gap-2 mt-1.5">
+                  <div className="w-20 h-1.5 bg-gray-200 rounded-full">
+                    <div className={`h-full rounded-full ${stockPct > 50 ? "bg-green-500" : stockPct > 20 ? "bg-yellow-500" : "bg-red-500"}`}
+                      style={{ width: `${stockPct}%` }} />
+                  </div>
+                  <span className="text-[11px] text-gray-400">{d.stockQty}/{d.maxStock}</span>
+                </div>
+                {/* Schedule */}
+                {d.endsAt && (
+                  <p className={`text-[11px] mt-1 ${expired ? "text-red-500 font-medium" : "text-gray-400"}`}>
+                    {expired ? "Ended: " : "Ends: "}{fmtDateTime(d.endsAt)}
+                  </p>
+                )}
+              </div>
+
+              {/* Right side controls */}
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <button onClick={() => toggleM.mutate({ id: d.id, active: !d.active })}
+                  className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${live ? "bg-green-50 text-green-700 border-green-200" : expired ? "bg-red-50 text-red-600 border-red-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                  {live ? <ToggleRight size={13} /> : <ToggleLeft size={13} />}
+                  {live ? "Live" : expired ? "Expired" : "Off"}
+                </button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setEditDeal(d); setShowModal(true); }} className="text-gray-400 hover:text-yellow-600 p-1.5 rounded-lg hover:bg-yellow-50"><Edit2 size={14} /></button>
+                  <button onClick={() => setDeleteId(d.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -947,12 +914,356 @@ function BundleDealsTab() {
   );
 }
 
+// ─── Banner Types & Helpers ───────────────────────────────────────────────────
+
+interface HeroBanner {
+  id: string; title: string; subtitle: string; imageUrl: string;
+  ctaText: string; ctaLink: string; linkType: string; linkValue: string;
+  active: boolean; startDate: string | null; endDate: string | null;
+  sortOrder: number; bgColor: string; createdAt: string;
+}
+
+const LINK_TYPES = [
+  { value: "url",          label: "Custom URL" },
+  { value: "flash-deals",  label: "Flash Deals page" },
+  { value: "bundle-deals", label: "Bundle Deals page" },
+  { value: "new",          label: "New Products" },
+  { value: "hard-to-find", label: "Hard to Find" },
+  { value: "category",     label: "Category (specify below)" },
+  { value: "product",      label: "Product slug (specify below)" },
+];
+
+const BANNER_EMPTY: Partial<HeroBanner> = {
+  title: "", subtitle: "", imageUrl: "", ctaText: "", ctaLink: "",
+  linkType: "url", linkValue: "", active: true, startDate: null, endDate: null, bgColor: "#111827",
+};
+
+// ─── Banner Modal ─────────────────────────────────────────────────────────────
+
+function BannerModal({ banner, onClose, onSave }: { banner: Partial<HeroBanner> | null; onClose: () => void; onSave: (d: any) => void }) {
+  const isEdit = !!banner?.id;
+  const [form, setForm] = useState<Partial<HeroBanner>>(banner ?? { ...BANNER_EMPTY });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function set(k: keyof HeroBanner, v: any) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function handleImageUpload(file: File) {
+    setUploading(true); setUploadError(null);
+    const fd = new FormData(); fd.append("image", file);
+    const r = await fetch(`${API}/admin/upload?folder=banners`, { method: "POST", body: fd });
+    const json = await r.json();
+    setUploading(false);
+    if (json.url) set("imageUrl", json.url);
+    else setUploadError(json.error ?? "Upload failed");
+  }
+
+  async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
+
+  const needsValue = form.linkType === "category" || form.linkType === "product";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <ImageIcon size={18} className="text-indigo-500" />
+            {isEdit ? "Edit Banner" : "New Banner"}
+          </h2>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Image upload */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Banner Image *</label>
+            <div
+              className="border-2 border-dashed rounded-xl overflow-hidden cursor-pointer hover:border-indigo-400 transition-colors"
+              style={{ minHeight: 120 }}
+              onClick={() => fileRef.current?.click()}
+            >
+              {form.imageUrl ? (
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={form.imageUrl} alt="" className="w-full h-36 object-cover" />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <p className="text-white text-sm font-semibold">Click to change</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  {uploading
+                    ? <><Loader2 size={28} className="animate-spin mb-2" /><p className="text-sm">Uploading…</p></>
+                    : <><ImageIcon size={28} className="mb-2" /><p className="text-sm">Click to upload banner image</p><p className="text-xs">JPG, PNG, WEBP — max 10 MB</p></>}
+                </div>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ""; }} />
+            {uploadError && <p className="text-red-500 text-xs mt-1">{uploadError}</p>}
+            {/* Or paste URL */}
+            <input value={form.imageUrl ?? ""} onChange={e => set("imageUrl", e.target.value)}
+              placeholder="Or paste image URL directly"
+              className="mt-2 w-full border rounded-xl px-3 py-2 text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+
+          {/* Title & Subtitle */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Title <span className="text-gray-300 normal-case font-normal text-xs">(optional)</span></label>
+            <input value={form.title ?? ""} onChange={e => set("title", e.target.value)} placeholder="Summer Flash Deals"
+              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Subtitle</label>
+            <input value={form.subtitle ?? ""} onChange={e => set("subtitle", e.target.value)} placeholder="Save up to 40% on premium spirits"
+              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+
+          {/* CTA */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">CTA Button Text</label>
+              <input value={form.ctaText ?? ""} onChange={e => set("ctaText", e.target.value)} placeholder="Shop Now"
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Link Destination</label>
+              <select value={form.linkType ?? "url"} onChange={e => set("linkType", e.target.value)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                {LINK_TYPES.map(lt => <option key={lt.value} value={lt.value}>{lt.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {form.linkType === "url" && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Custom URL</label>
+              <input value={form.ctaLink ?? ""} onChange={e => set("ctaLink", e.target.value)} placeholder="/products?category=whiskey"
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+          )}
+          {needsValue && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">
+                {form.linkType === "category" ? "Category name (e.g. Whiskey)" : "Product slug (e.g. buffalo-trace-bourbon)"}
+              </label>
+              <input value={form.linkValue ?? ""} onChange={e => set("linkValue", e.target.value)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+          )}
+
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Start Date (optional)</label>
+              <input type="date" value={form.startDate?.slice(0, 10) ?? ""}
+                onChange={e => set("startDate", e.target.value ? e.target.value + "T00:00:00.000" : null)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">End Date (optional)</label>
+              <input type="date" value={form.endDate?.slice(0, 10) ?? ""}
+                onChange={e => set("endDate", e.target.value ? e.target.value + "T23:59:59.000" : null)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+          </div>
+
+          {/* Active toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => set("active", !form.active)}>
+              {form.active ? <ToggleRight size={28} className="text-green-500" /> : <ToggleLeft size={28} className="text-gray-300" />}
+            </div>
+            <span className="text-sm font-medium">{form.active ? "Active — visible on website" : "Inactive — hidden"}</span>
+          </label>
+        </div>
+
+        <div className="flex gap-3 p-5 border-t">
+          <button onClick={onClose} className="flex-1 border rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !form.imageUrl}
+            className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {isEdit ? "Save Changes" : "Create Banner"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Banners Tab ──────────────────────────────────────────────────────────────
+
+function BannersTab() {
+  const [showModal, setShowModal] = useState(false);
+  const [editBanner, setEditBanner] = useState<HeroBanner | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const qc = useQueryClient();
+
+  const { data: banners = [], isLoading } = useQuery<HeroBanner[]>({
+    queryKey: ["admin-banners"],
+    queryFn: async () => { const r = await fetch(`${API}/admin/banners`); return r.json(); },
+    refetchInterval: 30_000,
+  });
+
+  const createM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/banners`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-banners"] }); setShowModal(false); },
+    onError: (e: any) => alert(e.message),
+  });
+
+  const updateM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/banners/${data.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-banners"] }); setEditBanner(null); setShowModal(false); },
+  });
+
+  const deleteM = useMutation({
+    mutationFn: async (id: string) => fetch(`${API}/admin/banners/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-banners"] }); setDeleteId(null); },
+  });
+
+  const toggleM = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const r = await fetch(`${API}/admin/banners/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) });
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-banners"] }),
+  });
+
+  const reorderM = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await fetch(`${API}/admin/banners`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reorder", ids }) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-banners"] }),
+  });
+
+  async function handleSave(data: any) {
+    if (data.id) await updateM.mutateAsync(data);
+    else await createM.mutateAsync(data);
+  }
+
+  // Drag-to-reorder
+  function onDragStart(id: string) { setDragId(id); }
+  function onDragOver(e: React.DragEvent, id: string) { e.preventDefault(); setDragOverId(id); }
+  function onDrop(targetId: string) {
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+    const ids = banners.map(b => b.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    const reordered = [...ids];
+    reordered.splice(from, 1);
+    reordered.splice(to, 0, dragId);
+    reorderM.mutate(reordered);
+    setDragId(null); setDragOverId(null);
+  }
+
+  const activeBanners = banners.filter(b => b.active && (!b.endDate || new Date(b.endDate) > new Date()));
+
+  return (
+    <>
+      {showModal && <BannerModal banner={editBanner} onClose={() => { setShowModal(false); setEditBanner(null); }} onSave={handleSave} />}
+      {deleteId && <DeleteConfirm onConfirm={() => deleteM.mutate(deleteId)} onCancel={() => setDeleteId(null)} busy={deleteM.isPending} />}
+
+      <div className="flex items-center justify-between mb-5">
+        <p className="text-sm text-gray-500">{banners.length} banners · {activeBanners.length} active</p>
+        <button onClick={() => { setEditBanner(null); setShowModal(true); }}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-colors">
+          <Plus size={16} /> New Banner
+        </button>
+      </div>
+
+      <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex gap-2 text-xs text-indigo-700">
+        <GripVertical size={14} className="mt-0.5 shrink-0" />
+        <span>Drag banners to reorder. The first active banner appears first in the carousel.</span>
+      </div>
+
+      <div className="space-y-2">
+        {isLoading ? (
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
+        ) : banners.length === 0 ? (
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
+            <ImageIcon size={32} className="mx-auto mb-2 opacity-30" />
+            <p>No banners yet. Create your first hero banner!</p>
+          </div>
+        ) : banners.map((b, idx) => {
+          const expired = b.endDate ? new Date(b.endDate) < new Date() : false;
+          const isActive = b.active && !expired;
+          const isDragOver = dragOverId === b.id;
+          return (
+            <div
+              key={b.id}
+              draggable
+              onDragStart={() => onDragStart(b.id)}
+              onDragOver={e => onDragOver(e, b.id)}
+              onDrop={() => onDrop(b.id)}
+              onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+              className={`bg-white rounded-xl border p-3 flex items-center gap-3 transition-all ${isDragOver ? "border-indigo-400 bg-indigo-50 scale-[1.01]" : ""} ${dragId === b.id ? "opacity-50" : ""}`}
+            >
+              {/* Drag handle */}
+              <div className="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 touch-none">
+                <GripVertical size={18} />
+              </div>
+
+              {/* Sort # */}
+              <span className="shrink-0 w-5 text-xs text-gray-400 font-mono text-center">{idx + 1}</span>
+
+              {/* Thumbnail */}
+              <div className="shrink-0 w-20 h-12 rounded-lg border bg-gray-100 overflow-hidden">
+                {b.imageUrl
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={b.imageUrl} alt="" className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-gray-300" /></div>}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{b.title}</p>
+                {b.subtitle && <p className="text-xs text-gray-400 truncate">{b.subtitle}</p>}
+                <div className="flex items-center gap-1 mt-0.5">
+                  <ExternalLink size={10} className="text-gray-300" />
+                  <span className="text-[11px] text-gray-400">{LINK_TYPES.find(lt => lt.value === b.linkType)?.label ?? b.linkType}</span>
+                  {b.endDate && <span className={`text-[11px] ${expired ? "text-red-500" : "text-gray-400"}`}>· {expired ? "Expired" : `Until ${fmtDate(b.endDate)}`}</span>}
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <button onClick={() => toggleM.mutate({ id: b.id, active: !b.active })}
+                  className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${isActive ? "bg-green-50 text-green-700 border-green-200" : expired ? "bg-red-50 text-red-600 border-red-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                  {isActive ? <ToggleRight size={13} /> : <ToggleLeft size={13} />}
+                  {isActive ? "Live" : expired ? "Expired" : "Off"}
+                </button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setEditBanner(b); setShowModal(true); }} className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50"><Edit2 size={14} /></button>
+                  <button onClick={() => setDeleteId(b.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const TABS = [
   { key: "coupons", label: "Coupons", icon: Tag, color: "text-brand-600" },
   { key: "flash", label: "Flash Deals", icon: Zap, color: "text-yellow-600" },
   { key: "bundle", label: "Bundle Deals", icon: Package, color: "text-purple-600" },
+  { key: "banners", label: "Banners", icon: ImageIcon, color: "text-indigo-600" },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -970,7 +1281,7 @@ export default function MarketingPage() {
         <p className="text-gray-500 text-sm mt-0.5">Manage promotions, flash sales, and bundle discounts</p>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${tab === t.key ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
@@ -983,6 +1294,7 @@ export default function MarketingPage() {
       {tab === "coupons" && <CouponsTab />}
       {tab === "flash" && <FlashDealsTab />}
       {tab === "bundle" && <BundleDealsTab />}
+      {tab === "banners" && <BannersTab />}
     </div>
   );
 }

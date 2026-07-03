@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Package,
@@ -12,6 +12,8 @@ import {
   Settings,
   LogOut,
   Megaphone,
+  Tag,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,19 +24,27 @@ const NAV = [
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/drivers", label: "Drivers", icon: Car },
   { href: "/marketing", label: "Marketing", icon: Megaphone },
+  { href: "/gift-cards", label: "Gift Cards", icon: Gift },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  function handleLogout() {
+    if (confirm("Are you sure you want to logout?")) {
+      window.location.href = "https://www.coldspringliquor.com";
+    }
+  }
 
   return (
     <aside className="hidden md:flex w-60 bg-gray-900 text-white flex-col shrink-0">
-      <div className="px-6 py-5 border-b border-white/10">
+      <Link href="/dashboard" className="px-6 py-5 border-b border-white/10 block hover:bg-white/5 transition-colors">
         <p className="font-bold text-brand-500">Cold Spring Liquor</p>
         <p className="text-xs text-gray-400 mt-0.5">Admin Panel</p>
-      </div>
+      </Link>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV.map(({ href, label, icon: Icon }) => (
@@ -55,7 +65,10 @@ export function AdminSidebar() {
       </nav>
 
       <div className="px-3 py-4 border-t border-white/10">
-        <button className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/10 transition-colors w-full">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 transition-colors w-full"
+        >
           <LogOut size={18} />
           Logout
         </button>

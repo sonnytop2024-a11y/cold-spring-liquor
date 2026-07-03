@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbSaveSettings } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
-  try {
+try {
     const sub = await req.json();
     if (!sub?.endpoint) return NextResponse.json({ ok: false }, { status: 400 });
     await dbSaveSettings({ pushSubscription: sub });
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE() {
-  await dbSaveSettings({ pushSubscription: null });
+export async function DELETE(req: NextRequest) {
+await dbSaveSettings({ pushSubscription: null });
   return NextResponse.json({ ok: true });
 }

@@ -60,13 +60,13 @@ function buildDailyChart(orders: MockOrder[], start: Date, end: Date) {
       label,
       orders: dayAll.length,
       delivered: dayDelivered.length,
-      revenue: +dayDelivered.reduce((a, o) => a + o.total, 0).toFixed(2),
+      revenue: +dayDelivered.reduce((a, o) => a + (o.subtotal ?? o.total), 0).toFixed(2),
     };
   });
 }
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
+const { searchParams } = req.nextUrl;
   const period = searchParams.get("period") ?? "today";
   const fromParam = searchParams.get("from") ?? undefined;
   const toParam = searchParams.get("to") ?? undefined;
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
   });
   const periodDelivered = periodOrders.filter(o => o.status === "delivered");
 
-  const revenue = +periodDelivered.reduce((a, o) => a + o.total, 0).toFixed(2);
+  const revenue = +periodDelivered.reduce((a, o) => a + (o.subtotal ?? o.total), 0).toFixed(2);
   const avgOrderValue = periodDelivered.length ? +(revenue / periodDelivered.length).toFixed(2) : 0;
 
   const stats = {
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
     if (!o.customerId) return;
     if (!customerSpend[o.customerId]) customerSpend[o.customerId] = { name: o.customerName, orders: 0, total: 0 };
     customerSpend[o.customerId].orders++;
-    customerSpend[o.customerId].total += o.total;
+    customerSpend[o.customerId].total += (o.subtotal ?? o.total);
   });
   const topCustomers = Object.values(customerSpend)
     .map(v => ({ ...v, total: +v.total.toFixed(2) }))
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
       driverPerf[o.driverId] = { name: d?.name ?? "Unknown", deliveries: 0, totalSales: 0 };
     }
     driverPerf[o.driverId].deliveries++;
-    driverPerf[o.driverId].totalSales += o.total;
+    driverPerf[o.driverId].totalSales += (o.subtotal ?? o.total);
   });
   const driverPerformance = Object.values(driverPerf)
     .map(d => ({ ...d, totalSales: +d.totalSales.toFixed(2) }))

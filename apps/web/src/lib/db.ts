@@ -16,6 +16,69 @@ function tbl(table: string) {
 
 // ── Products ──────────────────────────────────────────────────────────────────
 
+export async function dbGetProductsPage(opts: {
+  limit: number;
+  offset: number;
+  q?: string;
+  category?: string;
+  stock?: string;
+  bundleEligible?: boolean;
+  featured?: boolean;
+}): Promise<{ products: MockProduct[]; total: number }> {
+  const { limit, offset, q, category, stock, bundleEligible, featured } = opts;
+  const t = tbl("csl_products");
+  if (t) {
+    try {
+      let countQ = t.select("id", { count: "exact", head: true });
+      let dataQ  = t.select("data").range(offset, offset + limit - 1);
+      if (category) {
+        countQ = countQ.filter("data->>category", "eq", category);
+        dataQ  = dataQ.filter("data->>category", "eq", category);
+      }
+      if (q) {
+        const orStr = `data->>name.ilike.%${q}%,data->>brand.ilike.%${q}%`;
+        countQ = countQ.or(orStr);
+        dataQ  = dataQ.or(orStr);
+      }
+      if (stock === "in")  {
+        countQ = countQ.filter("data->>inStock", "eq", "true");
+        dataQ  = dataQ.filter("data->>inStock", "eq", "true");
+      }
+      if (stock === "out") {
+        countQ = countQ.filter("data->>inStock", "eq", "false");
+        dataQ  = dataQ.filter("data->>inStock", "eq", "false");
+      }
+      if (bundleEligible === true) {
+        countQ = countQ.filter("data->>bundleEligible", "eq", "true");
+        dataQ  = dataQ.filter("data->>bundleEligible", "eq", "true");
+      }
+      if (featured === true) {
+        countQ = countQ.filter("data->>featured", "eq", "true");
+        dataQ  = dataQ.filter("data->>featured", "eq", "true");
+      }
+      const [{ count, error: cErr }, { data, error: dErr }] = await Promise.all([countQ, dataQ]);
+      if (cErr) throw cErr;
+      if (dErr) throw dErr;
+      return {
+        products: (data ?? []).map((r: any) => r.data as MockProduct),
+        total: count ?? 0,
+      };
+    } catch (e) {
+      console.error("[db] getProductsPage error:", e);
+    }
+  }
+  // Fallback: in-memory slice
+  let all = store.getAllProducts();
+  const qLow = q?.toLowerCase();
+  if (qLow) all = all.filter(p => p.name.toLowerCase().includes(qLow) || (p.brand ?? "").toLowerCase().includes(qLow));
+  if (category) all = all.filter(p => p.category === category);
+  if (stock === "in")  all = all.filter(p => p.inStock !== false && p.stockQty > 0);
+  if (stock === "out") all = all.filter(p => p.inStock === false || p.stockQty <= 0);
+  if (bundleEligible === true) all = all.filter(p => p.bundleEligible);
+  if (featured === true) all = all.filter(p => p.featured);
+  return { products: all.slice(offset, offset + limit), total: all.length };
+}
+
 export async function dbGetAllProducts(): Promise<MockProduct[]> {
   const t = tbl("csl_products");
   if (t) {
@@ -33,7 +96,6 @@ export async function dbGetAllProducts(): Promise<MockProduct[]> {
         from += PAGE;
       }
       if (all.length > 0) {
-        console.log(`[db] loaded ${all.length} products from Supabase`);
         return all;
       }
     } catch (e) {
@@ -64,7 +126,6 @@ export async function dbSaveProduct(product: MockProduct): Promise<void> {
     // Upsert with only id + data — no updated_at dependency
     const { error } = await t.upsert({ id: product.id, data: product }, { onConflict: "id" });
     if (!error) {
-      console.log(`[db] saved product ${product.id}`);
       return;
     }
     console.error("[db] upsert error:", error.message);
@@ -83,7 +144,6 @@ export async function dbUpdateProduct(id: string, patch: Partial<MockProduct>): 
       const merged: MockProduct = { ...(row.data as MockProduct), ...patch };
       const { error: updateErr } = await t.update({ data: merged }).eq("id", id);
       if (!updateErr) {
-        console.log(`[db] patched product ${id}:`, Object.keys(patch));
         return merged;
       }
       throw new Error(`Patch failed: ${updateErr.message}`);
@@ -105,7 +165,6 @@ export async function dbDeleteProduct(id: string): Promise<boolean> {
     const { data, error } = await t.delete().eq("id", id).select("id");
     if (!error) {
       const count = Array.isArray(data) ? data.length : 0;
-      console.log(`[db] delete id=${id}: removed ${count} row(s) from Supabase`);
       // Also purge from in-memory store in case this instance cached it
       store.deleteProduct(id);
       return true;
@@ -132,7 +191,6 @@ export async function dbSaveManyProducts(products: MockProduct[]): Promise<{ sav
         }
       }
       if (errors.length === 0) {
-        console.log(`[db] batch saved ${products.length} products`);
         return { saved: products.length, errors: [] };
       }
     } catch (e) {
@@ -182,6 +240,24 @@ export async function dbSaveSettings(fields: Partial<StoreSettings>): Promise<St
   return store.saveSettings(fields);
 }
 
+export async function dbGetDriverPushSubs(): Promise<Record<string, unknown>> {
+  const settings = await dbGetSettings();
+  return (settings as any).driverPushSubs ?? {};
+}
+
+export async function dbSaveDriverPushSub(driverId: string, sub: unknown): Promise<void> {
+  const current = await dbGetSettings();
+  const subs = { ...((current as any).driverPushSubs ?? {}), [driverId]: sub };
+  await dbSaveSettings({ driverPushSubs: subs } as any);
+}
+
+export async function dbDeleteDriverPushSub(driverId: string): Promise<void> {
+  const current = await dbGetSettings();
+  const subs = { ...((current as any).driverPushSubs ?? {}) };
+  delete subs[driverId];
+  await dbSaveSettings({ driverPushSubs: subs } as any);
+}
+
 export async function dbResetSettings(): Promise<StoreSettings> {
   const t = tbl("csl_settings");
   if (t) {
@@ -227,6 +303,37 @@ export async function dbDeleteCoupon(id: string): Promise<boolean> {
   delete map[id];
   await dbSaveSettings({ coupons: map });
   return true;
+}
+
+// ── Gift Cards (stored in csl_settings under giftCards key) ─────────────────
+
+export interface GiftCard {
+  code: string;
+  originalAmount: number;
+  remainingBalance: number;
+  recipientEmail: string;
+  senderName: string;
+  message: string;
+  status: "active" | "redeemed" | "partial";
+  issuedAt: string;
+  source?: "customer_purchase" | "admin_issued";
+  buyerEmail?: string; // who paid (customer purchases only)
+}
+
+async function dbLoadGiftCardMap(): Promise<Record<string, GiftCard>> {
+  const settings = await dbGetSettings();
+  return (settings as any).giftCards ?? {};
+}
+
+export async function dbGetGiftCard(code: string): Promise<GiftCard | null> {
+  const map = await dbLoadGiftCardMap();
+  return map[code.toUpperCase()] ?? null;
+}
+
+export async function dbSaveGiftCard(card: GiftCard): Promise<void> {
+  const map = await dbLoadGiftCardMap();
+  map[card.code.toUpperCase()] = card;
+  await dbSaveSettings({ giftCards: map } as any);
 }
 
 // ── Flash Deals (stored in csl_settings row id=1 under flashDeals key) ───────
@@ -291,6 +398,192 @@ export async function dbDeleteFlashDeal(id: string): Promise<boolean> {
   delete map[id];
   await dbSaveFlashDealMap(map);
   return true;
+}
+
+// ── Banners (stored in csl_settings row id=1 under heroBanners key) ─────────
+
+export interface HeroBanner {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  ctaText: string;
+  ctaLink: string;
+  linkType: "url" | "flash-deals" | "bundle-deals" | "new" | "hard-to-find" | "category" | "product";
+  linkValue: string;
+  active: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  sortOrder: number;
+  bgColor: string;
+  createdAt: string;
+}
+
+async function dbLoadBannerMap(): Promise<Record<string, HeroBanner>> {
+  const t = tbl("csl_settings");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").eq("id", 1).maybeSingle();
+      if (!error && data?.data?.heroBanners) return data.data.heroBanners as Record<string, HeroBanner>;
+      if (error) console.error("[db] loadBanners error:", error.message);
+    } catch (e) {
+      console.error("[db] loadBanners exception:", e);
+    }
+  }
+  return {};
+}
+
+async function dbSaveBannerMap(map: Record<string, HeroBanner>): Promise<void> {
+  const t = tbl("csl_settings");
+  if (!t) return;
+  try {
+    const { data } = await t.select("data").eq("id", 1).maybeSingle();
+    const current = (data?.data ?? {}) as Record<string, unknown>;
+    const updated = { ...current, heroBanners: map };
+    const { error } = await t.upsert({ id: 1, data: updated }, { onConflict: "id" });
+    if (error) console.error("[db] saveBanners error:", error.message);
+  } catch (e) {
+    console.error("[db] saveBanners exception:", e);
+  }
+}
+
+export async function dbGetAllBanners(): Promise<HeroBanner[]> {
+  const map = await dbLoadBannerMap();
+  return Object.values(map).sort((a, b) => a.sortOrder - b.sortOrder || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+}
+
+export async function dbGetActiveBanners(): Promise<HeroBanner[]> {
+  const all = await dbGetAllBanners();
+  const todayStr = new Date().toISOString().slice(0, 10); // "2026-06-27"
+  return all.filter(b => {
+    if (!b.active) return false;
+    // Compare by date string only — avoids timezone UTC shift issues
+    if (b.startDate && b.startDate.slice(0, 10) > todayStr) return false;
+    if (b.endDate && b.endDate.slice(0, 10) < todayStr) return false;
+    return true;
+  });
+}
+
+export async function dbSaveBanner(banner: HeroBanner): Promise<HeroBanner> {
+  const map = await dbLoadBannerMap();
+  map[banner.id] = banner;
+  await dbSaveBannerMap(map);
+  return banner;
+}
+
+export async function dbDeleteBanner(id: string): Promise<boolean> {
+  const map = await dbLoadBannerMap();
+  if (!map[id]) return false;
+  delete map[id];
+  await dbSaveBannerMap(map);
+  return true;
+}
+
+export async function dbReorderBanners(orderedIds: string[]): Promise<void> {
+  const map = await dbLoadBannerMap();
+  orderedIds.forEach((id, i) => { if (map[id]) map[id].sortOrder = i; });
+  await dbSaveBannerMap(map);
+}
+
+// ── Categories (stored in csl_settings id=1 under "categories" key) ──────────
+
+export interface Category {
+  id: string;       // e.g. "cat_whiskey"
+  value: string;    // e.g. "whiskey" — matches product.category string
+  label: string;    // e.g. "Whiskey"
+  emoji: string;    // e.g. "🥃"
+  sortOrder: number;
+  active: boolean;
+}
+
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: "cat_whiskey",   value: "whiskey",   label: "Whiskey",      emoji: "🥃", sortOrder: 1,  active: true },
+  { id: "cat_scotch",    value: "scotch",    label: "Scotch",       emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", sortOrder: 2,  active: true },
+  { id: "cat_vodka",     value: "vodka",     label: "Vodka",        emoji: "🍸", sortOrder: 3,  active: true },
+  { id: "cat_tequila",   value: "tequila",   label: "Tequila",      emoji: "🌵", sortOrder: 4,  active: true },
+  { id: "cat_rum",       value: "rum",       label: "Rum",          emoji: "🍹", sortOrder: 5,  active: true },
+  { id: "cat_gin",       value: "gin",       label: "Gin",          emoji: "🌿", sortOrder: 6,  active: true },
+  { id: "cat_wine",      value: "wine",      label: "Wine",         emoji: "🍷", sortOrder: 7,  active: true },
+  { id: "cat_champagne", value: "champagne", label: "Champagne",    emoji: "🍾", sortOrder: 8,  active: true },
+  { id: "cat_beer",      value: "beer",      label: "Beer",         emoji: "🍺", sortOrder: 9,  active: true },
+  { id: "cat_cognac",    value: "cognac",    label: "Cognac",       emoji: "🥂", sortOrder: 10, active: true },
+  { id: "cat_rtd",       value: "rtd",       label: "RTD",          emoji: "🧃", sortOrder: 11, active: true },
+  { id: "cat_mixer",     value: "mixer",     label: "Mixer",        emoji: "🥤", sortOrder: 12, active: true },
+  { id: "cat_liqueur",   value: "liqueur",   label: "Liqueur",      emoji: "🌸", sortOrder: 13, active: true },
+  { id: "cat_rare",      value: "rare",      label: "Hard to Find", emoji: "💎", sortOrder: 14, active: true },
+  { id: "cat_other",     value: "other",     label: "Other",        emoji: "📦", sortOrder: 15, active: true },
+];
+
+async function dbLoadCategories(): Promise<Category[]> {
+  const t = tbl("csl_settings");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").eq("id", 1).maybeSingle();
+      if (!error && data?.data?.categories !== undefined) return data.data.categories as Category[];
+      if (!error) {
+        // First run — seed defaults
+        const current = (data?.data ?? {}) as Record<string, unknown>;
+        await t.upsert({ id: 1, data: { ...current, categories: DEFAULT_CATEGORIES } }, { onConflict: "id" });
+        return DEFAULT_CATEGORIES;
+      }
+    } catch (e) { console.error("[db] loadCategories exception:", e); }
+  }
+  return DEFAULT_CATEGORIES;
+}
+
+async function dbSaveCategoriesList(cats: Category[]): Promise<void> {
+  const t = tbl("csl_settings");
+  if (!t) return;
+  try {
+    const { data } = await t.select("data").eq("id", 1).maybeSingle();
+    const current = (data?.data ?? {}) as Record<string, unknown>;
+    const { error } = await t.upsert({ id: 1, data: { ...current, categories: cats } }, { onConflict: "id" });
+    if (error) console.error("[db] saveCategories error:", error.message);
+  } catch (e) { console.error("[db] saveCategories exception:", e); }
+}
+
+export async function dbGetAllCategories(): Promise<Category[]> {
+  return dbLoadCategories();
+}
+
+export async function dbGetActiveCategories(): Promise<Category[]> {
+  return (await dbLoadCategories()).filter(c => c.active).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export async function dbCreateCategory(fields: Omit<Category, "id">): Promise<Category> {
+  const cats = await dbLoadCategories();
+  const cat: Category = { id: `cat_${Date.now()}`, ...fields };
+  cats.push(cat);
+  cats.sort((a, b) => a.sortOrder - b.sortOrder);
+  await dbSaveCategoriesList(cats);
+  return cat;
+}
+
+export async function dbUpdateCategory(id: string, fields: Partial<Omit<Category, "id">>): Promise<Category | undefined> {
+  const cats = await dbLoadCategories();
+  const idx = cats.findIndex(c => c.id === id);
+  if (idx === -1) return undefined;
+  cats[idx] = { ...cats[idx], ...fields };
+  await dbSaveCategoriesList(cats);
+  return cats[idx];
+}
+
+export async function dbDeleteCategory(id: string): Promise<boolean> {
+  const cats = await dbLoadCategories();
+  const idx = cats.findIndex(c => c.id === id);
+  if (idx === -1) return false;
+  cats.splice(idx, 1);
+  await dbSaveCategoriesList(cats);
+  return true;
+}
+
+export async function dbReorderCategories(orderedIds: string[]): Promise<void> {
+  const cats = await dbLoadCategories();
+  orderedIds.forEach((id, i) => {
+    const c = cats.find(x => x.id === id);
+    if (c) c.sortOrder = i;
+  });
+  await dbSaveCategoriesList(cats);
 }
 
 // ── Supabase REST fetch helpers (bypass JS client — guaranteed to work) ────────
@@ -397,6 +690,12 @@ export async function dbSaveUser(user: MockUser): Promise<void> {
   if (!ok) console.error("[db] dbSaveUser failed for", user.id);
 }
 
+export async function dbGetUserByResetToken(token: string): Promise<MockUser | undefined> {
+  const rows = await supaGet("csl_users", "order=id.asc&limit=5000");
+  const match = rows.find((r: any) => r.data?.resetToken === token);
+  return match ? (match.data as MockUser) : undefined;
+}
+
 // ── Orders ────────────────────────────────────────────────────────────────────
 
 export async function dbGetOrder(id: string): Promise<MockOrder | undefined> {
@@ -437,4 +736,157 @@ export async function dbUpdateOrder(id: string, patch: Partial<MockOrder>): Prom
   const ok = await supaUpdate("csl_orders", id, updated);
   if (!ok) console.error("[db] dbUpdateOrder failed for", id);
   return updated;
+}
+
+// ── Drivers (stored in csl_settings id=1 under "drivers" key) ─────────────────
+
+import type { MockDriver } from "../app/api/_mock/store";
+
+function getDefaultDriverMap(): Record<string, MockDriver> {
+  const seeds = [
+    { id: "d1", name: "Marcus T.", phone: "5124441001", email: "marcus@csl.com", username: "marcus", pin: "1234", lat: null, lng: null, totalDeliveries: 0, totalEarnings: 0, rating: 5.0, isOnline: false },
+    { id: "d2", name: "Sarah J.",  phone: "5124441002", email: "sarah@csl.com",  username: "sarah",  pin: "5678", lat: null, lng: null, totalDeliveries: 0, totalEarnings: 0, rating: 5.0, isOnline: false },
+    { id: "d3", name: "James R.",  phone: "5124441003", email: "james@csl.com",  username: "james",  pin: "9012", lat: null, lng: null, totalDeliveries: 0, totalEarnings: 0, rating: 5.0, isOnline: false },
+  ];
+  const map: Record<string, MockDriver> = {};
+  for (const s of seeds) {
+    map[s.id] = { ...s, active: true, passwordHash: Buffer.from(s.pin).toString("base64"), locationUpdatedAt: null, currentOrderId: null, createdAt: new Date("2024-01-01").toISOString() };
+  }
+  return map;
+}
+
+async function dbLoadDriverMap(): Promise<Record<string, MockDriver>> {
+  const t = tbl("csl_settings");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").eq("id", 1).maybeSingle();
+      if (!error && data?.data?.drivers !== undefined) return data.data.drivers as Record<string, MockDriver>;
+      // Supabase connected but no drivers key yet — seed defaults into Supabase now
+      if (!error) {
+        const defaults = getDefaultDriverMap();
+        const current = (data?.data ?? {}) as Record<string, unknown>;
+        await t.upsert({ id: 1, data: { ...current, drivers: defaults } }, { onConflict: "id" });
+        return defaults;
+      }
+    } catch (e) { console.error("[db] loadDrivers exception:", e); }
+  }
+  return getDefaultDriverMap();
+}
+
+async function dbSaveDriverMap(map: Record<string, MockDriver>): Promise<void> {
+  const t = tbl("csl_settings");
+  if (!t) return;
+  try {
+    const { data } = await t.select("data").eq("id", 1).maybeSingle();
+    const current = (data?.data ?? {}) as Record<string, unknown>;
+    const { error } = await t.upsert({ id: 1, data: { ...current, drivers: map } }, { onConflict: "id" });
+    if (error) console.error("[db] saveDriverMap error:", error.message);
+  } catch (e) { console.error("[db] saveDriverMap exception:", e); }
+}
+
+export async function dbGetAllDrivers(): Promise<MockDriver[]> {
+  return Object.values(await dbLoadDriverMap());
+}
+
+export async function dbGetDriver(id: string): Promise<MockDriver | undefined> {
+  return (await dbLoadDriverMap())[id];
+}
+
+export async function dbGetDriverByUsername(username: string): Promise<MockDriver | undefined> {
+  const map = await dbLoadDriverMap();
+  return Object.values(map).find(d => d.username.toLowerCase() === username.toLowerCase());
+}
+
+export async function dbSaveDriver(driver: MockDriver): Promise<MockDriver> {
+  const map = await dbLoadDriverMap();
+  map[driver.id] = driver;
+  await dbSaveDriverMap(map);
+  return driver;
+}
+
+export async function dbDeleteDriver(id: string): Promise<boolean> {
+  const map = await dbLoadDriverMap();
+  if (!map[id]) return false;
+  delete map[id];
+  await dbSaveDriverMap(map);
+  return true;
+}
+
+export async function dbValidateDriverPin(username: string, pin: string): Promise<MockDriver | undefined> {
+  const driver = await dbGetDriverByUsername(username);
+  return driver && driver.pin === pin ? driver : undefined;
+}
+
+// ── Bundle Tiers (stored in csl_settings id=1 under "bundleTiers" key) ─────────
+
+import type { MockBundleTier } from "../app/api/_mock/store";
+
+function getDefaultBundleTiers(): MockBundleTier[] {
+  return [
+    { id: "bt1", minQty: 2, discountPct: 5,  label: "Buy 2+ bottles — Save 5%",  active: true, sortOrder: 1 },
+    { id: "bt2", minQty: 3, discountPct: 10, label: "Buy 3+ bottles — Save 10%", active: true, sortOrder: 2 },
+    { id: "bt3", minQty: 6, discountPct: 15, label: "Buy 6+ bottles — Save 15%", active: true, sortOrder: 3 },
+  ];
+}
+
+async function dbLoadBundleTiers(): Promise<MockBundleTier[]> {
+  const t = tbl("csl_settings");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").eq("id", 1).maybeSingle();
+      if (!error && data?.data?.bundleTiers !== undefined) return data.data.bundleTiers as MockBundleTier[];
+      if (!error) {
+        const defaults = getDefaultBundleTiers();
+        const current = (data?.data ?? {}) as Record<string, unknown>;
+        await t.upsert({ id: 1, data: { ...current, bundleTiers: defaults } }, { onConflict: "id" });
+        return defaults;
+      }
+    } catch (e) { console.error("[db] loadBundleTiers exception:", e); }
+  }
+  return store.getAllBundleTiers();
+}
+
+async function dbSaveBundleTiers(tiers: MockBundleTier[]): Promise<void> {
+  const t = tbl("csl_settings");
+  if (!t) return;
+  try {
+    const { data } = await t.select("data").eq("id", 1).maybeSingle();
+    const current = (data?.data ?? {}) as Record<string, unknown>;
+    const { error } = await t.upsert({ id: 1, data: { ...current, bundleTiers: tiers } }, { onConflict: "id" });
+    if (error) console.error("[db] saveBundleTiers error:", error.message);
+  } catch (e) { console.error("[db] saveBundleTiers exception:", e); }
+}
+
+export async function dbGetAllBundleTiers(): Promise<MockBundleTier[]> {
+  return dbLoadBundleTiers();
+}
+
+export async function dbGetActiveBundleTiers(): Promise<MockBundleTier[]> {
+  return (await dbLoadBundleTiers()).filter(t => t.active);
+}
+
+export async function dbCreateBundleTier(fields: Omit<MockBundleTier, "id">): Promise<MockBundleTier> {
+  const tiers = await dbLoadBundleTiers();
+  const tier: MockBundleTier = { id: `bt${Date.now()}`, ...fields };
+  tiers.push(tier);
+  await dbSaveBundleTiers(tiers);
+  return tier;
+}
+
+export async function dbUpdateBundleTier(id: string, fields: Partial<MockBundleTier>): Promise<MockBundleTier | undefined> {
+  const tiers = await dbLoadBundleTiers();
+  const idx = tiers.findIndex(t => t.id === id);
+  if (idx === -1) return undefined;
+  tiers[idx] = { ...tiers[idx], ...fields };
+  await dbSaveBundleTiers(tiers);
+  return tiers[idx];
+}
+
+export async function dbDeleteBundleTier(id: string): Promise<boolean> {
+  const tiers = await dbLoadBundleTiers();
+  const idx = tiers.findIndex(t => t.id === id);
+  if (idx === -1) return false;
+  tiers.splice(idx, 1);
+  await dbSaveBundleTiers(tiers);
+  return true;
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Trash2, Plus, Minus, Tag, Gift, Star, Truck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/cartStore";
+import { useAuthStore } from "@/store/authStore";
 import {
   formatCurrency,
   calcCartTotals,
@@ -20,6 +21,8 @@ export function CartView() {
     setCoupon, setGiftCard, setRewardsRedeem,
     couponCode, couponDiscount, giftCardCode, giftCardAmount, rewardsPointsToRedeem,
   } = useCartStore();
+  const { user, isLoggedIn } = useAuthStore();
+  const userPoints = user?.points ?? 0;
 
   const [couponInput, setCouponInput] = useState(couponCode ?? "");
   const [giftInput, setGiftInput] = useState(giftCardCode ?? "");
@@ -34,9 +37,7 @@ export function CartView() {
     bundleTiers,
   );
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
-  const rewardsDiscount = rewardsPointsToRedeem >= 100
-    ? Math.floor(rewardsPointsToRedeem / 100) * 5
-    : 0;
+  const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   const { tax, total, appliedGiftCard } = calcCartTotals(
     subtotal, couponDiscount + bundleDiscount, rewardsDiscount, giftCardAmount,
   );
@@ -81,7 +82,10 @@ export function CartView() {
       });
       if (res.ok) {
         const { balance } = await res.json();
-        setGiftCard(giftInput, balance);
+        // Cap to pre-gift-card total so card isn't over-charged
+        const preGiftTotal = Math.max(0, subtotal - couponDiscount - bundleDiscount - rewardsDiscount + tax);
+        const appliedAmount = Math.min(balance, preGiftTotal);
+        setGiftCard(giftInput, Math.round(appliedAmount * 100) / 100);
       } else {
         alert("Invalid or empty gift card.");
       }
@@ -220,29 +224,38 @@ export function CartView() {
           )}
         </div>
 
-        {/* CS Rewards redeem */}
-        <div className="bg-white border rounded-xl p-4">
-          <p className="font-semibold mb-3 flex items-center gap-2 text-sm">
-            <Star size={15} className="text-brand-500" /> CS Rewards Points
-          </p>
-          <div className="space-y-2">
-            {[0, 100, 250, 500, 1000].map((pts) => (
+        {/* CS Rewards redeem — only show if logged in with redeemable points */}
+        {isLoggedIn && userPoints >= 250 && (
+          <div className="bg-white border rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-semibold flex items-center gap-2 text-sm">
+                <Star size={15} className="text-brand-500" /> CS Rewards Points
+              </p>
+              <span className="text-xs text-gray-500 font-medium">{userPoints.toLocaleString()} pts available</span>
+            </div>
+            <div className="space-y-2">
               <button
-                key={pts}
-                onClick={() => setRewardsRedeem(pts)}
+                onClick={() => setRewardsRedeem(0)}
                 className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
-                  rewardsPointsToRedeem === pts
-                    ? "bg-brand-500 text-white border-brand-500"
-                    : "hover:bg-gray-50"
+                  rewardsPointsToRedeem === 0 ? "bg-brand-500 text-white border-brand-500" : "hover:bg-gray-50"
                 }`}
               >
-                {pts === 0
-                  ? "Don't use points"
-                  : `${pts} Points = ${formatCurrency(calcPointsValue(pts))} Off`}
+                Don&apos;t use points
               </button>
-            ))}
+              {([250, 500, 1000] as const).filter(pts => userPoints >= pts).map((pts) => (
+                <button
+                  key={pts}
+                  onClick={() => setRewardsRedeem(pts)}
+                  className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
+                    rewardsPointsToRedeem === pts ? "bg-brand-500 text-white border-brand-500" : "hover:bg-gray-50"
+                  }`}
+                >
+                  {pts} Points = {formatCurrency(calcPointsValue(pts))} Off
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Order Total */}
         <div className="bg-white border rounded-xl p-4 space-y-2.5">

@@ -1,31 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetAllProducts, dbSaveProduct } from "@/lib/db";
+import { dbGetProductsPage, dbSaveProduct, dbGetActiveFlashDeals } from "@/lib/db";
 import type { MockProduct } from "../_mock/store";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const q = searchParams.get("q")?.toLowerCase() ?? searchParams.get("search")?.toLowerCase();
-  const category = searchParams.get("category");
+  const q = searchParams.get("q") ?? searchParams.get("search") ?? undefined;
+  const category = searchParams.get("category") ?? undefined;
   const minPrice = Number(searchParams.get("minPrice") || 0);
   const maxPrice = Number(searchParams.get("maxPrice") || 999999);
-  const page = Number(searchParams.get("page") || 1);
-  const limit = Number(searchParams.get("limit") || 12);
+  const page = Math.max(Number(searchParams.get("page") || 1), 1);
+  const limit = Math.min(Math.max(Number(searchParams.get("limit") || 12), 1), 100);
   const featured = searchParams.get("featured");
-  const activeOnly = searchParams.get("activeOnly") !== "false";
+  const sale = searchParams.get("sale");
+  const flashdeal = searchParams.get("flashdeal");
+  const bundle = searchParams.get("bundle");
+  const offset = (page - 1) * limit;
 
-  let results = await dbGetAllProducts();
+  const needsSale = sale === "true";
+  const needsFlashdeal = flashdeal === "true";
 
-  // Website-facing: only show products with stock
-  if (activeOnly) results = results.filter((p) => p.stockQty > 0);
-  if (q) results = results.filter((p) => p.name.toLowerCase().includes(q) || (p.brand ?? "").toLowerCase().includes(q));
-  if (category) results = results.filter((p) => p.category === category);
-  if (featured === "true") results = results.filter((p) => p.featured);
-  results = results.filter((p) => p.price >= minPrice && p.price <= maxPrice);
+  // flash deal: needs special handling — build from flash deal store + product lookup
+  if (needsFlashdeal) {
+    const activeDeals = await dbGetActiveFlashDeals();
+    const productById   = new Map<string, MockProduct>();
+    const productBySlug = new Map<string, MockProduct>();
+    // Fetch all in-stock products for lookup (paginate to cover all)
+    const { products: allProds } = await dbGetProductsPage({ limit: 3000, offset: 0, stock: "in" });
+    allProds.forEach(p => { productById.set(p.id, p); productBySlug.set(p.slug, p); });
+    const flashProducts = activeDeals.map(deal => {
+      const real = (deal.productId ? productById.get(deal.productId) : undefined)
+                ?? productBySlug.get(deal.slug);
+      if (real) return { ...real, salePrice: deal.salePrice };
+      return {
+        id: deal.id, slug: deal.slug, name: deal.name, brand: deal.brand,
+        category: "other", price: deal.price, salePrice: deal.salePrice,
+        volume: deal.volume, stockQty: deal.stockQty, inStock: deal.stockQty > 0,
+        featured: false, bundleEligible: false, active: true,
+        rating: 0, reviewCount: 0, description: "", imageUrl: deal.imageUrl,
+        abv: 0, country: "",
+      } as MockProduct;
+    });
+    const total = flashProducts.length;
+    return NextResponse.json({ products: flashProducts, data: flashProducts, total, page: 1, pageSize: total, limit: total, totalPages: 1 });
+  }
 
-  const total = results.length;
-  const data = results.slice((page - 1) * limit, page * limit);
+  // sale: requires in-memory filter (salePrice comparison can't be done in Supabase JSON query)
+  if (needsSale) {
+    const { products: allProds } = await dbGetProductsPage({ limit: 3000, offset: 0, q, category, stock: "in" });
+    let filtered = allProds.filter(p => p.salePrice !== null && p.salePrice < p.price);
+    if (minPrice > 0) filtered = filtered.filter(p => p.price >= minPrice);
+    if (maxPrice < 999999) filtered = filtered.filter(p => p.price <= maxPrice);
+    const total = filtered.length;
+    const products = filtered.slice(offset, offset + limit);
+    return NextResponse.json({ products, data: products, total, page, pageSize: limit, limit, totalPages: Math.ceil(total / limit) });
+  }
 
-  return NextResponse.json({ products: data, data, total, page, pageSize: limit, limit, totalPages: Math.ceil(total / limit) });
+  // bundle / featured / normal: all handled at DB level now
+  let { products, total } = await dbGetProductsPage({
+    limit,
+    offset,
+    q,
+    category,
+    stock: "in",
+    bundleEligible: bundle === "true" ? true : undefined,
+    featured: featured === "true" ? true : undefined,
+  });
+
+  if (minPrice > 0) products = products.filter(p => p.price >= minPrice);
+  if (maxPrice < 999999) products = products.filter(p => p.price <= maxPrice);
+
+  return NextResponse.json({ products, data: products, total, page, pageSize: limit, limit, totalPages: Math.ceil(total / limit) });
 }
 
 export async function POST(req: NextRequest) {

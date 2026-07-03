@@ -24,7 +24,7 @@ export function RewardsHero() {
         <div className="flex flex-wrap justify-center gap-8 mb-10">
           {[
             { icon: Star, label: "Earn Points", desc: "$1 spent = 1 point" },
-            { icon: Gift, label: "Redeem Rewards", desc: "100 pts = $5 off" },
+            { icon: Gift, label: "Redeem Rewards", desc: "250 pts = $5 off" },
             { icon: Trophy, label: "Unlock VIP", desc: "Silver, Gold & Platinum" },
           ].map(({ icon: Icon, label, desc }) => (
             <div key={label} className="text-center">

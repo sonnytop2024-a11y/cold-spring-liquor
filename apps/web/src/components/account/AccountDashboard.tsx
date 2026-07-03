@@ -74,9 +74,16 @@ function LiveTracker({ order }: { order: any }) {
           );
         })}
       </div>
-      {live?.estimatedDelivery && (
-        <p className="mt-3 text-xs text-brand-600 font-medium flex items-center gap-1"><Clock size={11} /> ETA: {live.estimatedDelivery}</p>
-      )}
+      {live?.estimatedDelivery ? (
+        <p className="mt-3 text-xs text-brand-600 font-medium flex items-center gap-1">
+          <Clock size={11} /> ETA: {new Date(live.estimatedDelivery).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} or sooner
+        </p>
+      ) : live?.status === "pending" && live?.deliveryType === "same-day" ? (
+        <p className="mt-3 text-xs text-amber-700 font-medium flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
+          Confirming your order…
+        </p>
+      ) : null}
       <Link href={`/track/${order.id}`} className="block mt-3 text-center text-xs font-semibold text-brand-600 bg-white hover:bg-brand-50 border border-brand-200 rounded-lg py-1.5">
         Full Tracking View →
       </Link>
@@ -412,6 +419,12 @@ export function AccountDashboard() {
     refetchInterval: 30_000,
   });
 
+  const { data: availableCoupons = [] } = useQuery<{ code: string; type: string; value: number; label: string; minOrder: number | null }[]>({
+    queryKey: ["public-coupons"],
+    queryFn: async () => { try { const r = await fetch("/api/coupons"); return r.ok ? r.json() : []; } catch { return []; } },
+    staleTime: 60_000,
+  });
+
   const activeOrders = orders.filter((o: any) => ACTIVE_STATUSES.includes(o.status));
   const historyOrders = orders.filter((o: any) => !ACTIVE_STATUSES.includes(o.status));
 
@@ -460,19 +473,24 @@ export function AccountDashboard() {
 
           <SavedAddressCard />
 
-          {/* Available coupons teaser */}
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
-            <h3 className="font-semibold text-sm flex items-center gap-2 mb-2"><Tag size={14} className="text-green-600" /> Your Coupons</h3>
-            <div className="space-y-1.5">
-              {[{ code: "WELCOME10", label: "$10 off $50+" }, { code: "SUMMER15", label: "15% off $40+" }, { code: "PARTY25", label: "25% off $150+" }].map(c => (
-                <div key={c.code} className="flex items-center justify-between">
-                  <code className="text-xs font-bold bg-white border border-green-200 text-green-700 px-2 py-0.5 rounded">{c.code}</code>
-                  <span className="text-xs text-gray-500">{c.label}</span>
-                </div>
-              ))}
+          {/* Available coupons */}
+          {availableCoupons.length > 0 && (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+              <h3 className="font-semibold text-sm flex items-center gap-2 mb-2"><Tag size={14} className="text-green-600" /> Available Coupons</h3>
+              <div className="space-y-1.5">
+                {availableCoupons.map(c => (
+                  <div key={c.code} className="flex items-center justify-between gap-2">
+                    <code className="text-xs font-bold bg-white border border-green-200 text-green-700 px-2 py-0.5 rounded shrink-0">{c.code}</code>
+                    <span className="text-xs text-gray-500 text-right">
+                      {c.label ?? (c.type === "fixed" ? `$${c.value} off` : `${c.value}% off`)}
+                      {c.minOrder ? ` $${c.minOrder}+` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Link href="/checkout" className="block mt-3 text-xs text-center text-green-700 font-semibold hover:underline">Use at checkout →</Link>
             </div>
-            <Link href="/checkout" className="block mt-3 text-xs text-center text-green-700 font-semibold hover:underline">Use at checkout →</Link>
-          </div>
+          )}
         </div>
 
         {/* Orders section */}
@@ -499,7 +517,7 @@ export function AccountDashboard() {
               </div>
             )}
             <div className="grid grid-cols-3 gap-2">
-              {[["Value", `$${(points * 0.01).toFixed(0)}`], ["Earn rate", "10 pts/$1"], ["Redeem at", "100 pts"]].map(([l, v]) => (
+              {[["Value", points >= 250 ? `$${points >= 1000 ? 20 : points >= 500 ? 10 : 5} avail` : "Earn more"], ["Earn rate", "1 pt/$1"], ["Redeem at", "250 pts"]].map(([l, v]) => (
                 <div key={l} className="bg-white/10 rounded-lg px-2 py-1.5 text-center">
                   <p className="font-bold text-sm">{v}</p>
                   <p className="text-xs text-brand-200">{l}</p>

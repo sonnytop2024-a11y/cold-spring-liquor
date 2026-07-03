@@ -22,17 +22,19 @@ interface PreviewUpdated {
 interface ImportError { row: number; message: string; name?: string }
 interface PreviewResult {
   preview: true;
-  newCount: number; updateCount: number; errorCount: number;
+  newCount: number; updateCount: number; deleteCount: number; errorCount: number;
   newProducts: PreviewProduct[];
   updatedProducts: PreviewUpdated[];
+  deleteProducts: PreviewProduct[];
   errors: ImportError[];
 }
 interface ConfirmResult {
-  success: true; added: number; updated: number; skipped: number;
+  success: true; added: number; updated: number; deleted: number; skipped: number;
   errors: ImportError[];
 }
 
 type Step = "upload" | "parsing" | "preview" | "confirming" | "done";
+type PreviewTab = "new" | "updated" | "delete" | "errors";
 
 // ── CSV parser (native, no deps) ──────────────────────────────────────────────
 
@@ -123,7 +125,7 @@ export function ImportModal({ onClose, onDone }: Props) {
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [result, setResult] = useState<ConfirmResult | null>(null);
-  const [activeTab, setActiveTab] = useState<"new" | "updated" | "errors">("new");
+  const [activeTab, setActiveTab] = useState<PreviewTab>("new");
   const [isDragOver, setIsDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -154,7 +156,7 @@ export function ImportModal({ onClose, onDone }: Props) {
       if (!res.ok) throw new Error("Server error during preview");
       const data = (await res.json()) as PreviewResult;
       setPreview(data);
-      setActiveTab(data.newCount > 0 ? "new" : data.updateCount > 0 ? "updated" : "errors");
+      setActiveTab(data.newCount > 0 ? "new" : data.updateCount > 0 ? "updated" : data.deleteCount > 0 ? "delete" : "errors");
       setStep("preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Parse error");
@@ -180,6 +182,7 @@ export function ImportModal({ onClose, onDone }: Props) {
           rows: [
             ...preview.newProducts,
             ...preview.updatedProducts.map((u) => u.product),
+            ...preview.deleteProducts.map((p) => ({ ...p, action: "0" })),
           ],
           confirm: true,
         }),
@@ -294,9 +297,10 @@ export function ImportModal({ onClose, onDone }: Props) {
   // ── Preview screen ────────────────────────────────────────────────────────────
   if ((step === "preview" || step === "confirming") && preview) {
     const tabs = [
-      { key: "new" as const, label: "New Products", count: preview.newCount, color: "green" },
-      { key: "updated" as const, label: "Updates", count: preview.updateCount, color: "blue" },
-      { key: "errors" as const, label: "Errors / Skipped", count: preview.errorCount, color: "red" },
+      { key: "new" as const,    label: "New Products",   count: preview.newCount,    color: "green"  },
+      { key: "updated" as const, label: "Updates",       count: preview.updateCount, color: "blue"   },
+      { key: "delete" as const,  label: "Delete",        count: preview.deleteCount, color: "orange" },
+      { key: "errors" as const,  label: "Errors / Skipped", count: preview.errorCount, color: "red" },
     ];
 
     return (
@@ -312,6 +316,12 @@ export function ImportModal({ onClose, onDone }: Props) {
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
               <span className="text-sm"><strong>{preview.updateCount}</strong> updates</span>
             </div>
+            {preview.deleteCount > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                <span className="text-sm text-orange-700"><strong>{preview.deleteCount}</strong> will be deleted</span>
+              </div>
+            )}
             {preview.errorCount > 0 && (
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
@@ -338,8 +348,9 @@ export function ImportModal({ onClose, onDone }: Props) {
               {t.count > 0 && (
                 <span
                   className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold ${
-                    t.key === "new" ? "bg-green-100 text-green-700" :
+                    t.key === "new"     ? "bg-green-100 text-green-700" :
                     t.key === "updated" ? "bg-blue-100 text-blue-700" :
+                    t.key === "delete"  ? "bg-orange-100 text-orange-700" :
                     "bg-red-100 text-red-700"
                   }`}
                 >
@@ -414,6 +425,34 @@ export function ImportModal({ onClose, onDone }: Props) {
             </table>
           )}
 
+          {activeTab === "delete" && (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-orange-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-2.5 font-medium text-orange-700">Product to Delete</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-orange-700">Category</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-orange-700">Price</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-orange-700">Stock</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {(preview.deleteProducts ?? []).length === 0 ? (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No products marked for deletion</td></tr>
+                ) : (preview.deleteProducts ?? []).map((p, i) => (
+                  <tr key={i} className="hover:bg-orange-50/60 bg-red-50/20">
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium text-gray-800 line-through decoration-red-400">{p.name}</p>
+                      <p className="text-xs text-gray-400">{p.brand} · {p.volume}</p>
+                    </td>
+                    <td className="px-4 py-2.5 capitalize text-gray-500 text-xs">{p.category}</td>
+                    <td className="px-4 py-2.5 text-gray-500">${p.price.toFixed(2)}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{p.stockQty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
           {activeTab === "errors" && (
             <div className="divide-y">
               {preview.errors.length === 0 ? (
@@ -453,13 +492,13 @@ export function ImportModal({ onClose, onDone }: Props) {
             </button>
             <button
               onClick={handleConfirm}
-              disabled={step === "confirming" || (preview.newCount + preview.updateCount === 0)}
+              disabled={step === "confirming" || (preview.newCount + preview.updateCount + preview.deleteCount === 0)}
               className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl text-sm font-bold transition-colors"
             >
               {step === "confirming" ? (
                 <><Loader2 size={15} className="animate-spin" /> Importing…</>
               ) : (
-                <><ChevronRight size={15} /> Confirm Import ({preview.newCount + preview.updateCount} products)</>
+                <><ChevronRight size={15} /> Confirm ({preview.newCount + preview.updateCount} changes{preview.deleteCount > 0 ? ` · ${preview.deleteCount} deletions` : ""})</>
               )}
             </button>
           </div>
@@ -479,18 +518,22 @@ export function ImportModal({ onClose, onDone }: Props) {
             <p className="text-gray-500 text-sm">{fileName} has been processed</p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-4 gap-3 text-center">
             <div className="bg-green-50 rounded-xl p-4">
               <p className="text-3xl font-black text-green-600">{result.added}</p>
-              <p className="text-xs font-semibold text-green-700 mt-1">Products Added</p>
+              <p className="text-xs font-semibold text-green-700 mt-1">Added</p>
             </div>
             <div className="bg-blue-50 rounded-xl p-4">
               <p className="text-3xl font-black text-blue-600">{result.updated}</p>
-              <p className="text-xs font-semibold text-blue-700 mt-1">Products Updated</p>
+              <p className="text-xs font-semibold text-blue-700 mt-1">Updated</p>
+            </div>
+            <div className="bg-orange-50 rounded-xl p-4">
+              <p className="text-3xl font-black text-orange-600">{result.deleted ?? 0}</p>
+              <p className="text-xs font-semibold text-orange-700 mt-1">Deleted</p>
             </div>
             <div className="bg-gray-100 rounded-xl p-4">
               <p className="text-3xl font-black text-gray-500">{result.skipped}</p>
-              <p className="text-xs font-semibold text-gray-500 mt-1">Skipped (errors)</p>
+              <p className="text-xs font-semibold text-gray-500 mt-1">Skipped</p>
             </div>
           </div>
 

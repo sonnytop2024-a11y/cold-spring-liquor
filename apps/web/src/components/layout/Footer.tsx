@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { MapPin, Phone, Clock, Truck } from "lucide-react";
 import { dbGetSettings } from "@/lib/db";
 
@@ -17,34 +18,28 @@ export async function Footer() {
     : "Mon–Sat 10am–9pm";
 
   return (
-    <footer className="bg-dark-900 text-gray-400 pt-14 pb-6 mt-16">
-      {/* FREE delivery strip */}
-      <div className="border-y border-white/10 bg-brand-600/10 py-5 mb-10">
-        <div className="container-main">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
-            <div>
-              <p className="text-2xl font-bold text-white">$0</p>
-              <p className="text-sm text-brand-300 font-medium">Delivery Fee — Always Free</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">$0</p>
-              <p className="text-sm text-brand-300 font-medium">Tip Required — Never</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">10–30 min</p>
-              <p className="text-sm text-brand-300 font-medium">Delivery Time</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <footer className="bg-dark-900 text-gray-400 pt-14 pb-6">
 
       <div className="container-main">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           {/* Brand */}
           <div>
-            <h3 className="font-heading text-white text-lg font-bold mb-1">{storeName}</h3>
-            <p className="text-brand-400 text-xs font-semibold mb-4">FREE Delivery · NO Tip Required</p>
-            <div className="space-y-2 text-sm">
+            <div className="flex items-start gap-3 mb-4">
+              {/* Storefront photo */}
+              <div className="shrink-0">
+                <Image
+                  src="/store-front.jpg"
+                  alt="Cold Spring Liquor store front"
+                  width={130}
+                  height={130}
+                  className="rounded-xl shadow-md border border-white/10 object-contain w-[110px] sm:w-[130px] h-auto"
+                />
+              </div>
+              {/* Store info */}
+              <div className="min-w-0">
+                <h3 className="font-heading text-white text-base font-bold mb-0.5 leading-tight">{storeName}</h3>
+                <p className="text-brand-400 text-xs font-semibold mb-2">FREE Delivery · NO Tip Required</p>
+                <div className="space-y-1.5 text-sm">
               <div className="flex items-start gap-2">
                 <MapPin size={14} className="mt-0.5 text-brand-400 shrink-0" />
                 <span>{storeAddress}</span>
@@ -65,6 +60,8 @@ export async function Footer() {
                 <Clock size={14} className="mt-0.5 text-brand-400 shrink-0" />
                 <span>{hoursLine}<br />{sundayClosed ? "Sunday: Closed" : `Sunday: ${fmtTime(bh["Sunday"]?.open ?? "10:00")}–${fmtTime(bh["Sunday"]?.close ?? "22:00")}`}</span>
               </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -83,7 +80,7 @@ export async function Footer() {
                 </li>
               ))}
               <li>
-                <Link href="/products?sale=true" className="text-brand-400 hover:text-brand-300 transition-colors">
+                <Link href="/products?flashdeal=true" className="text-brand-400 hover:text-brand-300 transition-colors">
                   Deals & Specials
                 </Link>
               </li>

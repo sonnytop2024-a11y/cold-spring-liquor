@@ -20,6 +20,17 @@ export interface MockOrder {
   bundleDiscount: number;
   couponDiscount: number;
   couponCode?: string;
+  rewardsDiscount?: number;
+  rewardsPointsToRedeem?: number;
+  giftCardCode?: string;
+  giftCardAmount?: number;
+  paymentMethod?: string;
+  stripePaymentIntentId?: string;
+  stripeRefundId?: string;
+  refundStatus?: string;
+  refundedAt?: string;
+  refundedAmount?: number;
+  paypalOrderId?: string;
   tax: number;
   total: number;
   deliveryFee: number;
@@ -55,7 +66,7 @@ export interface MockOrder {
   etaMinutes?: number;
   createdAt: string;
   updatedAt: string;
-  estimatedDelivery: string;
+  estimatedDelivery: string | null;
 }
 
 export interface MockProduct {
@@ -78,6 +89,9 @@ export interface MockUser {
   billingAddress?: SavedAddress;
   billingAddressSameAsDelivery?: boolean;
   googleId?: string;
+  resetToken?: string;
+  resetTokenExpiry?: string;
+  savedCart?: Array<{ product: Record<string, unknown>; quantity: number }>;
 }
 
 export interface MockDriver {
@@ -447,6 +461,10 @@ export const store = {
   updateUserProfile(id: string, fields: Partial<Pick<MockUser, "name"|"phone"|"email"|"dob"|"deliveryAddress"|"billingAddress"|"billingAddressSameAsDelivery">>): MockUser | undefined {
     const data = read(); const user = data.users[id]; if (!user) return undefined;
     Object.assign(user, fields); write(data); return user;
+  },
+  updateUserCart(id: string, cart: MockUser["savedCart"]): MockUser | undefined {
+    const data = read(); const user = data.users[id]; if (!user) return undefined;
+    user.savedCart = cart; write(data); return user;
   },
   getUserByPhone(phone: string): MockUser | undefined {
     const clean = phone.replace(/\D/g, "");

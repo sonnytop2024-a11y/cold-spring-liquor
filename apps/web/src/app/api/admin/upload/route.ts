@@ -6,22 +6,28 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB raw input limit
 const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const BUCKET = "csl-images";
 
-// Output: 800×800 WebP, quality 85, white background, bottle centered
-async function processImage(buffer: ArrayBuffer): Promise<Buffer> {
+// Product images: 800×800 square, white background, bottle centered
+async function processProductImage(buffer: ArrayBuffer): Promise<Buffer> {
   const input = Buffer.from(buffer);
   return sharp(input)
-    .trim({ background: "#FFFFFF", threshold: 15 }) // strip excess whitespace
-    .resize(800, 800, {
-      fit: "cover",
-      position: "centre",
-    })
-    .flatten({ background: { r: 255, g: 255, b: 255 } }) // remove transparency → white
+    .trim({ background: "#FFFFFF", threshold: 15 })
+    .resize(800, 800, { fit: "cover", position: "centre" })
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
     .toFormat("webp", { quality: 85, effort: 4 })
     .toBuffer();
 }
 
+// Banner images: max 1600px wide, preserve aspect ratio, no crop
+async function processBannerImage(buffer: ArrayBuffer): Promise<Buffer> {
+  const input = Buffer.from(buffer);
+  return sharp(input)
+    .resize(1600, undefined, { fit: "inside", withoutEnlargement: true })
+    .toFormat("webp", { quality: 88, effort: 4 })
+    .toBuffer();
+}
+
 export async function POST(req: NextRequest) {
-  try {
+try {
     const formData = await req.formData();
     const file = formData.get("image");
     const rawFolder = req.nextUrl.searchParams.get("folder") ?? "products";
@@ -47,7 +53,9 @@ export async function POST(req: NextRequest) {
     }
 
     const rawBytes = await f.arrayBuffer();
-    const processed = await processImage(rawBytes);
+    const processed = folder === "banners"
+      ? await processBannerImage(rawBytes)
+      : await processProductImage(rawBytes);
 
     const safeName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
 
@@ -68,7 +76,6 @@ export async function POST(req: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: { publicUrl } } = (sb as any).storage.from(BUCKET).getPublicUrl(safeName);
-    console.log(`[upload] processed & saved ${safeName} → ${publicUrl}`);
     return NextResponse.json({ url: publicUrl });
   } catch (err) {
     console.error("[upload] error:", err);
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  try {
+try {
     const { url } = await req.json();
     if (!url || typeof url !== "string") return NextResponse.json({ ok: true });
     const sb = supabaseServer();

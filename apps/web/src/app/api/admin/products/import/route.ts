@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetAllProducts, dbSaveManyProducts } from "@/lib/db";
+import { dbGetAllProducts, dbSaveManyProducts, dbDeleteProduct } from "@/lib/db";
 import type { MockProduct } from "../../../_mock/store";
 
 const VALID_CATEGORIES = [
@@ -81,14 +81,13 @@ interface PreviewUpdated {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json() as { rows: Record<string, unknown>[]; confirm?: boolean };
+const body = await req.json() as { rows: Record<string, unknown>[]; confirm?: boolean };
   const { rows, confirm = false } = body;
 
   if (!Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: "No rows provided" }, { status: 400 });
   }
 
-  console.log(`[import] Processing ${rows.length} rows, confirm=${confirm}`);
 
   // Load existing products for dedup
   const existing = await dbGetAllProducts();
@@ -99,11 +98,15 @@ export async function POST(req: NextRequest) {
 
   const newProducts: PreviewProduct[] = [];
   const updatedProducts: PreviewUpdated[] = [];
+  const deleteProducts: PreviewProduct[] = [];
   const errors: ImportError[] = [];
 
   rows.forEach((raw, i) => {
     const rowNum = i + 2; // 1-based + header row
 
+    // Read action directly — bypass pick() because "0" must not be skipped
+    const rawAction = raw["action"] ?? raw["Action"] ?? "";
+    const action = String(rawAction).toLowerCase().trim();
     const sku         = pick(raw, "sku", "id", "productid", "product_id", "item_id");
     const name        = pick(raw, "name", "productname", "product name", "title", "item", "product");
     const brand       = pick(raw, "brand", "manufacturer", "maker", "distillery", "brewery") ?? "";
@@ -127,6 +130,19 @@ export async function POST(req: NextRequest) {
     const imageUrl    = pick(raw, "image url", "image", "photo", "img", "picture", "imageurl", "image_url") ?? null;
     const rawAbv      = pick(raw, "abv", "alcohol", "alcohol content", "proof", "alcohol%");
     const country     = pick(raw, "country", "origin", "made in", "region", "country of origin") ?? "USA";
+
+    // ── Handle delete action first (0 = delete) ──
+    if (action === "0" || action === "delete") {
+      let match: MockProduct | undefined;
+      if (sku) match = byId.get(sku.toLowerCase());
+      if (!match && name) match = byName.get(`${name?.toLowerCase()}|||${(pick(raw, "brand", "manufacturer", "maker", "distillery", "brewery") ?? "").toLowerCase()}`);
+      if (match) {
+        deleteProducts.push(match as PreviewProduct);
+      } else {
+        errors.push({ row: rowNum, name: name ?? sku, message: `action=delete but product not found` });
+      }
+      return;
+    }
 
     // ── Required: Product Name ──
     if (!name) {
@@ -167,7 +183,9 @@ export async function POST(req: NextRequest) {
     if (!match) match = byName.get(`${name.toLowerCase()}|||${brand.toLowerCase()}`);
 
     if (match) {
+      const newName = name.trim();
       const changes: string[] = [];
+      if (newName !== match.name) changes.push(`Name: "${match.name}" → "${newName}"`);
       if (Math.abs(match.price - price) >= 0.01) changes.push(`Price: $${match.price} → $${price}`);
       if (salePrice !== null && match.salePrice !== salePrice) changes.push(`Sale: $${match.salePrice ?? "–"} → $${salePrice}`);
       if (salePrice === null && match.salePrice !== null) changes.push("Sale price: removed");
@@ -177,8 +195,11 @@ export async function POST(req: NextRequest) {
       if (description && match.description !== description) changes.push("Description updated");
       if (match.category !== category) changes.push(`Category: ${match.category} → ${category}`);
 
+      if (changes.length === 0) return; // truly no changes — skip
+
       const updated: PreviewProduct = {
         ...match,
+        name: newName,
         brand: brand || match.brand,
         price,
         salePrice,
@@ -223,37 +244,46 @@ export async function POST(req: NextRequest) {
   });
 
   if (!confirm) {
-    console.log(`[import] Preview: ${newProducts.length} new, ${updatedProducts.length} updates, ${errors.length} errors`);
     return NextResponse.json({
       preview: true,
       newCount: newProducts.length,
       updateCount: updatedProducts.length,
+      deleteCount: deleteProducts.length,
       errorCount: errors.length,
       newProducts,
       updatedProducts,
+      deleteProducts,
       errors,
     });
   }
 
-  // ── Confirm: write to DB ──────────────────────────────────────────────────
+  // ── Confirm: write + delete ───────────────────────────────────────────────
   const toSave: MockProduct[] = [
     ...newProducts,
     ...updatedProducts.map((u) => u.product),
   ];
 
-  console.log(`[import] Saving ${toSave.length} products to DB...`);
   const { saved, errors: saveErrors } = await dbSaveManyProducts(toSave);
-  console.log(`[import] Saved ${saved} products. Errors: ${saveErrors.length}`);
+
+  let deleted = 0;
+  const deleteErrors: ImportError[] = [];
+  for (const p of deleteProducts) {
+    const ok = await dbDeleteProduct(p.id);
+    if (ok) deleted++;
+    else deleteErrors.push({ row: 0, name: p.name, message: `Failed to delete: ${p.name}` });
+  }
 
   return NextResponse.json({
     success: true,
     added: newProducts.length,
     updated: updatedProducts.length,
+    deleted,
     saved,
     skipped: errors.length,
     errors: [
       ...errors,
       ...saveErrors.map((e) => ({ row: 0, message: `DB save error: ${e}` })),
+      ...deleteErrors,
     ],
   });
 }

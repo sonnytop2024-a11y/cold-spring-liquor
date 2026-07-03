@@ -39,6 +39,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (deliveryConfirmations !== undefined) patch.deliveryConfirmations = deliveryConfirmations;
   if (status === "driver_arrived") patch.waitTimerStart = now;
 
+  // Set ETA only when order is first accepted (pending → confirmed) for same-day orders
+  if (status === "confirmed" && order.deliveryType === "same-day" && !order.estimatedDelivery) {
+    patch.estimatedDelivery = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  }
+
   const updated = await dbUpdateOrder(params.id, patch as any);
   if (!updated) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 

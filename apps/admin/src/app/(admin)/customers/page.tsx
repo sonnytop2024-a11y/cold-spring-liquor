@@ -162,13 +162,35 @@ function CustomerRow({ c }: { c: any }) {
                           <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
                             {new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                           </td>
-                          <td className="px-3 py-2.5 text-gray-700 max-w-[220px]">
-                            <p className="truncate">
-                              {o.items.slice(0, 2).map((i: any) => `${i.name} ×${i.quantity}`).join(", ")}
-                              {o.items.length > 2 && ` +${o.items.length - 2} more`}
-                            </p>
+                          <td className="px-3 py-2.5 text-gray-700 max-w-[260px]">
+                            <div className="flex flex-col gap-0.5">
+                              {o.items.slice(0, 3).map((i: any, idx: number) => (
+                                <p key={idx} className="text-xs leading-snug truncate">
+                                  {i.name} <span className="text-gray-400">×{i.quantity}</span>
+                                </p>
+                              ))}
+                              {o.items.length > 3 && (
+                                <p className="text-xs text-gray-400">+{o.items.length - 3} more</p>
+                              )}
+                            </div>
                           </td>
-                          <td className="px-3 py-2.5 font-semibold">${Number(o.total).toFixed(2)}</td>
+                          <td className="px-3 py-2.5">
+                            <p className="font-semibold">${Number(o.subtotal ?? o.total).toFixed(2)}</p>
+                            {Number(o.total) === 0 && Number(o.subtotal) > 0 ? (
+                              <p className="text-xs text-emerald-600 font-medium mt-0.5">Paid $0.00</p>
+                            ) : Number(o.total) < Number(o.subtotal ?? o.total) ? (
+                              <p className="text-xs text-emerald-600 mt-0.5">Paid ${Number(o.total).toFixed(2)}</p>
+                            ) : null}
+                            {Number(o.giftCardAmount) > 0 && (
+                              <p className="text-xs text-amber-600 mt-0.5">🎁 Gift ${Number(o.giftCardAmount).toFixed(2)}</p>
+                            )}
+                            {Number(o.rewardsDiscount) > 0 && (
+                              <p className="text-xs text-purple-600 mt-0.5">🏆 Rewards ${Number(o.rewardsDiscount).toFixed(2)}</p>
+                            )}
+                            {Number(o.couponDiscount) > 0 && (
+                              <p className="text-xs text-blue-600 mt-0.5">🏷️ Coupon ${Number(o.couponDiscount).toFixed(2)}</p>
+                            )}
+                          </td>
                           <td className="px-3 py-2.5">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[o.status] ?? "bg-gray-100 text-gray-600"}`}>
                               {STATUS_LABEL[o.status] ?? o.status}

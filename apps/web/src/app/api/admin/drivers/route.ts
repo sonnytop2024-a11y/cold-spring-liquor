@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { store } from "../../_mock/store";
+import { dbGetAllDrivers, dbSaveDriver, dbGetDriverByUsername } from "@/lib/db";
 import { dbGetAllOrders } from "@/lib/db";
 
-export async function GET() {
-  const drivers = store.getAllDrivers();
+export async function GET(req: NextRequest) {
+const drivers = await dbGetAllDrivers();
   const orders = await dbGetAllOrders();
 
   const enriched = drivers.map(d => {
@@ -29,7 +29,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+const body = await req.json();
   const { name, phone, email, username, pin, active } = body;
 
   if (!name || !username || !pin) {
@@ -38,14 +38,21 @@ export async function POST(req: NextRequest) {
   if (pin.length !== 4 || !/^\d+$/.test(pin)) {
     return NextResponse.json({ error: "PIN must be exactly 4 digits" }, { status: 400 });
   }
-  if (store.getDriverByUsername(username)) {
+  const existing = await dbGetDriverByUsername(username);
+  if (existing) {
     return NextResponse.json({ error: "Username already taken" }, { status: 409 });
   }
 
-  const driver = store.createDriver({
-    name, phone: phone ?? "", email: email ?? "",
+  const id = `d${Date.now()}`;
+  const driver = {
+    id, name, phone: phone ?? "", email: email ?? "",
     username, pin, active: active !== false,
-  });
+    passwordHash: Buffer.from(pin).toString("base64"),
+    isOnline: false, lat: null, lng: null, locationUpdatedAt: null,
+    currentOrderId: null, totalDeliveries: 0, totalEarnings: 0, rating: 5.0,
+    createdAt: new Date().toISOString(),
+  };
+  await dbSaveDriver(driver);
   const { passwordHash: _ph, ...safe } = driver;
   return NextResponse.json(safe, { status: 201 });
 }

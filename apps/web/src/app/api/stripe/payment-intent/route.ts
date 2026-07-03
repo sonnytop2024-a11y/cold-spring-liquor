@@ -12,8 +12,14 @@ export async function POST(req: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100),
       currency: "usd",
-      // card includes Apple Pay & Google Pay when domain is verified
+      // card covers Apple Pay & Google Pay when domain is verified
+      // klarna requires shipping country metadata — provided by PaymentElement automatically
       payment_method_types: ["card", "klarna"],
+      payment_method_options: {
+        klarna: {
+          preferred_locale: "en-US",
+        },
+      },
     });
     return NextResponse.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {

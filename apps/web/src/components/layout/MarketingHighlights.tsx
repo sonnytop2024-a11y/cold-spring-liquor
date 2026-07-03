@@ -25,7 +25,7 @@ const PERKS = [
   {
     emoji: "🏆",
     label: "Rewards Program",
-    desc: "Earn 10 CS Points per $1 spent. Redeem for real discounts.",
+    desc: "Earn 1 CS Point per $1 spent. 250 pts = $5 OFF · 500 pts = $10 OFF.",
     href: "/rewards",
     color: "#a855f7",
   },
