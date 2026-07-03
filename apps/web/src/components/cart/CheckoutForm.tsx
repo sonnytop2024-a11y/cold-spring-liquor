@@ -316,8 +316,32 @@ function ThankYouPopup({
   );
 }
 
-export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "pickup" } = {}) {
+export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "delivery" | "pickup" } = {}) {
+  // Delivery ↔ Pick Up is switched client-side (no page reload) — shared via
+  // checkoutStore so the page header and sidebar summary update together.
+  const storeMode = useCheckoutStore(s => s.fulfillmentMode);
+  const setFulfillmentMode = useCheckoutStore(s => s.setFulfillmentMode);
+  const mode = storeMode ?? initialMode;
   const isPickup = mode === "pickup";
+  // Direction of the content slide animation when switching
+  const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
+  const prevModeRef = useRef(mode);
+
+  // Align the shared mode with the URL's page on fresh mount
+  useEffect(() => {
+    setFulfillmentMode(initialMode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Any mode change (tabs, header link) → slide direction + URL sync, no reload
+  useEffect(() => {
+    if (prevModeRef.current === mode) return;
+    setSlideDir(mode === "pickup" ? "right" : "left");
+    prevModeRef.current = mode;
+    try { window.history.replaceState(null, "", mode === "pickup" ? "/checkout/pickup" : "/checkout"); } catch {}
+  }, [mode]);
+
+  const switchMode = setFulfillmentMode;
   const { items, clearCart, rewardsPointsToRedeem, setRewardsRedeem, giftCardCode, giftCardAmount, setGiftCard } = useCartStore();
   const { user, isLoggedIn } = useAuthStore();
   const router = useRouter();
@@ -365,10 +389,6 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
     }
   }, [isPickup, pickupSlots, pickupSlot]);
 
-  // Preserve typed contact info when switching Delivery ↔ Pick Up
-  function stashContact() {
-    try { sessionStorage.setItem("csl-checkout-contact", JSON.stringify({ name, email, phone })); } catch {}
-  }
 
 
   // Reorder prefill banner
@@ -435,19 +455,6 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
         }
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Restore contact typed before switching Delivery ↔ Pick Up
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("csl-checkout-contact");
-      if (!raw) return;
-      const c = JSON.parse(raw);
-      if (c.name) setName(v => v || c.name);
-      if (c.email) setEmail(v => v || c.email);
-      if (c.phone) setPhone(v => v || c.phone);
-    } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -933,7 +940,9 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
       <CheckoutSteps current={1} />
 
       {/* Delivery / Pick Up selector — always visible, sticky tabs on mobile */}
-      <FulfillmentSelector mode={mode} onBeforeSwitch={stashContact} />
+      <FulfillmentSelector mode={mode} onChange={switchMode} />
+
+      <div key={mode} className={`space-y-3 ${slideDir === "right" ? "csl-slide-in-right" : slideDir === "left" ? "csl-slide-in-left" : ""}`}>
 
       {/* Mobile order summary accordion */}
       <div className="lg:hidden bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
@@ -1294,6 +1303,8 @@ export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "picku
           <Link href="/products" className="inline-block bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors">+ Add More Items</Link>
         </div>
       )}
+
+      </div>
 
       {!clientSecret && (
         <button type="submit" disabled={submitting || items.length === 0 || !meetsMinimum}

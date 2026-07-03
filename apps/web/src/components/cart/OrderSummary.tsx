@@ -13,10 +13,11 @@ interface BundleTier {
   id: string; minQty: number; discountPct: number; label: string; sortOrder: number; active?: boolean;
 }
 
-export function OrderSummary({ mode = "delivery" }: { mode?: "delivery" | "pickup" } = {}) {
-  const isPickup = mode === "pickup";
+export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "delivery" | "pickup" } = {}) {
   const { items, rewardsPointsToRedeem, giftCardCode, giftCardAmount } = useCartStore();
-  const { promoCode, promoDiscount } = useCheckoutStore();
+  const { promoCode, promoDiscount, fulfillmentMode } = useCheckoutStore();
+  // Follows the client-side Delivery ↔ Pick Up switch (no reload)
+  const isPickup = (fulfillmentMode ?? initialMode) === "pickup";
   const [bundleTiers, setBundleTiers] = useState<BundleTier[]>([]);
 
   useEffect(() => {
