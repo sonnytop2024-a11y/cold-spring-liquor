@@ -18,7 +18,30 @@ function formatCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
 
+// Shared pickup blocks — used in confirmation + ready emails
+function pickupInfoBlock(order: MockOrder): string {
+  const win = order.pickupWindow;
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+    <tr><td style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:2px solid #f97316;border-radius:14px;padding:18px 24px;">
+      <p style="margin:0 0 4px;font-size:11px;color:#9a3412;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">🏬 Pick Up In Store</p>
+      ${win ? `<p style="margin:0 0 8px;font-size:20px;color:#ea580c;font-weight:800;">${win.dateLabel} · ${win.label} CT</p>` : ""}
+      <p style="margin:0;font-size:14px;color:#111827;font-weight:600;">Cold Spring Liquor</p>
+      <p style="margin:0;font-size:13px;color:#6b7280;">${STORE_ADDRESS}</p>
+    </td></tr></table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+    <tr><td style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 20px;">
+      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:1px;">🪪 What to bring</p>
+      <p style="margin:0;font-size:13px;color:#1e40af;line-height:1.7;">
+        ✓ A valid government-issued photo ID<br>
+        ✓ The person picking up must be <strong>21 or older</strong><br>
+        ✓ Name on the ID should match the order
+      </p>
+      <p style="margin:8px 0 0;font-size:12px;color:#6b7280;">We will hold your order for 7 days post pickup date.</p>
+    </td></tr></table>`;
+}
+
 function orderConfirmationHtml(order: MockOrder): string {
+  const isPickup = order.orderType === "pickup";
   const items = (order.items as Array<{ name: string; quantity: number; price: number; salePrice?: number | null }>) ?? [];
   const addr = order.deliveryAddress as { street?: string; city?: string; state?: string; zip?: string } | null;
   const addrStr = addr ? [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", ") : "";
@@ -69,10 +92,10 @@ function orderConfirmationHtml(order: MockOrder): string {
 
     <p style="margin:0 0 28px;font-size:16px;color:#374151;line-height:1.6;">
       Hi <strong style="color:#0a0a0a;">${firstName}</strong>, thank you for your order at Cold Spring Liquor!
-      We're getting it ready and will be on our way to you soon. 🚗
+      ${isPickup ? "We're getting it ready for pick up — we'll email you the moment it's ready. 🛍️" : "We're getting it ready and will be on our way to you soon. 🚗"}
     </p>
 
-    ${eta ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+    ${isPickup ? pickupInfoBlock(order) : eta ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
     <tr><td style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:2px solid #f97316;border-radius:14px;padding:18px 24px;">
       <p style="margin:0 0 4px;font-size:11px;color:#9a3412;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">📦 Estimated Delivery</p>
       <p style="margin:0;font-size:20px;color:#ea580c;font-weight:800;">${eta} CT</p>
@@ -84,8 +107,9 @@ function orderConfirmationHtml(order: MockOrder): string {
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:14px;padding:20px 24px;margin:24px 0;">
       <tr><td style="font-size:14px;color:#6b7280;padding:5px 0;">Subtotal</td><td style="font-size:14px;color:#374151;text-align:right;padding:5px 0;">${formatCurrency(order.subtotal)}</td></tr>
       ${discountRows}
+      ${(order.pickupDiscount ?? 0) > 0 ? `<tr><td style="font-size:14px;color:#059669;padding:5px 0;font-weight:600;">🏬 Pick Up Discount (−5%)</td><td style="font-size:14px;color:#059669;text-align:right;padding:5px 0;font-weight:600;">-${formatCurrency(order.pickupDiscount ?? 0)}</td></tr>` : ""}
       <tr><td style="font-size:14px;color:#6b7280;padding:5px 0;">Tax (8.25%)</td><td style="font-size:14px;color:#374151;text-align:right;padding:5px 0;">${formatCurrency(order.tax)}</td></tr>
-      <tr><td style="font-size:14px;color:#059669;padding:5px 0;font-weight:600;">🚚 Delivery</td><td style="font-size:14px;color:#059669;text-align:right;padding:5px 0;font-weight:600;">FREE</td></tr>
+      ${isPickup ? "" : `<tr><td style="font-size:14px;color:#059669;padding:5px 0;font-weight:600;">🚚 Delivery</td><td style="font-size:14px;color:#059669;text-align:right;padding:5px 0;font-weight:600;">FREE</td></tr>`}
       <tr><td colspan="2" style="padding:10px 0 0;"><div style="border-top:2px solid #e5e7eb;"></div></td></tr>
       <tr><td style="font-size:19px;font-weight:800;color:#0a0a0a;padding-top:10px;">Total</td><td style="font-size:19px;font-weight:800;color:#f97316;text-align:right;padding-top:10px;">${formatCurrency(order.total)}</td></tr>
     </table>
@@ -180,15 +204,82 @@ export async function sendOrderConfirmation(order: MockOrder): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
   const email = order.customerEmail;
   if (!email) return;
+  const isPickup = order.orderType === "pickup";
   try {
     await getResend().emails.send({
       from: FROM,
       to: email,
-      subject: `Order Confirmed #${order.orderNumber} — Cold Spring Liquor`,
+      subject: isPickup
+        ? `Pick Up Order Confirmed #${order.orderNumber} — Cold Spring Liquor`
+        : `Order Confirmed #${order.orderNumber} — Cold Spring Liquor`,
       html: orderConfirmationHtml(order),
     });
   } catch (e) {
     console.error("[email] sendOrderConfirmation failed:", e);
+  }
+}
+
+function pickupReadyHtml(order: MockOrder): string {
+  const firstName = order.customerName.split(" ")[0];
+  const win = order.pickupWindow;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ready for Pick Up</title></head>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f0;padding:24px 12px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+  <tr><td style="background:#ffffff;border-radius:20px 20px 0 0;padding:32px 40px 20px;text-align:center;border-bottom:1px solid #f3f4f6;">
+    <img src="${LOGO_URL}" alt="Cold Spring Liquor" width="160" height="auto" style="display:block;margin:0 auto 20px;max-width:160px;height:auto;" />
+    <div style="background:#0a0a0a;border-radius:14px;padding:22px 32px;">
+      <h1 style="margin:0 0 6px;color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;">Your Order is Ready! 🛍️</h1>
+      <p style="margin:0;color:#9ca3af;font-size:14px;">Order <span style="color:#f97316;font-weight:700;">#${order.orderNumber}</span></p>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f97316;height:4px;"></td></tr>
+
+  <tr><td style="background:#ffffff;padding:36px 40px;">
+    <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+      Hi <strong style="color:#0a0a0a;">${firstName}</strong>, great news — your order is packed and <strong>ready for pick up</strong>!
+      ${win ? `Please visit us during your selected window: <strong style="color:#ea580c;">${win.dateLabel} · ${win.label} CT</strong>.` : "Please visit us during your selected pickup window."}
+    </p>
+    ${pickupInfoBlock(order)}
+    <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center" style="padding:8px 0 4px;">
+      <a href="${STORE_URL}/track/${order.id}" style="display:inline-block;background:#f97316;color:#ffffff;font-weight:800;font-size:16px;padding:16px 48px;border-radius:14px;text-decoration:none;letter-spacing:0.3px;">View My Order →</a>
+    </td></tr></table>
+  </td></tr>
+
+  <tr><td style="background:#0a0a0a;border-radius:0 0 20px 20px;padding:28px 40px;text-align:center;">
+    <p style="margin:0 0 6px;font-size:14px;color:#f97316;font-weight:700;">Cold Spring Liquor</p>
+    <p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">📍 ${STORE_ADDRESS}</p>
+    <p style="margin:0;font-size:13px;color:#9ca3af;">📞 <a href="tel:+15123377051" style="color:#9ca3af;text-decoration:none;">${STORE_PHONE}</a></p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+// Returns true if the email was actually sent (admin shows "Email Sent ✓")
+export async function sendPickupReady(order: MockOrder): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false;
+  const email = order.customerEmail;
+  if (!email) return false;
+  try {
+    await getResend().emails.send({
+      from: FROM,
+      to: email,
+      subject: `Your order is ready for pick up — #${order.orderNumber}`,
+      html: pickupReadyHtml(order),
+    });
+    return true;
+  } catch (e) {
+    console.error("[email] sendPickupReady failed:", e);
+    return false;
   }
 }
 

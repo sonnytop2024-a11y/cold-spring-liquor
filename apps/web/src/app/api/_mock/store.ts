@@ -9,7 +9,15 @@ export type OrderStatus =
   | "pending" | "confirmed" | "preparing"
   | "driver_assigned" | "driver_at_store"
   | "out_for_delivery" | "driver_arriving" | "driver_arrived"
-  | "delivered" | "failed_delivery" | "cancelled";
+  | "delivered" | "failed_delivery" | "cancelled"
+  | "ready_for_pickup" | "picked_up";
+
+export interface PickupWindow {
+  start: string; // ISO
+  end: string;   // ISO
+  label: string; // e.g. "10:30 – 11:30 AM"
+  dateLabel: string; // e.g. "Today, Jul 3" / "Sat, Jul 4"
+}
 
 export interface MockOrder {
   id: string;
@@ -31,6 +39,13 @@ export interface MockOrder {
   refundedAt?: string;
   refundedAmount?: number;
   inventoryRestocked?: boolean;
+  // Pick Up In Store
+  orderType?: "delivery" | "pickup";
+  pickupWindow?: PickupWindow;
+  pickupDiscount?: number;
+  readyEmailSent?: boolean;
+  readySmsSent?: boolean;
+  pickedUpAt?: string;
   paypalOrderId?: string;
   tax: number;
   total: number;

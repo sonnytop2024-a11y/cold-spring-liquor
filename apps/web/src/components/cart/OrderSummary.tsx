@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useCartStore } from "@/store/cartStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
 import { calcDiscounts } from "@/lib/discountRules";
@@ -12,7 +13,8 @@ interface BundleTier {
   id: string; minQty: number; discountPct: number; label: string; sortOrder: number; active?: boolean;
 }
 
-export function OrderSummary() {
+export function OrderSummary({ mode = "delivery" }: { mode?: "delivery" | "pickup" } = {}) {
+  const isPickup = mode === "pickup";
   const { items, rewardsPointsToRedeem, giftCardCode, giftCardAmount } = useCartStore();
   const { promoCode, promoDiscount } = useCheckoutStore();
   const [bundleTiers, setBundleTiers] = useState<BundleTier[]>([]);
@@ -30,9 +32,11 @@ export function OrderSummary() {
     bundleTiers,
   );
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
-  const tax = subtotal * TAX_RATE;
-  const total = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - giftCardAmount + tax);
-  const totalSavings = flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + giftCardAmount;
+  // Pick Up In Store: automatic 5% discount, tax on the discounted subtotal
+  const pickupDiscount = isPickup ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+  const tax = (subtotal - pickupDiscount) * TAX_RATE;
+  const total = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax);
+  const totalSavings = flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + giftCardAmount + pickupDiscount;
   const pointsEarned = Math.floor(total);
 
   return (
@@ -77,8 +81,27 @@ export function OrderSummary() {
           {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {promoCode}</span><span>-{formatCurrency(promoDiscount)}</span></div>}
           {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
           {giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card ({giftCardCode})</span><span>-{formatCurrency(giftCardAmount)}</span></div>}
-          <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-          <div className="flex justify-between text-green-600 font-medium"><span>💰 Driver Tip</span><span>NOT Required ✓</span></div>
+          {isPickup ? (
+            <>
+              <div className="flex justify-between text-brand-600 font-medium"><span>🏬 Pick Up In Store</span><span className="font-bold">✓</span></div>
+              <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
+              <div className="text-right -mt-0.5">
+                <Link href="/checkout" className="text-xs font-bold text-gray-400 hover:text-brand-600 underline underline-offset-2 transition-colors">
+                  ← Change to Delivery
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+              <div className="text-right -mt-0.5">
+                <Link href="/checkout/pickup" className="text-xs font-bold text-brand-600 hover:text-brand-700 underline underline-offset-2 transition-colors">
+                  Change to Pick Up &amp; Save 5% →
+                </Link>
+              </div>
+              <div className="flex justify-between text-green-600 font-medium"><span>💰 Driver Tip</span><span>NOT Required ✓</span></div>
+            </>
+          )}
           <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(tax)}</span></div>
         </div>
 

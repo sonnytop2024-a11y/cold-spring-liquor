@@ -55,6 +55,8 @@ const STATUS_COLORS: Record<string, string> = {
   failed_delivery:   "bg-red-100 text-red-700",
   cancelled:         "bg-red-100 text-red-700",
   refunded:          "bg-gray-100 text-gray-700",
+  ready_for_pickup:  "bg-amber-100 text-amber-800",
+  picked_up:         "bg-green-100 text-green-700",
 };
 
 const NEXT_STATUS: Record<string, string> = {
@@ -69,6 +71,15 @@ const NEXT_STATUS: Record<string, string> = {
 };
 
 const ALL_STATUSES = ["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived","delivered","failed_delivery","cancelled","refunded"];
+
+// Pick Up orders have their own flow: New → Preparing → Ready for Pick Up → Picked Up
+const PICKUP_NEXT_STATUS: Record<string, string> = {
+  pending:          "preparing",
+  confirmed:        "preparing",
+  preparing:        "ready_for_pickup",
+  ready_for_pickup: "picked_up",
+};
+const PICKUP_STATUSES = ["pending","preparing","ready_for_pickup","picked_up","cancelled"];
 
 async function patchOrderStatus(orderId: string, status: string) {
   await fetch(`${API}/orders/${orderId}/status`, {
@@ -372,8 +383,9 @@ export default function OrdersPage() {
 
   function renderOrder(order: any) {
     const isExpanded = expandedId === order.id;
-    const nextStatus = NEXT_STATUS[order.status];
-    const isDone = ["delivered","failed_delivery","cancelled","refunded"].includes(order.status);
+    const isPickupOrder = order.orderType === "pickup";
+    const nextStatus = isPickupOrder ? PICKUP_NEXT_STATUS[order.status] : NEXT_STATUS[order.status];
+    const isDone = ["delivered","failed_delivery","cancelled","refunded","picked_up"].includes(order.status);
 
     const STATUS_LABELS: Record<string, string> = {
       pending: "New", confirmed: "Confirmed", preparing: "Preparing",
@@ -381,6 +393,7 @@ export default function OrdersPage() {
       out_for_delivery: "On the Way", driver_arriving: "Arriving",
       driver_arrived: "Arrived", delivered: "Delivered",
       failed_delivery: "Failed", cancelled: "Cancelled", refunded: "Refunded",
+      ready_for_pickup: "Ready for Pick Up", picked_up: "Picked Up",
     };
 
     return (
@@ -393,7 +406,11 @@ export default function OrdersPage() {
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>
                 {STATUS_LABELS[order.status] ?? order.status}
               </span>
-              {order.deliveryType === "next-morning" ? (
+              {isPickupOrder ? (
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                  🏬 Pick Up In Store
+                </span>
+              ) : order.deliveryType === "next-morning" ? (
                 <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700 border border-amber-200">
                   🌅 Next Morning
                 </span>
@@ -401,6 +418,12 @@ export default function OrdersPage() {
                 <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-100 text-green-700 border border-green-200">
                   ⚡ Same-Day
                 </span>
+              )}
+              {isPickupOrder && (order.readyEmailSent || order.readySmsSent) && (
+                <>
+                  {order.readyEmailSent && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700 border border-green-200">✉️ Email Sent ✓</span>}
+                  {order.readySmsSent && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700 border border-green-200">📱 SMS Sent ✓</span>}
+                </>
               )}
               {order.driverId && (
                 <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">
@@ -424,11 +447,19 @@ export default function OrdersPage() {
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-500">
               <span className="flex items-center gap-1"><User size={11} /> {order.customerName}</span>
+              {order.customerPhone && <span className="flex items-center gap-1">📞 {order.customerPhone}</span>}
               <span className="flex items-center gap-1"><Clock size={11} /> {new Date(order.createdAt).toLocaleString()}</span>
-              {order.deliveryAddress && (
+              {isPickupOrder && order.pickupWindow ? (
+                <span className="flex items-center gap-1 font-semibold text-orange-600">
+                  🕐 {order.pickupWindow.dateLabel} · {order.pickupWindow.label}
+                </span>
+              ) : order.deliveryAddress ? (
                 <span className="flex items-center gap-1">
                   <MapPin size={11} /> {order.deliveryAddress.city}, {order.deliveryAddress.state}
                 </span>
+              ) : null}
+              {(order.pickupDiscount ?? 0) > 0 && (
+                <span className="text-green-600 font-medium">💚 -${Number(order.pickupDiscount).toFixed(2)} pickup discount</span>
               )}
             </div>
           </div>
@@ -466,7 +497,7 @@ export default function OrdersPage() {
                   defaultValue=""
                   className="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
                   <option value="">Set Status…</option>
-                  {ALL_STATUSES.filter(s => s !== order.status).map(s => (
+                  {(isPickupOrder ? PICKUP_STATUSES : ALL_STATUSES).filter(s => s !== order.status).map(s => (
                     <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                   ))}
                 </select>
@@ -561,7 +592,21 @@ export default function OrdersPage() {
               <p className="text-sm text-gray-500">{order.customerEmail} · {order.customerPhone}</p>
             </div>
 
-            {!isDone && (
+            {isPickupOrder && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-gray-700 space-y-1">
+                <p className="font-semibold text-gray-500 uppercase">🏬 Pick Up Details</p>
+                {order.pickupWindow && <p>🕐 Window: <b>{order.pickupWindow.dateLabel} · {order.pickupWindow.label}</b></p>}
+                <p>💳 Payment: <b>{order.stripePaymentIntentId || order.paypalOrderId ? "Paid" : order.paymentMethod === "gift_card" ? "Paid (Gift Card)" : "—"}</b>{order.paymentMethod ? ` (${order.paymentMethod})` : ""}</p>
+                {(order.pickupDiscount ?? 0) > 0 && <p>💚 Pick Up Discount: <b>-${Number(order.pickupDiscount).toFixed(2)} (5%)</b></p>}
+                {order.pickedUpAt && <p>✅ Picked up at: <b>{new Date(order.pickedUpAt).toLocaleString()}</b></p>}
+                <p>
+                  ✉️ Email: <b>{order.readyEmailSent ? "Sent ✓" : "—"}</b>
+                  &nbsp;·&nbsp; 📱 SMS: <b>{order.readySmsSent ? "Sent ✓" : "—"}</b>
+                </p>
+              </div>
+            )}
+
+            {!isDone && !isPickupOrder && (
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
                   Assign Driver

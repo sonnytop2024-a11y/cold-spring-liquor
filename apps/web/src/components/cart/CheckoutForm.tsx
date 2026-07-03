@@ -9,6 +9,7 @@ import { calcDiscounts } from "@/lib/discountRules";
 import { useRouter } from "next/navigation";
 import { formatCurrency, MIN_ORDER, calcPointsValue } from "@/lib/utils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
+import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, type PickupSlot } from "@/lib/pickupWindows";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -23,6 +24,15 @@ interface AddrForm { street: string; city: string; state: string; zip: string }
 const BLANK_ADDR: AddrForm = { street: "", city: "Leander", state: "TX", zip: "" };
 
 const CHECKOUT_STEPS = ["Your Details", "Payment", "Review Order", "Confirm"];
+
+export const STORE_INFO = {
+  name: "Cold Spring Liquor",
+  street: "15609 Ronald Reagan Blvd Suite B-100",
+  city: "Leander",
+  state: "TX",
+  zip: "78641",
+  hours: "Mon–Sat 10 AM – 9 PM",
+};
 
 function CheckoutSteps({ current }: { current: 1 | 2 | 3 | 4 }) {
   return (
@@ -189,11 +199,13 @@ function ThankYouPopup({
   total,
   customerName,
   onTrack,
+  pickup,
 }: {
   orderNumber: string;
   total: number;
   customerName: string;
   onTrack: () => void;
+  pickup?: { dateLabel: string; label: string } | null;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -226,7 +238,7 @@ function ThankYouPopup({
           <h2 className="text-[1.75rem] font-black text-white tracking-tight leading-tight">
             Thank You, {firstName}!
           </h2>
-          <p className="text-white/80 text-sm mt-1.5">Your order has been received</p>
+          <p className="text-white/80 text-sm mt-1.5">{pickup ? "Your pick up order is confirmed" : "Your order has been received"}</p>
 
           {/* Order badge */}
           <div className="mt-5 inline-flex items-center gap-2 bg-white/15 border border-white/25 rounded-full px-5 py-2">
@@ -238,32 +250,55 @@ function ThankYouPopup({
 
         {/* White body */}
         <div className="px-8 py-7 space-y-5">
-          {/* Message */}
-          <p className="text-center text-gray-600 text-sm leading-relaxed">
-            Sit back, relax and enjoy your day —<br />
-            <strong className="text-gray-900">we'll take care of everything from here.</strong>
-          </p>
+          {pickup ? (
+            <>
+              {/* Pickup details */}
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm text-gray-700 space-y-1.5">
+                <p>🕐 <strong className="text-gray-900">Pick up:</strong> {pickup.dateLabel} · {pickup.label}</p>
+                <p>📍 <strong className="text-gray-900">{STORE_INFO.name}</strong></p>
+                <p className="text-gray-500 text-xs pl-5">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
+                🪪 <strong>Bring a valid photo ID</strong> — the person picking up must be 21+, and the name on the ID should match the order.
+              </div>
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3">
+                <div className="relative flex-shrink-0 w-2.5 h-2.5">
+                  <div className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
+                  <div className="relative w-full h-full rounded-full bg-green-500" />
+                </div>
+                <p className="text-sm text-gray-700 font-medium">We&apos;re preparing your order — you&apos;ll get an email when it&apos;s ready</p>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Message */}
+              <p className="text-center text-gray-600 text-sm leading-relaxed">
+                Sit back, relax and enjoy your day —<br />
+                <strong className="text-gray-900">we'll take care of everything from here.</strong>
+              </p>
 
-          {/* 2 perks */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col items-center gap-2 border border-green-100 bg-green-50 rounded-2xl py-4 px-3">
-              <Truck size={18} className="text-green-600" />
-              <span className="text-xs font-bold text-green-700 text-center leading-tight">FREE Delivery</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 border border-blue-100 bg-blue-50 rounded-2xl py-4 px-3">
-              <Star size={18} className="text-blue-600" />
-              <span className="text-xs font-bold text-blue-700 text-center leading-tight">No Tip Required</span>
-            </div>
-          </div>
+              {/* 2 perks */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col items-center gap-2 border border-green-100 bg-green-50 rounded-2xl py-4 px-3">
+                  <Truck size={18} className="text-green-600" />
+                  <span className="text-xs font-bold text-green-700 text-center leading-tight">FREE Delivery</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 border border-blue-100 bg-blue-50 rounded-2xl py-4 px-3">
+                  <Star size={18} className="text-blue-600" />
+                  <span className="text-xs font-bold text-blue-700 text-center leading-tight">No Tip Required</span>
+                </div>
+              </div>
 
-          {/* Preparing indicator */}
-          <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3">
-            <div className="relative flex-shrink-0 w-2.5 h-2.5">
-              <div className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
-              <div className="relative w-full h-full rounded-full bg-green-500" />
-            </div>
-            <p className="text-sm text-gray-700 font-medium">Your order is being confirmed — we'll get started right away</p>
-          </div>
+              {/* Preparing indicator */}
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3">
+                <div className="relative flex-shrink-0 w-2.5 h-2.5">
+                  <div className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
+                  <div className="relative w-full h-full rounded-full bg-green-500" />
+                </div>
+                <p className="text-sm text-gray-700 font-medium">Your order is being confirmed — we'll get started right away</p>
+              </div>
+            </>
+          )}
 
           {/* CTA */}
           <button
@@ -271,15 +306,17 @@ function ThankYouPopup({
             className="w-full flex items-center justify-center gap-2.5 bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white font-black py-4 rounded-2xl text-base transition-all shadow-lg shadow-orange-500/25"
           >
             <MapPin size={18} />
-            Track My Order
+            {pickup ? "View My Order" : "Track My Order"}
           </button>
+          {pickup && <p className="text-center text-[11px] text-gray-400 -mt-2">We will hold your order for 7 days post pickup date</p>}
         </div>
       </div>
     </div>
   );
 }
 
-export function CheckoutForm() {
+export function CheckoutForm({ mode = "delivery" }: { mode?: "delivery" | "pickup" } = {}) {
+  const isPickup = mode === "pickup";
   const { items, clearCart, rewardsPointsToRedeem, setRewardsRedeem, giftCardCode, giftCardAmount, setGiftCard } = useCartStore();
   const { user, isLoggedIn } = useAuthStore();
   const router = useRouter();
@@ -298,6 +335,18 @@ export function CheckoutForm() {
 
   // Delivery address
   const [delivery, setDelivery] = useState<AddrForm>(BLANK_ADDR);
+
+  // Pick Up In Store — date + time window
+  const [pickupDay, setPickupDay] = useState(0); // days ahead: 0=today, 1=tomorrow, 2+=custom
+  const [customDate, setCustomDate] = useState("");
+  const [showCustomDate, setShowCustomDate] = useState(false);
+  const [pickupSlot, setPickupSlot] = useState<PickupSlot | null>(null);
+  const todayHasSlots = useMemo(() => isPickup && getPickupWindows(0).length > 0, [isPickup]);
+  // Default to the first day that actually has slots
+  useEffect(() => {
+    if (isPickup && !todayHasSlots) setPickupDay(isPickupDayOpen(1) ? 1 : 2);
+  }, [isPickup, todayHasSlots]);
+  const pickupSlots = useMemo(() => (isPickup ? getPickupWindows(pickupDay) : []), [isPickup, pickupDay]);
 
 
   // Reorder prefill banner
@@ -324,7 +373,7 @@ export function CheckoutForm() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
   const [paymentStep, setPaymentStep] = useState<null | "select" | "paypal" | "review-free">(null);
-  const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number } | null>(null);
+  const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null } | null>(null);
   const [rewardsDismissed, setRewardsDismissed] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -360,7 +409,7 @@ export function CheckoutForm() {
         if (res.ok) {
           const order = await res.json();
           clearCart();
-          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total });
+          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
         }
       }
     });
@@ -417,9 +466,11 @@ export function CheckoutForm() {
   );
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
-  const tax = subtotal * TAX;
+  // Pick Up In Store: automatic 5% discount, tax on the discounted subtotal
+  const pickupDiscount = isPickup ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+  const tax = (subtotal - pickupDiscount) * TAX;
   // Re-cap gift card to what the order actually owes (guards against over-application when rewards added after gift card)
-  const preGiftOwed = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount + tax);
+  const preGiftOwed = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - pickupDiscount + tax);
   const effectiveGiftCard = Math.min(giftCardAmount, preGiftOwed);
   const total = Math.max(0, preGiftOwed - effectiveGiftCard);
   const pointsEarned = Math.floor(total); // 1 pt per $1
@@ -472,10 +523,14 @@ export function CheckoutForm() {
     if (!name.trim()) e.name = "Full name required";
     if (!email.includes("@")) e.email = "Valid email required";
     if (phone.replace(/\D/g, "").length < 10) e.phone = "Phone number required";
-    if (!delivery.street.trim()) e.street = "Street address required";
-    else if (!/^\d+\s/.test(delivery.street.trim())) e.street = "Please include your house/building number (e.g. 1221 Sonny Dr)";
-    if (!delivery.city.trim()) e.city = "City required";
-    if (!/^\d{5}$/.test(delivery.zip)) e.zip = "Valid ZIP code required";
+    if (isPickup) {
+      if (!pickupSlot) e.pickupSlot = "Please select a pickup time window";
+    } else {
+      if (!delivery.street.trim()) e.street = "Street address required";
+      else if (!/^\d+\s/.test(delivery.street.trim())) e.street = "Please include your house/building number (e.g. 1221 Sonny Dr)";
+      if (!delivery.city.trim()) e.city = "City required";
+      if (!/^\d{5}$/.test(delivery.zip)) e.zip = "Valid ZIP code required";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -494,30 +549,32 @@ export function CheckoutForm() {
     setSubmitting(true);
     setZoneError(null);
 
-    // Validate delivery zone BEFORE creating Stripe PaymentIntent
-    try {
-      const zoneRes = await fetch("/api/orders/validate-address", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(delivery),
-      });
-      const zoneData = await zoneRes.json();
-      if (!zoneData.inRange) {
-        setZoneError(zoneData.error ?? "Address is outside our delivery area.");
+    // Validate delivery zone BEFORE creating Stripe PaymentIntent (delivery only)
+    if (!isPickup) {
+      try {
+        const zoneRes = await fetch("/api/orders/validate-address", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(delivery),
+        });
+        const zoneData = await zoneRes.json();
+        if (!zoneData.inRange) {
+          setZoneError(zoneData.error ?? "Address is outside our delivery area.");
+          setSubmitting(false);
+          return;
+        }
+      } catch {
+        setZoneError("Could not verify delivery address. Please check your address and try again.");
         setSubmitting(false);
         return;
       }
-    } catch {
-      setZoneError("Could not verify delivery address. Please check your address and try again.");
-      setSubmitting(false);
-      return;
     }
 
     const payload = {
       items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity })),
-      deliveryAddress: delivery,
-      billingAddress: delivery,
-      billingAddressSameAsDelivery: true,
+      ...(isPickup
+        ? { orderType: "pickup", pickupWindow: pickupSlot, deliveryAddress: null, billingAddress: null, billingAddressSameAsDelivery: false }
+        : { orderType: "delivery", deliveryAddress: delivery, billingAddress: delivery, billingAddressSameAsDelivery: true }),
       customerName: name,
       customerEmail: email,
       customerPhone: phone,
@@ -560,6 +617,7 @@ export function CheckoutForm() {
         orderNumber={thankYouOrder.orderNumber}
         total={thankYouOrder.total}
         customerName={name}
+        pickup={thankYouOrder.pickupWindow ?? (isPickup ? pickupSlot : null)}
         onTrack={() => router.push(`/track/${thankYouOrder.orderId}`)}
       />
     );
@@ -587,7 +645,7 @@ export function CheckoutForm() {
         const order = await res.json();
         if (!res.ok) throw new Error(order.error ?? "Failed to place order");
         clearCart();
-        setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total });
+        setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
       } catch (err: any) {
         setConfirmError(err.message ?? "Something went wrong. Please try again.");
         setConfirming(false);
@@ -629,9 +687,19 @@ export function CheckoutForm() {
             <p className="text-sm text-gray-500">{rd.customerEmail} · {rd.customerPhone}</p>
           </div>
           <div className="border-t border-gray-100 pt-3">
-            <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">📍 Delivery</h3>
-            <p className="text-sm text-gray-800">{rd.deliveryAddress.street}</p>
-            <p className="text-sm text-gray-500">{rd.deliveryAddress.city}, {rd.deliveryAddress.state} {rd.deliveryAddress.zip}</p>
+            {isPickup ? (
+              <>
+                <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">🏬 Pick Up In Store</h3>
+                <p className="text-sm text-gray-800 font-medium">{pickupSlot ? `${pickupSlot.dateLabel} · ${pickupSlot.label}` : ""}</p>
+                <p className="text-sm text-gray-500">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
+              </>
+            ) : (
+              <>
+                <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">📍 Delivery</h3>
+                <p className="text-sm text-gray-800">{rd.deliveryAddress.street}</p>
+                <p className="text-sm text-gray-500">{rd.deliveryAddress.city}, {rd.deliveryAddress.state} {rd.deliveryAddress.zip}</p>
+              </>
+            )}
           </div>
           <div className="border-t border-gray-100 pt-3">
             <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">💳 Payment</h3>
@@ -648,7 +716,11 @@ export function CheckoutForm() {
             {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
             {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
             {rd.giftCardAmount > 0 && <div className="flex justify-between text-emerald-600 font-medium"><span>🎁 Gift Card ({giftCardCode})</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
-            <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+            {isPickup ? (
+              <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
+            ) : (
+              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+            )}
             <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(rd.tax)}</span></div>
           </div>
           <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-baseline">
@@ -744,10 +816,12 @@ export function CheckoutForm() {
           items, subtotal, flashSavings, bundleDiscount, bundlePct,
           promoCode, promoDiscount, rewardsDiscount, rewardsPointsToRedeem,
           giftCardAmount: effectiveGiftCard, tax,
+          pickup: isPickup && pickupSlot ? { dateLabel: pickupSlot.dateLabel, label: pickupSlot.label } : null,
+          pickupDiscount,
         }}
         onSuccess={(order) => {
           clearCart();
-          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total });
+          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
         }}
         onCancel={() => setPaymentStep("select")}
       />
@@ -801,6 +875,8 @@ export function CheckoutForm() {
             rewardsPointsToRedeem,
             giftCardAmount: effectiveGiftCard,
             tax,
+            pickup: isPickup && pickupSlot ? { dateLabel: pickupSlot.dateLabel, label: pickupSlot.label } : null,
+            pickupDiscount,
           }}
           onSuccess={(order) => {
             clearCart();
@@ -808,6 +884,7 @@ export function CheckoutForm() {
               orderId: order.id,
               orderNumber: order.orderNumber,
               total: order.total,
+              pickupWindow: order.pickupWindow ?? null,
             });
           }}
           onCancel={() => { setClientSecret(null); setPaymentStep("select"); setSubmitting(false); }}
@@ -850,7 +927,18 @@ export function CheckoutForm() {
               {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo</span><span>-{formatCurrency(promoDiscount)}</span></div>}
               {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
               {effectiveGiftCard > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(effectiveGiftCard)}</span></div>}
-              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+              {isPickup ? (
+                <>
+                  <div className="flex justify-between text-brand-600 font-medium"><span>🏬 Pick Up In Store</span><span>{pickupSlot ? pickupSlot.label : "—"}</span></div>
+                  <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
+                  <div className="text-right"><Link href="/checkout" className="text-[11px] font-bold text-gray-400 hover:text-brand-600 underline underline-offset-2">← Change to Delivery</Link></div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+                  <div className="text-right"><Link href="/checkout/pickup" className="text-[11px] font-bold text-brand-600 hover:text-brand-700 underline underline-offset-2">Change to Pick Up &amp; Save 5% →</Link></div>
+                </>
+              )}
               <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(tax)}</span></div>
               <div className="flex justify-between text-gray-900 font-bold text-sm pt-2 border-t border-gray-200">
                 <span>Total</span><span>{formatCurrency(total)}</span>
@@ -895,7 +983,8 @@ export function CheckoutForm() {
         </div>
       </div>
 
-      {/* 2. Delivery Address */}
+      {/* 2. Delivery Address (delivery) / Store Info + Pickup Time (pickup) */}
+      {!isPickup ? (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">2</div>
@@ -912,6 +1001,113 @@ export function CheckoutForm() {
         )}
         <p className="text-xs text-gray-400 mt-3">Service area: Leander · Cedar Park · Liberty Hill, TX (within 10 miles)</p>
       </div>
+      ) : (
+      <>
+      {/* Store Info */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">2</div>
+          <MapPin size={14} className="text-gray-400" />
+          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Pick Up Location</h2>
+        </div>
+        <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3.5">
+          <span className="text-xl leading-none mt-0.5">🏬</span>
+          <div>
+            <p className="font-bold text-gray-900 text-sm">{STORE_INFO.name}</p>
+            <p className="text-sm text-gray-600">{STORE_INFO.street}</p>
+            <p className="text-sm text-gray-600">{STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
+            <p className="text-xs text-gray-400 mt-1">{STORE_INFO.hours} · Sunday closed</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Pickup Date & Time */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">3</div>
+          <Clock size={14} className="text-gray-400" />
+          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Select Pick Up Date &amp; Time</h2>
+        </div>
+
+        {/* Day tabs */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {[{ d: 0, t: "Today" }, { d: 1, t: "Tomorrow" }].map(({ d, t }) => {
+            const open = isPickupDayOpen(d) && (d !== 0 || todayHasSlots);
+            const sel = !showCustomDate && pickupDay === d;
+            return (
+              <button key={d} type="button" disabled={!open}
+                onClick={() => { setPickupDay(d); setShowCustomDate(false); setPickupSlot(null); }}
+                className={`rounded-xl border px-2 py-2.5 text-center transition-all ${sel ? "bg-brand-500 border-brand-500 text-white" : open ? "bg-white border-gray-200 text-gray-700 hover:border-brand-300" : "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"}`}>
+                <span className="block text-sm font-bold">{t}</span>
+                <span className={`block text-[10px] font-semibold mt-0.5 ${sel ? "text-white/80" : "text-gray-400"}`}>
+                  {open ? pickupDateLabel(d).replace(/^(Today|Tomorrow), /, "") : "Closed"}
+                </span>
+              </button>
+            );
+          })}
+          <button type="button"
+            onClick={() => { setShowCustomDate(true); setPickupSlot(null); }}
+            className={`rounded-xl border px-2 py-2.5 text-center transition-all ${showCustomDate ? "bg-brand-500 border-brand-500 text-white" : "bg-white border-gray-200 text-gray-700 hover:border-brand-300"}`}>
+            <span className="block text-sm font-bold">📅 Pick a Date</span>
+            <span className={`block text-[10px] font-semibold mt-0.5 ${showCustomDate ? "text-white/80" : "text-gray-400"}`}>up to {MAX_PICKUP_DAYS_AHEAD} days</span>
+          </button>
+        </div>
+
+        {/* Custom date input */}
+        {showCustomDate && (
+          <input
+            type="date"
+            value={customDate}
+            min={new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10)}
+            max={new Date(Date.now() + 86400000 * MAX_PICKUP_DAYS_AHEAD).toISOString().slice(0, 10)}
+            onChange={e => {
+              setCustomDate(e.target.value);
+              setPickupSlot(null);
+              if (e.target.value) {
+                const diff = Math.round((new Date(e.target.value + "T12:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86400000);
+                setPickupDay(Math.min(Math.max(diff, 0), MAX_PICKUP_DAYS_AHEAD));
+              }
+            }}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-500 mb-4"
+          />
+        )}
+
+        {/* Time slots */}
+        {pickupSlots.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {pickupSlots.map(slot => {
+              const sel = pickupSlot?.start === slot.start;
+              return (
+                <button key={slot.start} type="button"
+                  onClick={() => { setPickupSlot(slot); setErrors(e => { const { pickupSlot: _drop, ...rest } = e; return rest; }); }}
+                  className={`rounded-xl border px-2 py-2.5 text-xs font-semibold text-center transition-all ${sel ? "bg-orange-50 border-brand-500 text-brand-600 ring-1 ring-brand-500" : "bg-white border-gray-200 text-gray-600 hover:border-brand-300"}`}>
+                  {slot.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+            {showCustomDate && !customDate
+              ? "Choose a date above to see available pickup times."
+              : "No pickup windows available for this day — please choose another date. (We're closed on Sunday.)"}
+          </div>
+        )}
+        {errors.pickupSlot && <p className="text-red-500 text-xs mt-2" data-error="1">{errors.pickupSlot}</p>}
+        <p className="text-xs text-gray-400 mt-3">Windows are 1 hour · earliest pickup is 30 minutes from now · we hold your order for 7 days post pickup date</p>
+      </div>
+
+      {/* Pickup Instructions */}
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3.5 text-sm text-blue-900">
+        <p className="font-bold text-xs uppercase tracking-wide mb-1.5">🪪 What to bring when you pick up</p>
+        <ul className="text-xs leading-relaxed text-blue-800 space-y-0.5">
+          <li>✓ A valid government-issued photo ID</li>
+          <li>✓ The person picking up must be <strong>21 or older</strong></li>
+          <li>✓ Name on the ID should match the order</li>
+        </ul>
+      </div>
+      </>
+      )}
 
       {/* 3. Promo & Rewards */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
@@ -1040,16 +1236,27 @@ export function CheckoutForm() {
               {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo ({promoCode})</span><span>-{formatCurrency(promoDiscount)}</span></div>}
               {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
               {effectiveGiftCard > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(effectiveGiftCard)}</span></div>}
-              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-              <div className="flex justify-between text-green-600 font-medium"><span>💰 Tip</span><span>NOT Required</span></div>
+              {isPickup ? (
+                <>
+                  <div className="flex justify-between text-brand-600 font-medium"><span>🏬 Pick Up In Store</span><span>{pickupSlot ? pickupSlot.label : "—"}</span></div>
+                  <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(pickupDiscount)}</span></div>
+                  <div className="text-right"><Link href="/checkout" className="text-[11px] font-bold text-gray-400 hover:text-brand-600 underline underline-offset-2">← Change to Delivery</Link></div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+                  <div className="text-right"><Link href="/checkout/pickup" className="text-[11px] font-bold text-brand-600 hover:text-brand-700 underline underline-offset-2">Change to Pick Up &amp; Save 5% →</Link></div>
+                  <div className="flex justify-between text-green-600 font-medium"><span>💰 Tip</span><span>NOT Required</span></div>
+                </>
+              )}
               <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(tax)}</span></div>
             </div>
             <div className="flex justify-between text-gray-900 font-bold text-sm pt-2 border-t border-gray-100">
               <span>Total</span><span>{formatCurrency(total)}</span>
             </div>
-            {(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard) > 0 && (
+            {(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard + pickupDiscount) > 0 && (
               <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
-                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard)} on this order!</p>
+                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard + pickupDiscount)} on this order!</p>
               </div>
             )}
             <p className="text-xs text-center text-brand-600 font-medium pt-1">🏆 You&apos;ll earn <strong>{pointsEarned} CS Points</strong> on this order</p>
@@ -1057,8 +1264,8 @@ export function CheckoutForm() {
         )}
       </div>
 
-      {/* Delivery timing */}
-      {timing.type === "same-day" ? (
+      {/* Delivery timing (delivery only) */}
+      {!isPickup && (timing.type === "same-day" ? (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
           <Clock size={15} className="shrink-0 text-green-600" />
           <span>{timing.message}</span>
@@ -1068,7 +1275,7 @@ export function CheckoutForm() {
           <AlertTriangle size={15} className="shrink-0 text-amber-500 mt-0.5" />
           <span>{timing.message}</span>
         </div>
-      )}
+      ))}
 
       {/* Min order */}
       {!meetsMinimum && (
@@ -1111,6 +1318,9 @@ interface ReviewData {
   rewardsPointsToRedeem: number;
   giftCardAmount: number;
   tax: number;
+  // Pick Up In Store
+  pickup?: { dateLabel: string; label: string } | null;
+  pickupDiscount?: number;
 }
 
 function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSuccess, onCancel }: {
@@ -1118,16 +1328,18 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
   orderPayload: object;
   total: number;
   reviewData: ReviewData;
-  onSuccess: (order: { id: string; orderNumber: string; total: number }) => void;
+  onSuccess: (order: { id: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null }) => void;
   onCancel: () => void;
 }) {
+  const isPickup = !!reviewData.pickup;
   const stripe = useStripe();
   const elements = useElements();
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [reviewing, setReviewing] = useState(false);
   const [pmInfo, setPmInfo] = useState<{ id: string; type: string; brand?: string; last4?: string } | null>(null);
-  const [diffBilling, setDiffBilling] = useState(false);
+  // Pickup has no delivery address — show billing fields by default so the card address can be entered
+  const [diffBilling, setDiffBilling] = useState(isPickup);
   const [billAddr, setBillAddr] = useState({
     street: reviewData.billingAddress.street,
     city: reviewData.billingAddress.city,
@@ -1170,13 +1382,16 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
               name: reviewData.customerName,
               email: reviewData.customerEmail,
               phone: reviewData.customerPhone,
-              address: {
-                line1: billAddr.street,
-                city: billAddr.city,
-                state: billAddr.state,
-                postal_code: billAddr.zip,
-                country: "US",
-              },
+              // Pickup orders may not have a billing address typed in — only send it when present
+              ...(billAddr.street || billAddr.zip ? {
+                address: {
+                  line1: billAddr.street,
+                  city: billAddr.city,
+                  state: billAddr.state,
+                  postal_code: billAddr.zip,
+                  country: "US",
+                },
+              } : {}),
             },
           },
         },
@@ -1223,7 +1438,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
   }
 
   const rd = reviewData;
-  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount;
+  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount + (rd.pickupDiscount ?? 0);
   const pointsEarned = Math.floor(total);
 
   return (
@@ -1272,15 +1487,27 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
               <p className="text-sm text-gray-500">{rd.customerEmail} · {rd.customerPhone}</p>
             </div>
             <div className="border-t border-gray-100 pt-4">
-              <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">📍 Delivery Address</h3>
-              <p className="text-sm text-gray-800">{rd.deliveryAddress.street}</p>
-              <p className="text-sm text-gray-500">{rd.deliveryAddress.city}, {rd.deliveryAddress.state} {rd.deliveryAddress.zip}</p>
+              {isPickup ? (
+                <>
+                  <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">🏬 Pick Up In Store</h3>
+                  <p className="text-sm text-gray-800 font-medium">{rd.pickup!.dateLabel} · {rd.pickup!.label}</p>
+                  <p className="text-sm text-gray-500">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">📍 Delivery Address</h3>
+                  <p className="text-sm text-gray-800">{rd.deliveryAddress.street}</p>
+                  <p className="text-sm text-gray-500">{rd.deliveryAddress.city}, {rd.deliveryAddress.state} {rd.deliveryAddress.zip}</p>
+                </>
+              )}
             </div>
+            {(billAddr.street || billAddr.zip) && (
             <div className="border-t border-gray-100 pt-4">
               <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">🧾 Billing Address</h3>
               <p className="text-sm text-gray-800">{billAddr.street}</p>
               <p className="text-sm text-gray-500">{billAddr.city}, {billAddr.state} {billAddr.zip}</p>
             </div>
+            )}
             <div className="border-t border-gray-100 pt-4">
               <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">💳 Payment Method</h3>
               <p className="text-sm text-gray-800 font-medium">🔒 Secure Card / Wallet Payment</p>
@@ -1296,7 +1523,11 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
               {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
               {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
               {rd.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
-              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+              {isPickup ? (
+                <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(rd.pickupDiscount ?? 0)}</span></div>
+              ) : (
+                <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+              )}
               <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(rd.tax)}</span></div>
             </div>
             <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-baseline">
@@ -1329,7 +1560,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
                 : <>Confirm & Pay {formatCurrency(total)} →</>}
             </button>
           </div>
-          <p className="text-center text-xs text-gray-400">🔒 Your payment is encrypted and secure. Must be 21+, valid ID checked at delivery.</p>
+          <p className="text-center text-xs text-gray-400">🔒 Your payment is encrypted and secure. Must be 21+, valid ID checked at {isPickup ? "pickup" : "delivery"}.</p>
         </div>
       )}
 
@@ -1354,7 +1585,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h2 className="font-bold text-base text-gray-800 mb-3 flex items-center gap-2">
-            🏠 Billing Address
+            🏠 Billing Address{isPickup ? " (for your card)" : ""}
           </h2>
           <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700 mb-3">
             <p className="font-medium">{billAddr.street}</p>

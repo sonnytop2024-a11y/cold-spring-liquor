@@ -19,6 +19,8 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: "Delivered",
   failed_delivery: "Delivery Failed",
   cancelled: "Cancelled",
+  ready_for_pickup: "Ready for Pick Up",
+  picked_up: "Picked Up",
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -33,9 +35,11 @@ const STATUS_COLOR: Record<string, string> = {
   delivered: "bg-green-100 text-green-700",
   failed_delivery: "bg-red-100 text-red-700",
   cancelled: "bg-red-100 text-red-700",
+  ready_for_pickup: "bg-amber-100 text-amber-700",
+  picked_up: "bg-green-100 text-green-700",
 };
 
-const ACTIVE_STATUSES = ["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"];
+const ACTIVE_STATUSES = ["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived","ready_for_pickup"];
 
 async function fetchOrder(id: string) {
   const res = await fetch(`/api/orders/${id}`);
@@ -98,7 +102,9 @@ export default function OrderDetailPage() {
   }
 
   const isActive = ACTIVE_STATUSES.includes(order.status);
-  const isDelivered = order.status === "delivered";
+  const isDelivered = order.status === "delivered" || order.status === "picked_up";
+  const isPickupOrder = order.orderType === "pickup";
+  const isReadyForPickup = order.status === "ready_for_pickup";
   const isFailed = ["failed_delivery", "cancelled"].includes(order.status);
 
   // Mask street number from address for privacy in history
@@ -145,14 +151,27 @@ export default function OrderDetailPage() {
 
       {/* Active order CTA */}
       {isActive && (
-        <div className="mb-4 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-brand-700">Your order is on its way!</p>
+        <div className={`mb-4 border rounded-xl px-4 py-3 flex items-center justify-between gap-3 ${isReadyForPickup ? "bg-amber-50 border-amber-300" : "bg-brand-50 border-brand-200"}`}>
+          <p className={`text-sm font-medium ${isReadyForPickup ? "text-amber-800" : "text-brand-700"}`}>
+            {isReadyForPickup
+              ? "🛍️ Your order is ready for pick up!"
+              : isPickupOrder ? "Your pick up order is being prepared" : "Your order is on its way!"}
+          </p>
           <Link
             href={`/track/${order.id}`}
-            className="text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 px-4 py-2 rounded-lg transition-colors"
+            className={`text-sm font-bold text-white px-4 py-2 rounded-lg transition-colors ${isReadyForPickup ? "bg-green-600 hover:bg-green-700" : "bg-brand-500 hover:bg-brand-600"}`}
           >
-            Track Order →
+            {isReadyForPickup ? "Confirm Picked Up →" : isPickupOrder ? "View Order →" : "Track Order →"}
           </Link>
+        </div>
+      )}
+
+      {/* Pickup info card */}
+      {isPickupOrder && order.pickupWindow && (
+        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm text-gray-700">
+          <p className="font-bold text-gray-900 text-xs uppercase tracking-wide mb-1">🏬 Pick Up In Store</p>
+          <p>🕐 {order.pickupWindow.dateLabel} · {order.pickupWindow.label}</p>
+          <p className="text-gray-500 text-xs mt-0.5">15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641 · Bring a valid 21+ photo ID</p>
         </div>
       )}
 
@@ -210,6 +229,12 @@ export default function OrderDetailPage() {
           <div className="flex justify-between text-sm text-blue-600">
             <span>Bundle Discount</span>
             <span>-{formatCurrency(order.bundleDiscount)}</span>
+          </div>
+        )}
+        {Number(order.pickupDiscount) > 0 && (
+          <div className="flex justify-between text-sm text-green-600 font-medium">
+            <span>💚 Pick Up Discount (−5%)</span>
+            <span>-{formatCurrency(order.pickupDiscount)}</span>
           </div>
         )}
         {Number(order.couponDiscount) > 0 && (

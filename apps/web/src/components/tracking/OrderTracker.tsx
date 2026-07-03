@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Circle, Clock, Loader2, Bell } from "lucide-react";
 
 const STEPS = [
@@ -55,6 +55,33 @@ const STEPS = [
   },
 ];
 
+const PICKUP_STEPS = [
+  {
+    statuses: ["pending", "confirmed"],
+    label: "Order Received",
+    description: "We got your pick up order and are confirming it",
+    emoji: "📋",
+  },
+  {
+    statuses: ["preparing"],
+    label: "Preparing Order",
+    description: "Your items are being packed for pick up",
+    emoji: "📦",
+  },
+  {
+    statuses: ["ready_for_pickup"],
+    label: "Ready for Pick Up",
+    description: "Your order is ready! Visit us during your pickup window — bring your 21+ photo ID",
+    emoji: "🛍️",
+  },
+  {
+    statuses: ["picked_up", "delivered"],
+    label: "Picked Up",
+    description: "Enjoy your order! 🎉",
+    emoji: "✅",
+  },
+];
+
 const FAILED_STATUSES = ["failed_delivery", "cancelled"];
 
 const STATUS_LABELS: Record<string, string> = {
@@ -69,13 +96,15 @@ const STATUS_LABELS: Record<string, string> = {
   delivered: "Delivered",
   failed_delivery: "Delivery Failed",
   cancelled: "Cancelled",
+  ready_for_pickup: "Ready for Pick Up",
+  picked_up: "Picked Up",
 };
 
 const ACTIVE_STATUSES = ["out_for_delivery", "driver_arriving", "driver_arrived"];
 
-function getCurrentStep(status: string): number {
-  for (let i = 0; i < STEPS.length; i++) {
-    if (STEPS[i].statuses.includes(status)) return i;
+function getCurrentStep(status: string, steps: typeof STEPS): number {
+  for (let i = 0; i < steps.length; i++) {
+    if (steps[i].statuses.includes(status)) return i;
   }
   return -1;
 }
@@ -158,6 +187,24 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
     await fetch("/api/notifications", { method: "PATCH" });
   }
 
+  const [confirmingPickup, setConfirmingPickup] = useState(false);
+  const [confirmPickupError, setConfirmPickupError] = useState("");
+  const qc = useQueryClient();
+  async function confirmPickedUp() {
+    setConfirmingPickup(true);
+    setConfirmPickupError("");
+    try {
+      const res = await fetch(`/api/orders/${orderId}/pickup-confirm`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not confirm pickup");
+      qc.setQueryData(["order", orderId], data);
+    } catch (e) {
+      setConfirmPickupError(e instanceof Error ? e.message : "Could not confirm pickup");
+    } finally {
+      setConfirmingPickup(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl border p-8 flex items-center justify-center gap-3 text-gray-400">
@@ -175,10 +222,13 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
     );
   }
 
+  const isPickupOrder = order.orderType === "pickup";
+  const steps = isPickupOrder ? PICKUP_STEPS : STEPS;
   const isFailed = FAILED_STATUSES.includes(order.status);
-  const currentStep = getCurrentStep(order.status);
-  const isDelivered = order.status === "delivered";
+  const currentStep = getCurrentStep(order.status, steps);
+  const isDelivered = order.status === "delivered" || order.status === "picked_up";
   const isDriverArrived = order.status === "driver_arrived";
+  const isReadyForPickup = order.status === "ready_for_pickup";
 
   return (
     <div className="bg-white rounded-xl border">
@@ -213,7 +263,21 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
           </div>
         </div>
 
-        {!isDelivered && !isFailed && (
+        {!isDelivered && !isFailed && isPickupOrder && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-semibold px-3 py-1 rounded-full border border-orange-200">
+              🏬 Pick Up In Store
+            </span>
+            {order.pickupWindow && (
+              <span className="flex items-center gap-1 text-sm text-gray-500">
+                <Clock size={13} />
+                {order.pickupWindow.dateLabel} · {order.pickupWindow.label}
+              </span>
+            )}
+          </div>
+        )}
+
+        {!isDelivered && !isFailed && !isPickupOrder && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {order.deliveryType === "next-morning" ? (
               <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1 rounded-full border border-amber-200">
@@ -250,6 +314,29 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
         {ACTIVE_STATUSES.includes(order.status) && (
           <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700 font-medium">
             🪪 Please have your valid 21+ photo ID ready for delivery. You must show it to receive your order.
+          </div>
+        )}
+
+        {/* Ready for pickup: instructions + customer confirm */}
+        {isReadyForPickup && (
+          <div className="mt-3 space-y-3">
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl px-4 py-3.5">
+              <p className="font-bold text-amber-800 text-sm mb-1">🛍️ Your order is ready for pick up!</p>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                📍 Cold Spring Liquor — 15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641<br />
+                🪪 Bring a valid 21+ photo ID — the name should match the order.<br />
+                We will hold your order for 7 days post pickup date.
+              </p>
+            </div>
+            {confirmPickupError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-xs text-red-700">{confirmPickupError}</div>
+            )}
+            <button onClick={confirmPickedUp} disabled={confirmingPickup}
+              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-black py-3.5 rounded-xl text-sm transition-all">
+              {confirmingPickup ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+              Confirm Order Picked Up
+            </button>
+            <p className="text-center text-[11px] text-gray-400">Already picked up your order? Tap to confirm and complete it.</p>
           </div>
         )}
       </div>
@@ -294,10 +381,10 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
       {!isFailed && (
         <div className="px-6 py-5">
           <div className="space-y-0">
-            {STEPS.map((step, idx) => {
+            {steps.map((step, idx) => {
               const done = idx <= currentStep;
               const active = idx === currentStep;
-              const isLast = idx === STEPS.length - 1;
+              const isLast = idx === steps.length - 1;
 
               return (
                 <div key={step.label} className="flex gap-4">
@@ -344,12 +431,23 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
           <span className="text-gray-600">{order.items?.length ?? 0} item(s)</span>
           <span className="font-bold">${Number(order.total).toFixed(2)}</span>
         </div>
-        {order.deliveryAddress && (
-          <p className="text-xs text-gray-400 mt-1">
-            Delivering to: {order.deliveryAddress.street}, {order.deliveryAddress.city}
-          </p>
+        {isPickupOrder ? (
+          <>
+            <p className="text-xs text-gray-400 mt-1">
+              Pick up at: 15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641
+            </p>
+            <p className="text-xs text-green-600 font-medium mt-1">🏬 Pick Up In Store · 💚 5% Discount Applied</p>
+          </>
+        ) : (
+          <>
+            {order.deliveryAddress && (
+              <p className="text-xs text-gray-400 mt-1">
+                Delivering to: {order.deliveryAddress.street}, {order.deliveryAddress.city}
+              </p>
+            )}
+            <p className="text-xs text-green-600 font-medium mt-1">🚚 FREE Delivery · 💰 No Tip Required</p>
+          </>
         )}
-        <p className="text-xs text-green-600 font-medium mt-1">🚚 FREE Delivery · 💰 No Tip Required</p>
       </div>
     </div>
   );

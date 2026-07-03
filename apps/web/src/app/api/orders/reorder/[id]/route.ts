@@ -4,7 +4,7 @@ import { dbGetOrder, dbGetProduct } from "@/lib/db";
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const order = await dbGetOrder(params.id);
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-  if (order.status !== "delivered") return NextResponse.json({ error: "Only delivered orders can be reordered" }, { status: 400 });
+  if (order.status !== "delivered" && order.status !== "picked_up") return NextResponse.json({ error: "Only completed orders can be reordered" }, { status: 400 });
 
   const validItems: {
     product: NonNullable<Awaited<ReturnType<typeof dbGetProduct>>>;

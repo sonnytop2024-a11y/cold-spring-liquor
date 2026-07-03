@@ -8,6 +8,7 @@ import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
 import { estimateDeliveryFromStoreAsync } from "./deliveryEstimate";
 import { calcDiscounts } from "./discountRules";
+import { validatePickupWindow } from "./pickupWindows";
 import type { MockOrder } from "../app/api/_mock/store";
 
 export interface OrderInput {
@@ -65,33 +66,48 @@ export async function processOrder(
   });
   const bundleTiers = store.getActiveBundleTiers();
   const { subtotal, bundleDiscount } = calcDiscounts(enrichedItems, bundleTiers);
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
   const safeBundleDiscount = Math.round(bundleDiscount * 100) / 100;
-  const total = Math.round(Math.max(0, subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - giftCardAmount + tax) * 100) / 100;
 
-  // We are delivery-only. Reject placeholder/pickup addresses like "101 - Will Pick Up".
-  const street: string = (deliveryAddress?.street ?? "").trim();
-  const streetLower = street.toLowerCase().replace(/[^a-z ]/g, " ");
-  const PICKUP_WORDS = ["pickup", "pick up", "will call", "willcall", "in store", "instore", "store pickup", "n a", "none"];
-  if (PICKUP_WORDS.some(w => streetLower.includes(w))) {
-    return {
-      error: "We are a delivery-only service — in-store pickup is not available. Please enter a valid street address for delivery.",
-      status: 422,
-    };
-  }
-  if (!/^\d+\s+[A-Za-z]/.test(street)) {
-    return {
-      error: "Please provide a complete street address including your house or building number (e.g. 1221 Sonny Dr).",
-      status: 422,
-    };
-  }
+  const isPickup = body.orderType === "pickup";
+  // Pick Up In Store: automatic 5% discount, tax computed on the discounted subtotal
+  const pickupDiscount = isPickup ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+  const tax = Math.round((subtotal - pickupDiscount) * TAX_RATE * 100) / 100;
+  const total = Math.round(Math.max(0, subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax) * 100) / 100;
 
-  const { distanceMiles, etaMinutes } = await estimateDeliveryFromStoreAsync(deliveryAddress ?? {});
-  if (distanceMiles > 10) {
-    return {
-      error: `Sorry, we only deliver within 10 miles of our store. Your address is ${distanceMiles} miles away.`,
-      status: 422,
-    };
+  let distanceMiles = 0;
+  let etaMinutes = 0;
+
+  if (isPickup) {
+    const winError = validatePickupWindow(body.pickupWindow);
+    if (winError) return { error: winError, status: 422 };
+  } else {
+    // Delivery orders: validate the street address.
+    // Reject placeholder/pickup text like "101 - Will Pick Up" — pickup has its own checkout.
+    const street: string = (deliveryAddress?.street ?? "").trim();
+    const streetLower = street.toLowerCase().replace(/[^a-z ]/g, " ");
+    const PICKUP_WORDS = ["pickup", "pick up", "will call", "willcall", "in store", "instore", "store pickup", "n a", "none"];
+    if (PICKUP_WORDS.some(w => streetLower.includes(w))) {
+      return {
+        error: "Looking to pick up in store? Use our Pick Up checkout and save 5% — or enter a valid street address for delivery.",
+        status: 422,
+      };
+    }
+    if (!/^\d+\s+[A-Za-z]/.test(street)) {
+      return {
+        error: "Please provide a complete street address including your house or building number (e.g. 1221 Sonny Dr).",
+        status: 422,
+      };
+    }
+
+    const est = await estimateDeliveryFromStoreAsync(deliveryAddress ?? {});
+    distanceMiles = est.distanceMiles;
+    etaMinutes = est.etaMinutes;
+    if (distanceMiles > 10) {
+      return {
+        error: `Sorry, we only deliver within 10 miles of our store. Your address is ${distanceMiles} miles away.`,
+        status: 422,
+      };
+    }
   }
 
   const nowDate = new Date();
@@ -118,8 +134,11 @@ export async function processOrder(
     total,
     deliveryFee: 0,
     deliveryType: timing.type,
-    deliveryAddress,
-    billingAddress: billingAddressSameAsDelivery ? deliveryAddress : (billingAddress ?? deliveryAddress),
+    orderType: isPickup ? "pickup" : "delivery",
+    pickupWindow: isPickup ? body.pickupWindow : undefined,
+    pickupDiscount: isPickup ? pickupDiscount : undefined,
+    deliveryAddress: isPickup ? null : deliveryAddress,
+    billingAddress: isPickup ? (billingAddress ?? null) : (billingAddressSameAsDelivery ? deliveryAddress : (billingAddress ?? deliveryAddress)),
     billingAddressSameAsDelivery: billingAddressSameAsDelivery ?? true,
     // Prefer non-empty values — a logged-in user with a blank profile phone
     // must not wipe out the phone they typed at checkout
@@ -134,7 +153,10 @@ export async function processOrder(
     updatedAt: nowStr,
     // same-day ETA is set only after admin/driver accepts (confirmed status)
     // next-morning / before-opening ETA is a fixed future time — set now so customer knows when to expect
-    estimatedDelivery: timing.type === "next-morning" || timing.isStoreClosed ? timing.estimatedDelivery.toISOString() : null,
+    // pickup: ETA = start of the chosen pickup window
+    estimatedDelivery: isPickup
+      ? body.pickupWindow.start
+      : timing.type === "next-morning" || timing.isStoreClosed ? timing.estimatedDelivery.toISOString() : null,
   };
 
   await dbCreateOrder(order);
@@ -161,7 +183,7 @@ export async function processOrder(
       const card = await dbGetGiftCard(giftCardCode);
       if (card) {
         // Only deduct what was actually charged (order could be < gift card balance)
-        const totalBeforeGift = Math.round((subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount + tax) * 100) / 100;
+        const totalBeforeGift = Math.round((subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - pickupDiscount + tax) * 100) / 100;
         const actualDeduction = Math.min(giftCardAmount, Math.max(0, totalBeforeGift));
         const newBalance = Math.round(Math.max(0, card.remainingBalance - actualDeduction) * 100) / 100;
         await dbSaveGiftCard({ ...card, remainingBalance: newBalance, status: newBalance <= 0 ? "redeemed" : "partial" });

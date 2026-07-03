@@ -14,7 +14,8 @@ function stripPrivate(order: MockOrder) {
 
 export async function GET(req: NextRequest) {
   const driverId = req.nextUrl.searchParams.get("driverId");
-  const orders = await dbGetAllOrders();
+  // Pick Up In Store orders never involve a driver
+  const orders = (await dbGetAllOrders()).filter(o => o.orderType !== "pickup");
 
   let newOrders, activeOrders;
   if (driverId) {

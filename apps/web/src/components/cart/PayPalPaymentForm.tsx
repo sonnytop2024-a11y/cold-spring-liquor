@@ -22,13 +22,16 @@ interface ReviewData {
   rewardsPointsToRedeem: number;
   giftCardAmount: number;
   tax: number;
+  // Pick Up In Store
+  pickup?: { dateLabel: string; label: string } | null;
+  pickupDiscount?: number;
 }
 
 interface Props {
   total: number;
   orderPayload: object;
   reviewData: ReviewData;
-  onSuccess: (order: { id: string; orderNumber: string; total: number }) => void;
+  onSuccess: (order: { id: string; orderNumber: string; total: number; pickupWindow?: { start: string; end: string; label: string; dateLabel: string } | null }) => void;
   onCancel: () => void;
 }
 
@@ -50,7 +53,8 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
   const buttonsRef = useRef<{ close?: () => void } | null>(null);
 
   const rd = reviewData;
-  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount;
+  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount + (rd.pickupDiscount ?? 0);
+  const isPickup = !!rd.pickup;
   const addrStr = (a: ReviewData["deliveryAddress"]) => [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ");
 
   useEffect(() => {
@@ -135,7 +139,7 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
       });
       const order = await res.json();
       if (!res.ok) throw new Error(order.error ?? "Capture failed");
-      onSuccess({ id: order.id, orderNumber: order.orderNumber, total: order.total });
+      onSuccess({ id: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Payment failed. Please try again.");
       setCapturing(false);
@@ -179,8 +183,12 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
 
         {/* Address */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">📍 Delivery</h3>
-          <p className="text-sm text-gray-700 flex items-start gap-2"><MapPin size={13} className="mt-0.5 shrink-0 text-gray-400" />{addrStr(rd.deliveryAddress)}</p>
+          <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">{isPickup ? "🏬 Pick Up In Store" : "📍 Delivery"}</h3>
+          {isPickup ? (
+            <p className="text-sm text-gray-700 flex items-start gap-2"><MapPin size={13} className="mt-0.5 shrink-0 text-gray-400" /><span><strong>{rd.pickup!.dateLabel} · {rd.pickup!.label}</strong><br />15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641</span></p>
+          ) : (
+            <p className="text-sm text-gray-700 flex items-start gap-2"><MapPin size={13} className="mt-0.5 shrink-0 text-gray-400" />{addrStr(rd.deliveryAddress)}</p>
+          )}
         </div>
 
         {/* Payment method */}
@@ -199,7 +207,7 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
             {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
             {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
             {rd.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
-            <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+            {isPickup ? (<div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(rd.pickupDiscount ?? 0)}</span></div>) : (<div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>)}
             <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(rd.tax)}</span></div>
           </div>
           <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-baseline">
