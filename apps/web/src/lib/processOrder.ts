@@ -88,7 +88,7 @@ export async function processOrder(
     const PICKUP_WORDS = ["pickup", "pick up", "will call", "willcall", "in store", "instore", "store pickup", "n a", "none"];
     if (PICKUP_WORDS.some(w => streetLower.includes(w))) {
       return {
-        error: "Looking to pick up in store? Use our Pick Up checkout and save 10% — or enter a valid street address for delivery.",
+        error: "Looking to pick up in store? Use our Pick Up checkout and save 5% — or enter a valid street address for delivery.",
         status: 422,
       };
     }

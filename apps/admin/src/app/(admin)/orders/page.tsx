@@ -597,7 +597,7 @@ export default function OrdersPage() {
                 <p className="font-semibold text-gray-500 uppercase">🏬 Pick Up Details</p>
                 {order.pickupWindow && <p>🕐 Window: <b>{order.pickupWindow.dateLabel} · {order.pickupWindow.label}</b></p>}
                 <p>💳 Payment: <b>{order.stripePaymentIntentId || order.paypalOrderId ? "Paid" : order.paymentMethod === "gift_card" ? "Paid (Gift Card)" : "—"}</b>{order.paymentMethod ? ` (${order.paymentMethod})` : ""}</p>
-                {(order.pickupDiscount ?? 0) > 0 && <p>💚 Pick Up Discount: <b>-${Number(order.pickupDiscount).toFixed(2)} (10%)</b></p>}
+                {(order.pickupDiscount ?? 0) > 0 && <p>💚 Pick Up Discount: <b>-${Number(order.pickupDiscount).toFixed(2)} (5%)</b></p>}
                 {order.pickedUpAt && <p>✅ Picked up at: <b>{new Date(order.pickedUpAt).toLocaleString()}</b></p>}
                 <p>
                   ✉️ Email: <b>{order.readyEmailSent ? "Sent ✓" : "—"}</b>

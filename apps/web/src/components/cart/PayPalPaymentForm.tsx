@@ -207,7 +207,7 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
             {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
             {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
             {rd.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
-            {isPickup ? (<div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−10%)</span><span>-{formatCurrency(rd.pickupDiscount ?? 0)}</span></div>) : (<div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>)}
+            {isPickup ? (<div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount (−5%)</span><span>-{formatCurrency(rd.pickupDiscount ?? 0)}</span></div>) : (<div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>)}
             <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(rd.tax)}</span></div>
           </div>
           <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-baseline">
