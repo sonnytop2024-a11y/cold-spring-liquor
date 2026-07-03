@@ -5,14 +5,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/cartStore";
-import { formatCurrency, calcCartTotals, calcPointsEarned, MIN_ORDER } from "@/lib/utils";
+import { useAuthStore } from "@/store/authStore";
+import { formatCurrency, calcCartTotals, calcPointsEarned, calcPointsValue, MIN_ORDER } from "@/lib/utils";
 import { calcDiscounts } from "@/lib/discountRules";
 
 // Cheap add-on suggestions to help reach the $20 minimum
 const ADDONS = [
-  { id: "p10", name: "Blue Moon Belgian White", price: 11.99, volume: "6-pack", emoji: "🍺" },
-  { id: "p11", name: "Josh Cellars Cabernet", price: 14.99, volume: "750ml", emoji: "🍷" },
-  { id: "p5", name: "Modelo Especial", price: 19.99, volume: "12-pack", emoji: "🍺" },
+  { id: "imp995", name: "Bud Light 6pk", price: 12.99, volume: "12oz cans", emoji: "🍺" },
+  { id: "imp1149", name: "Modelo Especial 6pk", price: 15.99, volume: "12oz bottles", emoji: "🍺" },
+  { id: "imp1215", name: "Barefoot Cabernet Sauvignon", price: 10.99, volume: "750mL", emoji: "🍷" },
 ];
 
 interface CartDrawerProps {
@@ -21,19 +22,33 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
-  const { items, updateQuantity, removeItem, addItem, couponDiscount, giftCardAmount, rewardsPointsToRedeem } = useCartStore();
+  const { items, updateQuantity, removeItem, addItem, couponDiscount, giftCardAmount, rewardsPointsToRedeem, setRewardsRedeem } = useCartStore();
+  const { user } = useAuthStore();
 
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
   useEffect(() => {
     fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
   }, []);
 
+  // Clear stale rewards if user no longer has enough points
+  useEffect(() => {
+    if (rewardsPointsToRedeem > 0 && (user?.points ?? 0) < rewardsPointsToRedeem) {
+      setRewardsRedeem(0);
+    }
+  }, [user?.points, rewardsPointsToRedeem, setRewardsRedeem]);
+
+  // Add body class so PayPal/Venmo iframes hide themselves when cart is open
+  useEffect(() => {
+    document.body.classList.toggle("cart-open", open);
+    return () => document.body.classList.remove("cart-open");
+  }, [open]);
+
   const { subtotal, flashSavings, bundleDiscount, bundleQty } = calcDiscounts(
     items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
     bundleTiers,
   );
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
-  const rewardsDiscount = rewardsPointsToRedeem >= 100 ? Math.floor(rewardsPointsToRedeem / 100) * 5 : 0;
+  const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   const { tax, total } = calcCartTotals(subtotal, couponDiscount + bundleDiscount, rewardsDiscount, giftCardAmount);
   const pointsEarned = calcPointsEarned(subtotal);
 
@@ -46,8 +61,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />}
-      <div className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}>
+      {open && <div className="fixed inset-0 z-[9999] bg-black/40" onClick={onClose} />}
+      <div className={`fixed top-0 right-0 z-[9999] h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}>
         <div className="flex items-center justify-between px-5 py-4 border-b bg-dark-900 text-white">
           <h2 className="font-heading text-lg font-bold">Your Cart ({items.length})</h2>
           <button onClick={onClose}><X size={22} /></button>
@@ -112,7 +127,6 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold line-clamp-1">{product.name}</p>
-                    <p className="text-xs text-gray-400">{product.volume}</p>
                     <p className="text-sm font-bold text-brand-600 mt-0.5">{formatCurrency((product.salePrice ?? product.price) * quantity)}</p>
                     <div className="flex items-center gap-2 mt-1.5">
                       <button onClick={() => updateQuantity(product.id, quantity - 1)} className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100">

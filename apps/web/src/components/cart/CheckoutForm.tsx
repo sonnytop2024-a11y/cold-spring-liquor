@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star } from "lucide-react";
+import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star, Gift } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
 import { calcDiscounts } from "@/lib/discountRules";
 import { useRouter } from "next/navigation";
-import { formatCurrency, MIN_ORDER } from "@/lib/utils";
+import { formatCurrency, MIN_ORDER, calcPointsValue } from "@/lib/utils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
@@ -22,22 +22,51 @@ const TAX = 0.0825;
 interface AddrForm { street: string; city: string; state: string; zip: string }
 const BLANK_ADDR: AddrForm = { street: "", city: "Leander", state: "TX", zip: "" };
 
+const CHECKOUT_STEPS = ["Your Details", "Payment", "Review Order", "Confirm"];
+
+function CheckoutSteps({ current }: { current: 1 | 2 | 3 | 4 }) {
+  return (
+    <div className="flex items-center gap-0 mb-1">
+      {CHECKOUT_STEPS.map((label, i) => {
+        const step = i + 1;
+        const done = step < current;
+        const active = step === current;
+        return (
+          <div key={label} className="flex items-center flex-1 min-w-0">
+            <div className="flex flex-col items-center shrink-0">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-colors ${done ? "bg-green-500 text-white" : active ? "bg-brand-500 text-white" : "bg-gray-200 text-gray-400"}`}>
+                {done ? "✓" : step}
+              </div>
+              <span className={`text-[10px] font-semibold mt-1 text-center leading-tight ${active ? "text-brand-600" : done ? "text-green-600" : "text-gray-400"}`}>
+                {label}
+              </span>
+            </div>
+            {i < CHECKOUT_STEPS.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-1 mb-4 rounded ${done ? "bg-green-400" : "bg-gray-200"}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Field({ label, value, onChange, placeholder, error, type = "text", readOnly }: {
   label: string; value: string; onChange?: (v: string) => void;
   placeholder?: string; error?: string; type?: string; readOnly?: boolean;
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">{label}</label>
       <input
         type={type}
         value={value}
         onChange={e => onChange?.(e.target.value)}
         placeholder={placeholder}
         readOnly={readOnly}
-        className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${readOnly ? "bg-gray-50 text-gray-500" : ""}`}
+        className={`w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all ${readOnly ? "bg-gray-50 text-gray-400 cursor-default" : "bg-white"}`}
       />
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-red-500 text-xs mt-1" data-error="1">{error}</p>}
     </div>
   );
 }
@@ -126,7 +155,7 @@ function AddressAutocomplete({
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder ?? "123 Main St, Apt 4B"}
       autoComplete="off"
-      className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all"
     />
   );
 }
@@ -233,7 +262,7 @@ function ThankYouPopup({
               <div className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
               <div className="relative w-full h-full rounded-full bg-green-500" />
             </div>
-            <p className="text-sm text-gray-700 font-medium">Our team is preparing your order now</p>
+            <p className="text-sm text-gray-700 font-medium">Your order is being confirmed — we'll get started right away</p>
           </div>
 
           {/* CTA */}
@@ -251,9 +280,16 @@ function ThankYouPopup({
 }
 
 export function CheckoutForm() {
-  const { items, clearCart } = useCartStore();
+  const { items, clearCart, rewardsPointsToRedeem, setRewardsRedeem, giftCardCode, giftCardAmount, setGiftCard } = useCartStore();
   const { user, isLoggedIn } = useAuthStore();
   const router = useRouter();
+
+  // Redirect to home only if user was logged in and then logs out mid-checkout
+  const wasLoggedIn = useRef(isLoggedIn);
+  useEffect(() => {
+    if (wasLoggedIn.current && !isLoggedIn) router.push("/");
+    wasLoggedIn.current = isLoggedIn;
+  }, [isLoggedIn, router]);
 
   // Contact info
   const [name, setName] = useState("");
@@ -263,9 +299,6 @@ export function CheckoutForm() {
   // Delivery address
   const [delivery, setDelivery] = useState<AddrForm>(BLANK_ADDR);
 
-  // Billing address
-  const [sameBilling, setSameBilling] = useState(true);
-  const [billing, setBilling] = useState<AddrForm>(BLANK_ADDR);
 
   // Reorder prefill banner
   const [reorderFromOrder, setReorderFromOrder] = useState<string | null>(null);
@@ -279,18 +312,60 @@ export function CheckoutForm() {
   const [applyingPromo, setApplyingPromo] = useState(false);
   const { setPromo, clearPromo } = useCheckoutStore();
 
+  // Gift card
+  const [giftInput, setGiftInput] = useState(giftCardCode ?? "");
+  const [giftError, setGiftError] = useState("");
+  const [applyingGift, setApplyingGift] = useState(false);
+
   const [showSummary, setShowSummary] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [zoneError, setZoneError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
-  const [paymentStep, setPaymentStep] = useState<null | "select" | "paypal">(null);
+  const [paymentStep, setPaymentStep] = useState<null | "select" | "paypal" | "review-free">(null);
   const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number } | null>(null);
+  const [rewardsDismissed, setRewardsDismissed] = useState(false);
+  const [showMobileSummary, setShowMobileSummary] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
 
   // Scroll to top on mount and whenever switching to the payment step
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
   useEffect(() => { if (clientSecret || paymentStep) window.scrollTo({ top: 0, behavior: "smooth" }); }, [clientSecret, paymentStep]);
+
+  // Handle return from Klarna / 3DS redirect
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const returnedSecret = url.searchParams.get("payment_intent_client_secret");
+    const redirectStatus = url.searchParams.get("redirect_status");
+    if (!returnedSecret) return;
+    // Clean URL immediately
+    ["payment_intent", "payment_intent_client_secret", "redirect_status"].forEach(p => url.searchParams.delete(p));
+    window.history.replaceState({}, "", url.toString());
+    if (redirectStatus !== "succeeded") return;
+    const pendingRaw = sessionStorage.getItem("csl-pending-stripe-order");
+    if (!pendingRaw) return;
+    sessionStorage.removeItem("csl-pending-stripe-order");
+    const { orderPayload: pendingPayload } = JSON.parse(pendingRaw) as { orderPayload: object };
+    stripePromise.then(async (stripe) => {
+      if (!stripe) return;
+      const { paymentIntent } = await stripe.retrievePaymentIntent(returnedSecret);
+      if (paymentIntent?.status === "succeeded") {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...pendingPayload, stripePaymentIntentId: paymentIntent.id }),
+        });
+        if (res.ok) {
+          const order = await res.json();
+          clearCart();
+          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total });
+        }
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Read reorder prefill from localStorage (runs once on mount) ───────────
   const [reorderPrefill, setReorderPrefill] = useState<Record<string, any> | null>(null);
@@ -313,15 +388,18 @@ export function CheckoutForm() {
     const finalEmail = rp?.customerEmail ?? u?.email ?? "";
     const finalPhone = rp?.customerPhone ?? u?.phone ?? "";
     const finalDelivery = rp?.deliveryAddress ?? u?.deliveryAddress;
-    const finalBilling = rp?.billingAddress ?? u?.billingAddress;
-    const finalSameBilling = rp?.billingAddressSameAsDelivery ?? u?.billingAddressSameAsDelivery;
     if (finalName) setName(finalName);
     if (finalEmail) setEmail(finalEmail);
     if (finalPhone) setPhone(finalPhone);
     if (finalDelivery?.street) setDelivery(finalDelivery);
-    if (finalBilling?.street) setBilling(finalBilling);
-    if (finalSameBilling !== undefined) setSameBilling(finalSameBilling);
   }, [user, reorderPrefill]);
+
+  // Clear stale rewards redemption if user no longer has enough points
+  useEffect(() => {
+    if (rewardsPointsToRedeem > 0 && (user?.points ?? 0) < rewardsPointsToRedeem) {
+      setRewardsRedeem(0);
+    }
+  }, [user?.points, rewardsPointsToRedeem, setRewardsRedeem]);
 
   // Delivery timing — computed once per render (updates each page load)
   const timing = useMemo(() => getDeliveryTiming(), []);
@@ -338,9 +416,15 @@ export function CheckoutForm() {
     bundleTiers,
   );
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
+  const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   const tax = subtotal * TAX;
-  const total = Math.max(0, subtotal - bundleDiscount - promoDiscount + tax);
-  const pointsEarned = Math.floor(total * 10);
+  // Re-cap gift card to what the order actually owes (guards against over-application when rewards added after gift card)
+  const preGiftOwed = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount + tax);
+  const effectiveGiftCard = Math.min(giftCardAmount, preGiftOwed);
+  const total = Math.max(0, preGiftOwed - effectiveGiftCard);
+  const pointsEarned = Math.floor(total); // 1 pt per $1
+  const userPoints = user?.points ?? 0;
+  const bestEligibleTier = [1000, 500, 250].find(t => userPoints >= t) ?? 0;
   const meetsMinimum = subtotal >= MIN_ORDER;
   const amountToMin = Math.max(0, MIN_ORDER - subtotal);
 
@@ -361,6 +445,28 @@ export function CheckoutForm() {
     finally { setApplyingPromo(false); }
   }
 
+  async function applyGiftCard() {
+    const code = giftInput.trim().toUpperCase();
+    if (!code) return;
+    setApplyingGift(true); setGiftError("");
+    try {
+      const res = await fetch("/api/gift-cards/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) { setGiftError("Invalid or already used gift card code"); setGiftCard(null, 0); }
+      else {
+        // Cap to the pre-gift-card order total so we don't over-apply
+        const preGiftTotal = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount + tax);
+        const appliedAmount = Math.min(data.balance, preGiftTotal);
+        setGiftCard(code, Math.round(appliedAmount * 100) / 100);
+      }
+    } catch { setGiftError("Could not validate gift card. Please try again."); }
+    finally { setApplyingGift(false); }
+  }
+
   function validate() {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Full name required";
@@ -370,18 +476,21 @@ export function CheckoutForm() {
     else if (!/^\d+\s/.test(delivery.street.trim())) e.street = "Please include your house/building number (e.g. 1221 Sonny Dr)";
     if (!delivery.city.trim()) e.city = "City required";
     if (!/^\d{5}$/.test(delivery.zip)) e.zip = "Valid ZIP code required";
-    if (!sameBilling) {
-      if (!billing.street.trim()) e.billStreet = "Billing street required";
-      else if (!/^\d+\s/.test(billing.street.trim())) e.billStreet = "Please include your house/building number";
-      if (!/^\d{5}$/.test(billing.zip)) e.billZip = "Billing ZIP required";
-    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      // Scroll to first visible error so user doesn't miss it
+      requestAnimationFrame(() => {
+        const el = document.querySelector("[data-error]") as HTMLElement | null;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        else window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+      return;
+    }
     setSubmitting(true);
     setZoneError(null);
 
@@ -407,16 +516,22 @@ export function CheckoutForm() {
     const payload = {
       items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity })),
       deliveryAddress: delivery,
-      billingAddress: sameBilling ? delivery : billing,
-      billingAddressSameAsDelivery: sameBilling,
+      billingAddress: delivery,
+      billingAddressSameAsDelivery: true,
       customerName: name,
       customerEmail: email,
       customerPhone: phone,
       couponCode: promoCode,
       couponDiscount: promoDiscount,
+      rewardsDiscount,
+      rewardsPointsToRedeem,
+      giftCardCode,
+      giftCardAmount: effectiveGiftCard,
     };
+
     setOrderPayload(payload);
-    setPaymentStep("select");
+    // Gift card (+ rewards) covers full amount → show review before finalizing
+    setPaymentStep(total === 0 ? "review-free" : "select");
     setSubmitting(false);
   }
 
@@ -450,62 +565,167 @@ export function CheckoutForm() {
     );
   }
 
+  // ── Review screen for $0 orders (gift card covers full amount) ─────────────
+  if (paymentStep === "review-free") {
+    const rd = {
+      customerName: name, customerEmail: email, customerPhone: phone,
+      deliveryAddress: delivery,
+      items, subtotal, flashSavings, bundleDiscount, bundlePct,
+      promoCode, promoDiscount, rewardsDiscount, rewardsPointsToRedeem,
+      giftCardAmount: effectiveGiftCard, tax,
+    };
+
+    async function confirmFreeOrder() {
+      setConfirming(true);
+      setConfirmError("");
+      try {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...orderPayload, paymentMethod: "gift_card" }),
+        });
+        const order = await res.json();
+        if (!res.ok) throw new Error(order.error ?? "Failed to place order");
+        clearCart();
+        setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total });
+      } catch (err: any) {
+        setConfirmError(err.message ?? "Something went wrong. Please try again.");
+        setConfirming(false);
+      }
+    }
+
+    return (
+      <div className="space-y-4">
+        <CheckoutSteps current={4} />
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <CheckCircle size={18} className="text-green-600" />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900 text-base">Review Your Order</h2>
+              <p className="text-xs text-gray-400">Paid in full by gift card — confirm to complete</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">🛒 Items</h3>
+          <div className="space-y-2">
+            {rd.items.map(({ product: p, quantity }) => (
+              <div key={p.id} className="flex justify-between text-sm">
+                <span className="text-gray-700 flex-1 pr-4">{p.name} <span className="text-gray-400">×{quantity}</span></span>
+                <span className="font-medium text-gray-900">{formatCurrency((p.salePrice ?? p.price) * quantity)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+          <div>
+            <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">👤 Contact</h3>
+            <p className="text-sm font-semibold text-gray-800">{rd.customerName}</p>
+            <p className="text-sm text-gray-500">{rd.customerEmail} · {rd.customerPhone}</p>
+          </div>
+          <div className="border-t border-gray-100 pt-3">
+            <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">📍 Delivery</h3>
+            <p className="text-sm text-gray-800">{rd.deliveryAddress.street}</p>
+            <p className="text-sm text-gray-500">{rd.deliveryAddress.city}, {rd.deliveryAddress.state} {rd.deliveryAddress.zip}</p>
+          </div>
+          <div className="border-t border-gray-100 pt-3">
+            <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">💳 Payment</h3>
+            <p className="text-sm text-gray-800">🎁 Gift Card — {giftCardCode}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">💰 Order Total</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(rd.subtotal)}</span></div>
+            {rd.flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Sale</span><span>-{formatCurrency(rd.flashSavings)}</span></div>}
+            {rd.bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(rd.bundlePct * 100)}%)</span><span>-{formatCurrency(rd.bundleDiscount)}</span></div>}
+            {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
+            {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
+            {rd.giftCardAmount > 0 && <div className="flex justify-between text-emerald-600 font-medium"><span>🎁 Gift Card ({giftCardCode})</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
+            <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+            <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(rd.tax)}</span></div>
+          </div>
+          <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-baseline">
+            <span className="font-bold text-gray-900">Total</span>
+            <span className="font-black text-2xl text-gray-900">$0.00</span>
+          </div>
+          <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center">
+            <p className="text-xs text-emerald-700 font-semibold">🎁 Fully covered by your gift card!</p>
+          </div>
+        </div>
+
+        {confirmError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+            <AlertTriangle size={14} className="shrink-0" /> {confirmError}
+          </div>
+        )}
+
+        <button onClick={confirmFreeOrder} disabled={confirming}
+          className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 text-white font-black py-4 rounded-2xl text-base transition-all shadow-lg shadow-brand-500/25">
+          {confirming ? <><Loader2 size={18} className="animate-spin" /> Placing Order…</> : <>Confirm Order — $0.00 →</>}
+        </button>
+
+        <button type="button" onClick={() => setPaymentStep(null)} disabled={confirming}
+          className="w-full border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-40">
+          ← Edit Order
+        </button>
+        <p className="text-center text-xs text-gray-400">🔒 Must be 21+, valid ID checked at delivery.</p>
+      </div>
+    );
+  }
+
   // ── Payment method selection ────────────────────────────────────────────────
   if (paymentStep === "select") {
     return (
-      <div className="space-y-4">
-        <div className="bg-white border rounded-2xl p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="font-bold text-base sm:text-lg">Choose Payment</h2>
-            <span className="font-black text-xl sm:text-2xl text-gray-900">{formatCurrency(total)}</span>
-          </div>
-          <p className="text-xs text-gray-400 mb-5">Select how you'd like to pay</p>
+      <div className="space-y-3">
+        {/* Step progress */}
+        <CheckoutSteps current={2} />
 
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-bold text-base text-gray-800">Choose Payment</h2>
+            <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+          </div>
+          <p className="text-xs text-gray-400 mb-5">Select how you&apos;d like to pay — you&apos;ll review your order before confirming</p>
           <div className="space-y-3">
-            {/* Card / Apple Pay / Klarna */}
             <button onClick={selectStripe} disabled={submitting}
-              className="w-full flex items-center gap-3 border-2 border-gray-200 hover:border-brand-400 rounded-2xl p-4 text-left transition-all group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 group-hover:bg-brand-50 rounded-xl flex items-center justify-center shrink-0 transition-colors">
-                <CreditCard size={20} className="text-gray-600 group-hover:text-brand-500" />
+              className="w-full flex items-center gap-3 bg-white border-2 border-gray-200 hover:border-brand-400 rounded-2xl p-4 text-left transition-all">
+              <div className="w-11 h-11 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
+                <CreditCard size={20} className="text-brand-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-sm sm:text-base">Card · Apple Pay · Klarna</p>
-                <p className="text-xs text-gray-400 mt-0.5 truncate">Credit/debit, Apple Pay, Google Pay, or pay later</p>
+                <p className="font-bold text-gray-800 text-sm">Card · Apple Pay · Klarna</p>
+                <p className="text-xs text-gray-400 mt-0.5">Credit/debit, Apple Pay, Google Pay, or pay later</p>
               </div>
               <div className="hidden sm:flex gap-1.5 shrink-0">
                 {["💳", "🍎", "K"].map(icon => (
-                  <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-bold">{icon}</span>
+                  <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-bold text-gray-600">{icon}</span>
                 ))}
               </div>
             </button>
-
-            {/* PayPal / Venmo */}
             <button onClick={() => setPaymentStep("paypal")}
-              className="w-full flex items-center gap-3 border-2 border-gray-200 hover:border-[#0070BA] rounded-2xl p-4 text-left transition-all group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#003087] rounded-xl flex items-center justify-center shrink-0">
-                <span className="text-white font-black text-base sm:text-lg">P</span>
+              className="w-full flex items-center gap-3 bg-white border-2 border-gray-200 hover:border-[#0070BA] rounded-2xl p-4 text-left transition-all">
+              <div className="w-11 h-11 bg-[#003087] rounded-xl flex items-center justify-center shrink-0">
+                <span className="text-white font-black text-lg">P</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-sm sm:text-base">PayPal · Venmo</p>
+                <p className="font-bold text-gray-800 text-sm">PayPal · Venmo</p>
                 <p className="text-xs text-gray-400 mt-0.5">Pay with your PayPal balance, bank, or Venmo</p>
-              </div>
-              <div className="hidden sm:flex gap-1.5 shrink-0">
-                {["🅿️", "V"].map(icon => (
-                  <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-sm font-bold">{icon}</span>
-                ))}
               </div>
             </button>
           </div>
         </div>
-
         <button type="button" onClick={() => { setPaymentStep(null); setOrderPayload(null); }}
-          className="w-full border-2 border-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+          className="w-full border border-gray-200 text-gray-600 text-sm font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors">
           ← Back to your details
         </button>
-
-        <p className="text-center text-xs text-gray-400">
-          🔒 All payments are encrypted and secure. Must be 21+.
-        </p>
+        <p className="text-center text-xs text-gray-400">🔒 All payments are encrypted and secure. Must be 21+.</p>
       </div>
     );
   }
@@ -516,6 +736,15 @@ export function CheckoutForm() {
       <PayPalPaymentForm
         total={total}
         orderPayload={orderPayload!}
+        reviewData={{
+          customerName: name, customerEmail: email, customerPhone: phone,
+          deliveryAddress: delivery,
+          billingAddress: delivery,
+          sameBilling: true,
+          items, subtotal, flashSavings, bundleDiscount, bundlePct,
+          promoCode, promoDiscount, rewardsDiscount, rewardsPointsToRedeem,
+          giftCardAmount: effectiveGiftCard, tax,
+        }}
         onSuccess={(order) => {
           clearCart();
           setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total });
@@ -554,6 +783,25 @@ export function CheckoutForm() {
           clientSecret={clientSecret}
           orderPayload={orderPayload!}
           total={total}
+          reviewData={{
+            customerName: name,
+            customerEmail: email,
+            customerPhone: phone,
+            deliveryAddress: delivery,
+            billingAddress: delivery,
+            sameBilling: true,
+            items,
+            subtotal,
+            flashSavings,
+            bundleDiscount,
+            bundlePct,
+            promoCode,
+            promoDiscount,
+            rewardsDiscount,
+            rewardsPointsToRedeem,
+            giftCardAmount: effectiveGiftCard,
+            tax,
+          }}
           onSuccess={(order) => {
             clearCart();
             setThankYouOrder({
@@ -569,34 +817,75 @@ export function CheckoutForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-3">
+      <CheckoutSteps current={1} />
 
-      {/* Reorder prefill notice */}
+      {/* Mobile order summary accordion */}
+      <div className="lg:hidden bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
+        <button type="button" onClick={() => setShowMobileSummary(s => !s)}
+          className="w-full flex items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-800 font-bold text-sm">Order Summary</span>
+            <span className="text-xs font-bold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">{totalQty} items</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-900 font-bold">{formatCurrency(total)}</span>
+            {showMobileSummary ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
+          </div>
+        </button>
+        {showMobileSummary && (
+          <div className="px-5 pb-5 border-t border-gray-200">
+            <div className="space-y-2 pt-4 mb-3">
+              {items.map(({ product, quantity }) => (
+                <div key={product.id} className="flex items-center gap-2.5 text-xs">
+                  <span className="w-5 h-5 bg-brand-500 rounded-full text-white font-black flex items-center justify-center shrink-0 text-[10px]">{quantity}</span>
+                  <span className="flex-1 text-gray-600 truncate">{product.name}</span>
+                  <span className="text-gray-900 font-medium">{formatCurrency((product.salePrice ?? product.price) * quantity)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-gray-200 pt-3 space-y-1 text-xs">
+              <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+              {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
+              {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo</span><span>-{formatCurrency(promoDiscount)}</span></div>}
+              {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
+              {effectiveGiftCard > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(effectiveGiftCard)}</span></div>}
+              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+              <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(tax)}</span></div>
+              <div className="flex justify-between text-gray-900 font-bold text-sm pt-2 border-t border-gray-200">
+                <span>Total</span><span>{formatCurrency(total)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Notices */}
       {reorderFromOrder && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-blue-800">
-          <RefreshCw size={16} className="shrink-0 text-blue-600" />
-          <span>Reordering from <strong>#{reorderFromOrder}</strong> — your previous delivery info has been pre-filled.</span>
+          <RefreshCw size={14} className="shrink-0 text-blue-500" />
+          <span>Reordering from <strong>#{reorderFromOrder}</strong> — your previous info has been pre-filled.</span>
         </div>
       )}
-
-      {/* Auto-fill notice */}
       {!reorderFromOrder && isLoggedIn && user?.deliveryAddress?.street && (
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-green-800">
-          <CheckCircle size={16} className="shrink-0 text-green-600" />
+          <CheckCircle size={14} className="shrink-0 text-green-600" />
           <span>Your saved info has been auto-filled. <button type="button" onClick={() => { setDelivery(BLANK_ADDR); setName(""); setEmail(""); setPhone(""); }} className="underline font-medium">Clear</button></span>
         </div>
       )}
       {!isLoggedIn && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
-          <Link href="/auth/login" className="font-semibold underline">Sign in</Link> to auto-fill your info and save your address for next time.
+        <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm text-orange-800">
+          <Link href="/auth/login" className="font-semibold underline">Sign in</Link> to auto-fill your info and earn points on this order.
         </div>
       )}
 
-      {/* Contact Info */}
-      <div className="bg-white border rounded-xl p-4 sm:p-6">
-        <h2 className="font-bold text-base sm:text-lg mb-4 flex items-center gap-2">
-          <User size={16} className="text-brand-500" /> Contact Information
-        </h2>
+      {/* 1. Contact Info */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">1</div>
+          <User size={14} className="text-gray-400" />
+          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Contact Information</h2>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="sm:col-span-2">
             <Field label="Full Name" value={name} onChange={setName} placeholder="John Smith" error={errors.name} />
@@ -606,56 +895,35 @@ export function CheckoutForm() {
         </div>
       </div>
 
-      {/* Delivery Address */}
-      <div className="bg-white border rounded-xl p-4 sm:p-6">
-        <h2 className="font-bold text-base sm:text-lg mb-4 flex items-center gap-2">
-          <MapPin size={16} className="text-brand-500" /> Delivery Address
-        </h2>
+      {/* 2. Delivery Address */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">2</div>
+          <MapPin size={14} className="text-gray-400" />
+          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Delivery Address</h2>
+        </div>
         <AddressFields addr={delivery} onChange={(a) => { setDelivery(a); setZoneError(null); }} prefix="delivery" />
-        {errors.street && <p className="text-red-500 text-xs mt-1">{errors.street}</p>}
-        {errors.zip && <p className="text-red-500 text-xs mt-1">{errors.zip}</p>}
+        {errors.street && <p className="text-red-500 text-xs mt-2" data-error="1">{errors.street}</p>}
+        {errors.zip && <p className="text-red-500 text-xs mt-2" data-error="1">{errors.zip}</p>}
         {zoneError && (
-          <div className="mt-3 bg-red-50 border border-red-300 rounded-xl px-4 py-3 flex items-start gap-2.5 text-sm text-red-700">
-            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-            <span>{zoneError}</span>
+          <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2.5 text-sm text-red-700">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-red-500" /><span>{zoneError}</span>
           </div>
         )}
-        <p className="text-xs text-gray-400 mt-3">Service area: Leander · Cedar Park · Liberty Hill, TX (within 10 miles of store)</p>
+        <p className="text-xs text-gray-400 mt-3">Service area: Leander · Cedar Park · Liberty Hill, TX (within 10 miles)</p>
       </div>
 
-      {/* Billing Address */}
-      <div className="bg-white border rounded-xl p-4 sm:p-6">
-        <h2 className="font-bold text-base sm:text-lg mb-3 flex items-center gap-2">
-          <BillingIcon size={16} className="text-brand-500" /> Billing Address
-        </h2>
-        <label className="flex items-center gap-2.5 cursor-pointer mb-4">
-          <input type="checkbox" checked={sameBilling} onChange={e => setSameBilling(e.target.checked)}
-            className="w-4 h-4 accent-brand-500 rounded" />
-          <span className="text-sm font-medium">Same as Delivery Address</span>
-        </label>
-        {!sameBilling && (
-          <div className="mt-2">
-            <AddressFields addr={billing} onChange={setBilling} prefix="billing" />
-            {errors.billStreet && <p className="text-red-500 text-xs mt-1">{errors.billStreet}</p>}
-            {errors.billZip && <p className="text-red-500 text-xs mt-1">{errors.billZip}</p>}
-          </div>
-        )}
-        {sameBilling && delivery.street && (
-          <p className="text-sm text-gray-500 bg-gray-50 border rounded-lg px-4 py-2.5">
-            {delivery.street}, {delivery.city}, {delivery.state} {delivery.zip}
-          </p>
-        )}
-      </div>
-
-      {/* Promo Code */}
-      <div className="bg-white border rounded-xl p-4 sm:p-5">
-        <h2 className="font-bold text-sm sm:text-base mb-3 flex items-center gap-2">
-          <Tag size={18} className="text-brand-500" /> Promo Code
-          <span className="text-xs font-normal text-gray-400 ml-1">(optional)</span>
-        </h2>
+      {/* 3. Promo & Rewards */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">3</div>
+          <Tag size={14} className="text-gray-400" />
+          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Promo & Rewards</h2>
+          <span className="text-xs text-gray-400 ml-1">(optional)</span>
+        </div>
         {promoCode ? (
-          <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-            <CheckCircle size={18} className="text-green-600 shrink-0" />
+          <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-3">
+            <CheckCircle size={16} className="text-green-600 shrink-0" />
             <div className="flex-1">
               <p className="font-bold text-green-700 text-sm">{promoCode} applied!</p>
               <p className="text-xs text-green-600">{promoMsg}</p>
@@ -663,57 +931,125 @@ export function CheckoutForm() {
             <button type="button" onClick={() => { setPromoCode(null); setPromoDiscount(0); setPromoMsg(""); setPromoInput(""); clearPromo(); }} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
           </div>
         ) : (
-          <div>
+          <div className="mb-3">
             <div className="flex gap-2">
               <input value={promoInput} onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(""); }}
                 onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyPromo())}
-                placeholder="WELCOME10" className="flex-1 border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 uppercase placeholder:normal-case" />
+                placeholder="WELCOME10"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 uppercase placeholder:normal-case"
+              />
               <button type="button" onClick={applyPromo} disabled={applyingPromo || !promoInput.trim()}
-                className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
+                className="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors">
                 {applyingPromo ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
               </button>
             </div>
             {promoError && <p className="text-red-500 text-xs mt-2">{promoError}</p>}
             <div className="flex flex-wrap gap-2 mt-3">
-              <p className="text-xs text-gray-400 w-full">Try:</p>
               {QUICK_CODES.map(c => (
                 <button key={c} type="button" onClick={() => { setPromoInput(c); setPromoError(""); }}
-                  className="text-xs bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-mono px-3 py-1 rounded-full border border-gray-200">
+                  className="text-xs text-gray-500 font-mono bg-gray-100 hover:bg-brand-50 hover:text-brand-600 px-3 py-1 rounded-full border border-gray-200 transition-colors">
                   {c}
                 </button>
               ))}
             </div>
           </div>
         )}
+        {/* Gift Card */}
+        <div className="mt-3">
+          {giftCardAmount > 0 ? (
+            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+              <Gift size={15} className="text-green-600 shrink-0" />
+              <div className="flex-1">
+                <p className="font-bold text-green-700 text-sm">Gift card applied!</p>
+                <p className="text-xs text-green-600">{giftCardCode} · saving {formatCurrency(giftCardAmount)}</p>
+              </div>
+              <button type="button" onClick={() => { setGiftCard(null, 0); setGiftInput(""); }} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-gray-500 font-medium mb-2">Have a gift card?</p>
+              <div className="flex gap-2">
+                <input
+                  value={giftInput}
+                  onChange={e => { setGiftInput(e.target.value.toUpperCase()); setGiftError(""); }}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyGiftCard())}
+                  placeholder="GIFT-XXXX-XXXX"
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 font-mono placeholder:font-sans"
+                />
+                <button type="button" onClick={applyGiftCard} disabled={applyingGift || !giftInput.trim()}
+                  className="bg-gray-800 hover:bg-gray-900 disabled:opacity-40 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors">
+                  {applyingGift ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
+                </button>
+              </div>
+              {giftError && <p className="text-red-500 text-xs mt-2">{giftError}</p>}
+            </div>
+          )}
+        </div>
+
+        {isLoggedIn && bestEligibleTier > 0 && !rewardsDismissed && (
+          rewardsPointsToRedeem > 0 ? (
+            <div className="flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+              <Gift size={15} className="text-purple-600 shrink-0" />
+              <div className="flex-1">
+                <p className="font-bold text-purple-800 text-sm">{rewardsPointsToRedeem} pts redeemed!</p>
+                <p className="text-xs text-purple-600">Saving {formatCurrency(rewardsDiscount)} on this order</p>
+              </div>
+              <button type="button" onClick={() => setRewardsRedeem(0)} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
+            </div>
+          ) : (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Gift size={14} className="text-purple-600 shrink-0" />
+                <p className="font-bold text-sm text-purple-800">You have rewards available!</p>
+                <span className="ml-auto text-xs text-gray-500">{userPoints.toLocaleString()} pts</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Congratulations! You have <strong className="text-purple-700">{formatCurrency(calcPointsValue(bestEligibleTier))}</strong> reward available for this order.
+              </p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setRewardsRedeem(bestEligibleTier)}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold py-2.5 rounded-lg transition-colors">
+                  Redeem Now
+                </button>
+                <button type="button" onClick={() => setRewardsDismissed(true)}
+                  className="flex-1 border border-gray-200 bg-white text-gray-600 text-sm font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition-colors">
+                  Save for Later
+                </button>
+              </div>
+            </div>
+          )
+        )}
       </div>
 
-      {/* Order Summary */}
-      <div className="bg-white border rounded-xl p-4 sm:p-5">
+      {/* Order Totals accordion */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <button type="button" onClick={() => setShowSummary(s => !s)}
-          className="w-full flex items-center justify-between font-bold text-base">
-          <span>Order Summary</span>
-          <div className="flex items-center gap-2 text-brand-600">
-            <span>{formatCurrency(total)}</span>
-            {showSummary ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors">
+          <span className="font-bold text-sm text-gray-800">Order Totals</span>
+          <div className="flex items-center gap-2">
+            <span className="text-brand-600 font-bold">{formatCurrency(total)}</span>
+            {showSummary ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
           </div>
         </button>
-
         {showSummary && (
-          <div className="mt-4 space-y-2 text-sm border-t pt-4">
-            <div className="flex justify-between text-gray-600"><span>Subtotal ({totalQty} items)</span><span>{formatCurrency(subtotal)}</span></div>
-            {flashSavings > 0 && <div className="flex justify-between text-red-500 font-medium"><span>⚡ Flash Sale savings</span><span>-{formatCurrency(flashSavings)}</span></div>}
-            {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle discount ({Math.round(bundlePct * 100)}%)</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
-            {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo ({promoCode})</span><span>-{formatCurrency(promoDiscount)}</span></div>}
-            <div className="flex justify-between font-bold text-green-600">
-              <span>🚚 Delivery Fee</span>
-              <span>FREE</span>
+          <div className="px-5 pb-5 border-t border-gray-100 space-y-1.5 text-sm">
+            <div className="pt-4 space-y-1.5">
+              <div className="flex justify-between text-gray-500"><span>Subtotal ({totalQty} items)</span><span>{formatCurrency(subtotal)}</span></div>
+              {flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Sale savings</span><span>-{formatCurrency(flashSavings)}</span></div>}
+              {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(bundlePct * 100)}%)</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
+              {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo ({promoCode})</span><span>-{formatCurrency(promoDiscount)}</span></div>}
+              {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
+              {effectiveGiftCard > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(effectiveGiftCard)}</span></div>}
+              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+              <div className="flex justify-between text-green-600 font-medium"><span>💰 Tip</span><span>NOT Required</span></div>
+              <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(tax)}</span></div>
             </div>
-            <div className="flex justify-between text-green-600 font-bold"><span>💰 Tip</span><span>NOT Required</span></div>
-            <div className="flex justify-between text-gray-600"><span>Tax (8.25%)</span><span>{formatCurrency(tax)}</span></div>
-            <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span>{formatCurrency(total)}</span></div>
-            {(flashSavings + bundleDiscount + promoDiscount) > 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-center">
-                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(flashSavings + bundleDiscount + promoDiscount)} on this order!</p>
+            <div className="flex justify-between text-gray-900 font-bold text-sm pt-2 border-t border-gray-100">
+              <span>Total</span><span>{formatCurrency(total)}</span>
+            </div>
+            {(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard) > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
+                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard)} on this order!</p>
               </div>
             )}
             <p className="text-xs text-center text-brand-600 font-medium pt-1">🏆 You&apos;ll earn <strong>{pointsEarned} CS Points</strong> on this order</p>
@@ -721,77 +1057,67 @@ export function CheckoutForm() {
         )}
       </div>
 
-      {/* Payment */}
-      <div className="bg-white border rounded-xl p-4 sm:p-6">
-        <h2 className="font-bold text-base mb-3 flex items-center gap-2">
-          <CreditCard size={16} className="text-brand-500" /> Payment
-        </h2>
-        <div className="bg-gray-50 border border-dashed rounded-xl p-4 text-center text-gray-400 text-sm">
-          Fill in your details above and click &ldquo;Place Order&rdquo; to enter payment.
-          <p className="text-xs mt-2">Credit Card · Debit Card · Apple Pay · Google Pay</p>
-        </div>
-        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
-          ⚠️ Must be 21+. Valid ID checked at delivery.
-        </div>
-      </div>
-
-      {/* Perks */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-        {[
-          { e: "🚚", t: "FREE Delivery" },
-          { e: "💰", t: "No Tip" },
-          { e: "🏆", t: `+${pointsEarned} Points` },
-          { e: "⚡", t: timing.type === "same-day" ? "10–30 Min" : "Next Morning" },
-        ].map(({ e, t }) => (
-          <div key={t} className="bg-white border rounded-xl py-3 px-2">
-            <p className="text-xl">{e}</p>
-            <p className="text-xs font-semibold text-gray-600 mt-0.5">{t}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Delivery timing message */}
+      {/* Delivery timing */}
       {timing.type === "same-day" ? (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
-          <Clock size={16} className="shrink-0 text-green-600" />
+          <Clock size={15} className="shrink-0 text-green-600" />
           <span>{timing.message}</span>
         </div>
       ) : (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <AlertTriangle size={16} className="shrink-0 text-amber-500 mt-0.5" />
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle size={15} className="shrink-0 text-amber-500 mt-0.5" />
           <span>{timing.message}</span>
         </div>
       )}
 
-      {/* Minimum order block */}
+      {/* Min order */}
       {!meetsMinimum && (
-        <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 text-center">
-          <p className="font-bold text-amber-800 text-base mb-1">⚠️ Minimum order not met</p>
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
+          <p className="font-bold text-amber-800 mb-1">⚠️ Minimum order not met</p>
           <p className="text-amber-700 text-sm mb-3">
-            Add <strong>{formatCurrency(amountToMin)}</strong> more to place your order.
-            <br />Minimum order is <strong>$20.00</strong> · Delivery always FREE.
+            Add <strong>{formatCurrency(amountToMin)}</strong> more in items · Minimum cart value is $20 (gift cards &amp; discounts don&apos;t count toward the minimum).
           </p>
-          <Link href="/products"
-            className="inline-block bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors">
-            + Add More Items
-          </Link>
+          <Link href="/products" className="inline-block bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors">+ Add More Items</Link>
         </div>
       )}
 
       {!clientSecret && (
         <button type="submit" disabled={submitting || items.length === 0 || !meetsMinimum}
-          className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-lg transition-colors shadow-lg shadow-brand-500/30">
-          {submitting ? <><Loader2 size={20} className="animate-spin" />Processing...</> : `Place Order · ${formatCurrency(total)}`}
+          className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-base transition-all shadow-lg shadow-brand-500/25">
+          {submitting
+            ? <><Loader2 size={18} className="animate-spin" /> Processing...</>
+            : <><span>Continue to Payment</span><span className="opacity-60 mx-1">·</span><span>{formatCurrency(total)}</span><span className="opacity-60 ml-1">→</span></>}
         </button>
       )}
     </form>
   );
 }
 
-function StripePaymentForm({ clientSecret, orderPayload, total, onSuccess, onCancel }: {
+interface ReviewData {
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  deliveryAddress: { street: string; city: string; state: string; zip: string };
+  billingAddress: { street: string; city: string; state: string; zip: string };
+  sameBilling: boolean;
+  items: { product: { id: string; name: string; price: number; salePrice?: number | null }; quantity: number }[];
+  subtotal: number;
+  flashSavings: number;
+  bundleDiscount: number;
+  bundlePct: number;
+  promoCode: string | null;
+  promoDiscount: number;
+  rewardsDiscount: number;
+  rewardsPointsToRedeem: number;
+  giftCardAmount: number;
+  tax: number;
+}
+
+function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSuccess, onCancel }: {
   clientSecret: string;
   orderPayload: object;
   total: number;
+  reviewData: ReviewData;
   onSuccess: (order: { id: string; orderNumber: string; total: number }) => void;
   onCancel: () => void;
 }) {
@@ -799,88 +1125,288 @@ function StripePaymentForm({ clientSecret, orderPayload, total, onSuccess, onCan
   const elements = useElements();
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
+  const [reviewing, setReviewing] = useState(false);
+  const [pmInfo, setPmInfo] = useState<{ id: string; type: string; brand?: string; last4?: string } | null>(null);
+  const [diffBilling, setDiffBilling] = useState(false);
+  const [billAddr, setBillAddr] = useState({
+    street: reviewData.billingAddress.street,
+    city: reviewData.billingAddress.city,
+    state: reviewData.billingAddress.state,
+    zip: reviewData.billingAddress.zip,
+  });
 
-  async function handlePay(e: React.FormEvent) {
+  async function handleGoToReview(e: React.FormEvent) {
     e.preventDefault();
+    if (!stripe || !elements) return;
+    // Skip elements.submit() — it causes false "card incomplete" errors on mobile.
+    // stripe.confirmPayment handles full validation when user confirms.
+    setReviewing(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleConfirmPay() {
     if (!stripe || !elements) return;
     setPaying(true);
     setPayError("");
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        redirect: "if_required",
-      });
-      if (error) {
-        setPayError(error.message ?? "Payment failed.");
+      // Stripe requires elements.submit() immediately before confirmPayment, before any async work
+      const { error: submitErr } = await elements.submit();
+      if (submitErr) {
+        setPayError(submitErr.message ?? "Please check your payment details.");
         setPaying(false);
         return;
       }
+
+      // Save payload before any potential redirect (Klarna, 3DS)
+      sessionStorage.setItem("csl-pending-stripe-order", JSON.stringify({ orderPayload }));
+
+      const result = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: window.location.href,
+          payment_method_data: {
+            billing_details: {
+              name: reviewData.customerName,
+              email: reviewData.customerEmail,
+              phone: reviewData.customerPhone,
+              address: {
+                line1: billAddr.street,
+                city: billAddr.city,
+                state: billAddr.state,
+                postal_code: billAddr.zip,
+                country: "US",
+              },
+            },
+          },
+        },
+        redirect: "if_required",
+      });
+      const error = result.error;
+      const paymentIntent = "paymentIntent" in result ? result.paymentIntent : undefined;
+
+      if (error) {
+        sessionStorage.removeItem("csl-pending-stripe-order");
+        setPayError(error.message ?? "Payment failed.");
+        setPaying(false);
+        // Stay on review screen so error is visible with "Edit Payment" option
+        return;
+      }
+      // Reached here = no redirect → payment confirmed inline (card without 3DS, Apple Pay, etc.)
       if (paymentIntent?.status === "succeeded") {
+        sessionStorage.removeItem("csl-pending-stripe-order");
         const res = await fetch("/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...orderPayload, stripePaymentIntentId: paymentIntent.id }),
         });
         const order = await res.json();
+        if (!res.ok) throw new Error(order.error ?? "Order creation failed");
+        // Immediately clear server cart so other devices sync on next focus
+        fetch("/api/auth/cart", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cart: [] }),
+        }).catch(() => {});
         onSuccess(order);
+      } else if (paymentIntent) {
+        setPayError(`Payment status: ${paymentIntent.status}. Please try again.`);
+        setPaying(false);
       }
-    } catch {
-      setPayError("Something went wrong. Please try again.");
+    } catch (err) {
+      sessionStorage.removeItem("csl-pending-stripe-order");
+      const msg = err instanceof Error ? err.message : String(err);
+      setPayError(msg || "Something went wrong. Please try again.");
       setPaying(false);
+      // Keep review screen open so user sees the error in context
     }
   }
 
+  const rd = reviewData;
+  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount;
+  const pointsEarned = Math.floor(total);
+
   return (
-    <form onSubmit={handlePay} className="space-y-5">
-      {/* Header */}
-      <div className="bg-white border rounded-2xl p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="font-bold text-base sm:text-lg flex items-center gap-2">
-            <CreditCard size={18} className="text-brand-500 shrink-0" /> Payment
-          </h2>
-          <span className="font-black text-xl sm:text-2xl text-gray-900">{formatCurrency(total)}</span>
+    <>
+      {/* ── REVIEW SCREEN — shown on top when reviewing=true ── */}
+      {reviewing && (
+        <div className="space-y-4">
+          <CheckoutSteps current={4} />
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle size={18} className="text-green-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-900 text-base">Review Your Order</h2>
+                <p className="text-xs text-gray-400">Please confirm all details before paying</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">🛒 Items Ordered</h3>
+            <div className="space-y-3">
+              {rd.items.map(({ product, quantity }) => {
+                const price = product.salePrice ?? product.price;
+                return (
+                  <div key={product.id} className="flex items-center gap-3">
+                    <span className="w-6 h-6 bg-brand-500 rounded-full text-white text-[10px] font-black flex items-center justify-center shrink-0">{quantity}</span>
+                    <span className="flex-1 text-sm text-gray-700 leading-snug">{product.name}</span>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-semibold text-gray-900">{formatCurrency(price * quantity)}</p>
+                      {product.salePrice != null && product.salePrice < product.price && (
+                        <p className="text-xs text-gray-400 line-through">{formatCurrency(product.price * quantity)}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+            <div>
+              <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">👤 Contact</h3>
+              <p className="text-sm text-gray-800 font-medium">{rd.customerName}</p>
+              <p className="text-sm text-gray-500">{rd.customerEmail} · {rd.customerPhone}</p>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">📍 Delivery Address</h3>
+              <p className="text-sm text-gray-800">{rd.deliveryAddress.street}</p>
+              <p className="text-sm text-gray-500">{rd.deliveryAddress.city}, {rd.deliveryAddress.state} {rd.deliveryAddress.zip}</p>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">🧾 Billing Address</h3>
+              <p className="text-sm text-gray-800">{billAddr.street}</p>
+              <p className="text-sm text-gray-500">{billAddr.city}, {billAddr.state} {billAddr.zip}</p>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">💳 Payment Method</h3>
+              <p className="text-sm text-gray-800 font-medium">🔒 Secure Card / Wallet Payment</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">💰 Order Total</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-gray-500"><span>Subtotal ({rd.items.reduce((a,i)=>a+i.quantity,0)} items)</span><span>{formatCurrency(rd.subtotal)}</span></div>
+              {rd.flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Deal savings</span><span>-{formatCurrency(rd.flashSavings)}</span></div>}
+              {rd.bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(rd.bundlePct * 100)}%)</span><span>-{formatCurrency(rd.bundleDiscount)}</span></div>}
+              {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
+              {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
+              {rd.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
+              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+              <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(rd.tax)}</span></div>
+            </div>
+            <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-baseline">
+              <span className="font-bold text-gray-900 text-base">Total</span>
+              <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+            </div>
+            {totalSavings > 0 && (
+              <div className="mt-3 bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-center">
+                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(totalSavings)} on this order!</p>
+              </div>
+            )}
+            <p className="text-xs text-center mt-2 text-brand-600 font-medium">🏆 You&apos;ll earn <strong>{pointsEarned} CS Points</strong> on this order</p>
+          </div>
+
+          {payError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm flex items-center gap-2 text-red-700">
+              <AlertTriangle size={14} className="shrink-0 text-red-500" /> <span>{payError}</span>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button type="button" onClick={() => { setReviewing(false); setPayError(""); }} disabled={paying}
+              className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+              ← Edit Payment
+            </button>
+            <button type="button" onClick={handleConfirmPay} disabled={paying || !stripe}
+              className="flex-[2] flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/25 text-base">
+              {paying
+                ? <><Loader2 size={18} className="animate-spin" /> Processing…</>
+                : <>Confirm & Pay {formatCurrency(total)} →</>}
+            </button>
+          </div>
+          <p className="text-center text-xs text-gray-400">🔒 Your payment is encrypted and secure. Must be 21+, valid ID checked at delivery.</p>
         </div>
-        <p className="text-xs text-gray-400 mb-4 sm:mb-5">Pay securely with Card or Klarna (buy now, pay later)</p>
+      )}
 
-        <PaymentElement options={{ layout: "tabs", wallets: { applePay: "auto", googlePay: "auto" } }} />
+      {/* ── PAYMENT FORM — always mounted (hidden via CSS when reviewing) ──
+          Keeping this mounted ensures Stripe retains the card data entered
+          by the user so stripe.confirmPayment works from the review screen. */}
+      <form onSubmit={handleGoToReview} className={`space-y-4${reviewing ? " hidden" : ""}`}>
+        <CheckoutSteps current={3} />
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-bold text-base text-gray-800 flex items-center gap-2">
+              <CreditCard size={17} className="text-brand-500 shrink-0" /> Payment
+            </h2>
+            <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
+          </div>
+          <p className="text-xs text-gray-400 mb-5">Pay securely with Card or Klarna (buy now, pay later)</p>
+          <PaymentElement options={{
+            layout: "tabs",
+            wallets: { applePay: "auto", googlePay: "auto" },
+            fields: { billingDetails: "never" },
+          }} />
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="font-bold text-base text-gray-800 mb-3 flex items-center gap-2">
+            🏠 Billing Address
+          </h2>
+          <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700 mb-3">
+            <p className="font-medium">{billAddr.street}</p>
+            <p className="text-gray-500">{billAddr.city}, {billAddr.state} {billAddr.zip}</p>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={diffBilling}
+              onChange={e => setDiffBilling(e.target.checked)}
+              className="w-4 h-4 accent-brand-500 cursor-pointer"
+            />
+            <span className="text-sm text-gray-600">My card uses a different billing address</span>
+          </label>
+          {diffBilling && (
+            <div className="mt-3">
+              <AddressFields addr={billAddr} onChange={setBillAddr} prefix="billing-payment" />
+            </div>
+          )}
+        </div>
 
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {[
+            { icon: "🔒", label: "SSL Encrypted" },
+            { icon: "✅", label: "Powered by Stripe" },
+            { icon: "🛡️", label: "Secure Checkout" },
+          ].map(({ icon, label }) => (
+            <div key={label} className="bg-gray-50 border border-gray-100 rounded-xl py-2.5 px-2">
+              <p className="text-lg">{icon}</p>
+              <p className="text-[10px] font-semibold text-gray-500 mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
         {payError && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center gap-2">
-            <AlertTriangle size={15} className="shrink-0" /> {payError}
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm flex items-center gap-2 text-red-700">
+            <AlertTriangle size={14} className="shrink-0 text-red-500" /> <span>{payError}</span>
           </div>
         )}
-      </div>
-
-      {/* Trust badges */}
-      <div className="grid grid-cols-3 gap-2 text-center">
-        {[
-          { icon: "🔒", label: "SSL Encrypted" },
-          { icon: "✅", label: "Powered by Stripe" },
-          { icon: "🛡️", label: "Secure Checkout" },
-        ].map(({ icon, label }) => (
-          <div key={label} className="bg-gray-50 border rounded-xl py-2.5 px-2">
-            <p className="text-lg">{icon}</p>
-            <p className="text-[10px] font-semibold text-gray-500 mt-0.5">{label}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex gap-3">
-        <button type="button" onClick={onCancel} disabled={paying}
-          className="flex-1 border-2 border-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
-          ← Back
-        </button>
-        <button type="submit" disabled={paying || !stripe}
-          className="flex-[2] flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/25 text-base">
-          {paying
-            ? <><Loader2 size={18} className="animate-spin" /> Processing…</>
-            : <>Pay {formatCurrency(total)} →</>}
-        </button>
-      </div>
-
-      <p className="text-center text-xs text-gray-400">
-        🔒 Your payment is encrypted and secure. Must be 21+, valid ID checked at delivery.
-      </p>
-    </form>
+        <div className="flex gap-3">
+          <button type="button" onClick={onCancel}
+            className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+            ← Back
+          </button>
+          <button type="submit" disabled={!stripe}
+            className="flex-[2] flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/25 text-base">
+            Review Order →
+          </button>
+        </div>
+        <p className="text-center text-xs text-gray-400">
+          🔒 Your payment is encrypted and secure. Must be 21+, valid ID checked at delivery.
+        </p>
+      </form>
+    </>
   );
 }
