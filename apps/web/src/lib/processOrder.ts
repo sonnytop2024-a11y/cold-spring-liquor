@@ -2,7 +2,7 @@
 import { store, createOrderNumber } from "../app/api/_mock/store";
 import { TAX_RATE } from "../app/api/_mock/data";
 import { getDeliveryTiming } from "./deliveryTiming";
-import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct } from "./db";
+import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct, dbGetSettings } from "./db";
 import { notifyNewOrder } from "./notify";
 import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
@@ -81,6 +81,15 @@ export async function processOrder(
     const winError = validatePickupWindow(body.pickupWindow);
     if (winError) return { error: winError, status: 422 };
   } else {
+    // Admin kill-switch: no drivers available → Pick Up only
+    const settings = await dbGetSettings();
+    if (settings.deliveryEnabled === false) {
+      return {
+        error: "Delivery is currently unavailable. Please choose Pick Up In Store to continue your order.",
+        status: 422,
+      };
+    }
+
     // Delivery orders: validate the street address.
     // Reject placeholder/pickup text like "101 - Will Pick Up" — pickup has its own checkout.
     const street: string = (deliveryAddress?.street ?? "").trim();

@@ -18,6 +18,7 @@ type Settings = {
   businessHours: Record<string, { open: string; close: string; closed: boolean }>;
   deliveryRadius: number; deliveryTimeMin: number; deliveryTimeMax: number;
   freeDeliveryEnabled: boolean; noTipRequired: boolean; minOrderAmount: number;
+  deliveryEnabled?: boolean;
   ageVerificationRequired: boolean; dobRequired: boolean;
   billingAddressRequired: boolean; deliveryAddressRequired: boolean;
   promoCodeEnabled: boolean; rewardsEnabled: boolean; orderNotesEnabled: boolean;
@@ -494,6 +495,14 @@ export default function SettingsPage() {
           {tab === "delivery" && (
             <>
             <SectionCard title="Delivery Settings" icon={Truck}>
+              <Toggle checked={form.deliveryEnabled !== false} onChange={v => set("deliveryEnabled", v)}
+                label={`Accept Delivery Orders — ${form.deliveryEnabled !== false ? "ON" : "OFF"}`}
+                description="Turn off when no driver is available — customers can still order Pick Up In Store" />
+              {form.deliveryEnabled === false && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800 font-medium">
+                  ⚠️ Delivery is OFF — customers can only place Pick Up orders until you turn this back on.
+                </div>
+              )}
               <Field label="Delivery Radius" description="Maximum miles for delivery">
                 <Input value={form.deliveryRadius} onChange={v => set("deliveryRadius", Number(v))} type="text" inputMode="decimal" prefix="miles" />
               </Field>

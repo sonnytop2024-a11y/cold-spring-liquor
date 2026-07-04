@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display, Montserrat } from "next/font/google";
+import { Inter, Playfair_Display, Montserrat, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Header } from "@/components/layout/Header";
@@ -12,6 +12,8 @@ import { CartSyncProvider } from "@/components/cart/CartSyncProvider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat", weight: ["600", "700", "800"] });
+// Product typography — same family Total Wine uses
+const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-product", weight: ["400", "600", "700", "900"] });
 
 export const metadata: Metadata = {
   title: "Cold Spring Liquor | FREE Delivery in Leander, Cedar Park & Liberty Hill",
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${playfair.variable} ${montserrat.variable} font-sans bg-white text-gray-900`}>
+      <body className={`${inter.variable} ${playfair.variable} ${montserrat.variable} ${sourceSans.variable} font-sans bg-white text-gray-900`}>
         <Providers>
           <CartSyncProvider />
           <AgeGateModal />

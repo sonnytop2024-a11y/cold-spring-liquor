@@ -199,6 +199,7 @@ export interface StoreSettings {
   deliveryTimeMin: number;
   deliveryTimeMax: number;
   freeDeliveryEnabled: boolean;
+  deliveryEnabled?: boolean; // admin kill-switch: false = Pick Up only (no driver available)
   noTipRequired: boolean;
   minOrderAmount: number;
   ageVerificationRequired: boolean;

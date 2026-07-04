@@ -30,6 +30,7 @@ const config: Config = {
         sans: ["var(--font-inter)", "sans-serif"],
         heading: ["var(--font-playfair)", "serif"],
         display: ["var(--font-montserrat)", "sans-serif"],
+        product: ["var(--font-product)", "Source Sans Pro", "sans-serif"],
       },
       screens: {
         xs: "360px",

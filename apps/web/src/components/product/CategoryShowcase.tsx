@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Loader2, Tag, Zap, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Zap, Sparkles } from "lucide-react";
 
 interface Category {
   value: string;
@@ -64,7 +64,6 @@ function CategoryCard({ value, label, emoji }: Category) {
 }
 
 const SPECIALS = [
-  { href: "/products?sale=true",      label: "Hot Deals",    desc: "Best Deals Right Now",           Icon: Tag,      img: "special-hotdeals", badge: null },
   { href: "/products?flashdeal=true", label: "Flash Sale",   desc: "Limited Time Offers",            Icon: Zap,      img: "special-flash",    badge: null },
   { href: "/products?featured=true",  label: "New Arrivals", desc: "Check out our latest additions", Icon: Sparkles, img: "special-new",      badge: "NEW" },
 ];
@@ -124,7 +123,7 @@ export function CategoryShowcase() {
       </div>
 
       {/* Special collections row */}
-      <div className="mt-3 sm:mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="mt-3 sm:mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {SPECIALS.map((s) => <SpecialCard key={s.label} {...s} />)}
       </div>
 

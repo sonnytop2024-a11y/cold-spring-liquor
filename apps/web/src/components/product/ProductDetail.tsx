@@ -173,7 +173,7 @@ export function ProductDetail({ slug }: { slug: string }) {
         <p className="text-sm font-medium text-brand-600 uppercase tracking-wide mb-1">
           {product.category} · {product.brand}
         </p>
-        <h1 className="font-display text-3xl font-bold mb-3">{product.name}</h1>
+        <h1 className="font-product text-3xl font-bold mb-3">{product.name}</h1>
 
         {(product.rating ?? 0) > 0 && (
           <div className="flex items-center gap-2 mb-4">
@@ -197,11 +197,11 @@ export function ProductDetail({ slug }: { slug: string }) {
         )}
 
         <div className="flex items-baseline gap-3 mb-2">
-          <span className="text-4xl font-bold">
+          <span className="font-product text-4xl font-black">
             {formatCurrency(effectiveProduct!.salePrice ?? effectiveProduct!.price)}
           </span>
           {effectiveProduct!.salePrice && (
-            <span className="text-xl text-gray-400 line-through">
+            <span className="font-product text-xl text-gray-400 line-through">
               {formatCurrency(effectiveProduct!.price)}
             </span>
           )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
 import { calcDiscounts } from "@/lib/discountRules";
@@ -33,6 +34,17 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
     bundleTiers,
   );
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
+  // Admin kill-switch — shares the checkout's 10s poll via the same query key
+  const { data: deliveryStatus } = useQuery({
+    queryKey: ["delivery-status"],
+    queryFn: async () => {
+      const r = await fetch("/api/delivery/status");
+      if (!r.ok) throw new Error("status failed");
+      return r.json() as Promise<{ deliveryEnabled: boolean }>;
+    },
+    refetchInterval: 10_000,
+  });
+  const deliveryDisabled = deliveryStatus?.deliveryEnabled === false;
   // Pick Up In Store: automatic discount, tax on the discounted subtotal
   const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
   const tax = (subtotal - pickupDiscount) * TAX_RATE;
@@ -86,8 +98,14 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
             <div className="flex justify-between text-green-600 font-bold"><span>Pick Up Discount ({PICKUP_DISCOUNT_LABEL})</span><span>-{formatCurrency(pickupDiscount)}</span></div>
           ) : (
             <>
-              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-              <div className="flex justify-between text-green-600 font-medium"><span>💰 Driver Tip</span><span>NOT Required ✓</span></div>
+              {deliveryDisabled ? (
+                <div className="flex justify-between text-gray-400"><span>🚚 Delivery</span><span className="font-bold italic">Unavailable</span></div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+                  <div className="flex justify-between text-green-600 font-medium"><span>💰 Driver Tip</span><span>NOT Required ✓</span></div>
+                </>
+              )}
             </>
           )}
           <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(tax)}</span></div>

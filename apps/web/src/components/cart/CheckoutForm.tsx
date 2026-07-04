@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star, Gift } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
@@ -342,6 +343,23 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   }, [mode]);
 
   const switchMode = setFulfillmentMode;
+
+  // Admin kill-switch: Delivery may be turned off (no driver available).
+  // Poll every 10s so flipping the toggle reaches open checkout sessions fast.
+  const { data: deliveryStatus } = useQuery({
+    queryKey: ["delivery-status"],
+    queryFn: async () => {
+      const r = await fetch("/api/delivery/status");
+      if (!r.ok) throw new Error("status failed");
+      return r.json() as Promise<{ deliveryEnabled: boolean }>;
+    },
+    refetchInterval: 10_000,
+  });
+  const deliveryDisabled = deliveryStatus?.deliveryEnabled === false;
+  // Customer on the Delivery form when it goes offline → move them to Pick Up
+  useEffect(() => {
+    if (deliveryDisabled && mode === "delivery") setFulfillmentMode("pickup");
+  }, [deliveryDisabled, mode, setFulfillmentMode]);
   const { items, clearCart, rewardsPointsToRedeem, setRewardsRedeem, giftCardCode, giftCardAmount, setGiftCard } = useCartStore();
   const { user, isLoggedIn } = useAuthStore();
   const router = useRouter();
@@ -940,7 +958,14 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       <CheckoutSteps current={1} />
 
       {/* Delivery / Pick Up selector — always visible, sticky tabs on mobile */}
-      <FulfillmentSelector mode={mode} onChange={switchMode} />
+      <FulfillmentSelector mode={mode} onChange={switchMode} deliveryDisabled={deliveryDisabled} />
+
+      {deliveryDisabled && (
+        <div className="flex items-start gap-2.5 bg-amber-50 border-[1.5px] border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-500" />
+          <span><strong>Delivery is currently unavailable.</strong> Please choose Pick Up In Store to continue your order.</span>
+        </div>
+      )}
 
       <div key={mode} className={`space-y-3 ${slideDir === "right" ? "csl-slide-in-right" : slideDir === "left" ? "csl-slide-in-left" : ""}`}>
 

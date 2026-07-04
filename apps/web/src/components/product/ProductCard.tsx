@@ -182,23 +182,23 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* ── Info ─────────────────────────────────────────────────── */}
       <div className="p-3 flex flex-col flex-1">
-        <p className="text-[10px] text-gray-400 uppercase tracking-widest truncate mb-0.5 h-3.5">
+        <p className="font-product text-[10px] text-gray-400 uppercase tracking-widest truncate mb-0.5 h-3.5">
           {product.brand ?? " "}
         </p>
 
         <Link href={`/products/${product.slug}`} className="flex-1">
-          <h3 className="font-display text-[13px] font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors line-clamp-2 mb-2" style={{ minHeight: "2.5rem" }}>
+          <h3 className="font-product text-[14px] font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors line-clamp-2 mb-2" style={{ minHeight: "2.5rem" }}>
             {product.name}
           </h3>
         </Link>
 
         <div className="flex items-center justify-between gap-2 mt-auto">
           <div className="flex items-baseline gap-1 min-w-0">
-            <span className="text-sm font-bold text-gray-900 truncate">
+            <span className="font-product text-base font-black text-gray-900 truncate">
               ${(product.salePrice ?? product.price).toFixed(2)}
             </span>
             {product.salePrice && (
-              <span className="text-[10px] text-gray-400 line-through shrink-0">
+              <span className="font-product text-[11px] text-gray-400 line-through shrink-0">
                 ${product.price.toFixed(2)}
               </span>
             )}
