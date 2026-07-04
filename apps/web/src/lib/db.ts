@@ -129,9 +129,11 @@ export async function dbGetProduct(idOrSlug: string): Promise<MockProduct | unde
 // e.g. "Deep Eddy Peach Vodka"), then alphabetical A→Z.
 // Stored on each row so Supabase can ORDER BY it and pagination stays correct.
 export function computeProductSortKey(p: MockProduct): string {
-  const img = p.imageUrl && String(p.imageUrl).trim() ? "0" : "1";
+  // Legacy imports stored the literal strings "null"/"undefined" in imageUrl
+  const raw = String(p.imageUrl ?? "").trim().toLowerCase();
+  const hasImage = raw !== "" && raw !== "null" && raw !== "undefined";
   const group = ((p.brand ?? "").trim() || p.name || "").toLowerCase();
-  return `${img}|${group}|${(p.name ?? "").toLowerCase()}`;
+  return `${hasImage ? "0" : "1"}|${group}|${(p.name ?? "").toLowerCase()}`;
 }
 
 export async function dbSaveProduct(product: MockProduct): Promise<void> {
