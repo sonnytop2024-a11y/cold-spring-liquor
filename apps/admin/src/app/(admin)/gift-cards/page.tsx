@@ -21,7 +21,7 @@ interface GiftCard {
   buyerEmail?: string;
 }
 
-const AMOUNTS = [25, 50, 100, 250];
+const AMOUNTS = [5, 10, 25, 50, 100, 250];
 
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
@@ -240,7 +240,7 @@ export default function GiftCardsPage() {
                 {/* Amount */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {AMOUNTS.map(a => (
                       <button key={a} onClick={() => setAmount(a)}
                         className={`py-2.5 rounded-xl font-bold text-sm border-2 transition-all ${amount === a ? "bg-brand-500 text-white border-brand-500" : "border-gray-200 text-gray-700 hover:border-brand-300"}`}>

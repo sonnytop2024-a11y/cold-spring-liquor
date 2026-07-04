@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, MapPin, User, ChevronRight, Package, X, Edit2, XCircle, RefreshCw, Loader2, Plus, Minus, FlaskConical } from "lucide-react";
+import { Clock, MapPin, User, ChevronRight, Package, X, Edit2, XCircle, RefreshCw, Loader2, Plus, Minus, FlaskConical , Search } from "lucide-react";
 import { API } from "@/lib/api";
 
 // ─── Audio alert (persistent ctx — required by iOS/Safari) ───────────────────
@@ -330,7 +330,12 @@ function EditOrderModal({ order, onClose, onSave }: { order: any; onClose: () =>
 
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function OrdersPage() {
-  const [statusFilter, setStatusFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("today");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(30);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [cancelOrder, setCancelOrder] = useState<any>(null);
   const [detailOrder, setDetailOrder] = useState<any>(null);
@@ -368,10 +373,9 @@ export default function OrdersPage() {
   const DRIVERS = (Array.isArray(driversData) ? driversData : []).map((d: any) => ({ id: d.id, name: d.name, isOnline: d.isOnline, active: d.active }));
 
   const { data: orders = [], isLoading, refetch } = useQuery({
-    queryKey: ["admin-orders", statusFilter],
+    queryKey: ["admin-orders"],
     queryFn: async () => {
-      const q = statusFilter ? `?status=${statusFilter}` : "";
-      const r = await fetch(`${API}/admin/orders${q}`);
+      const r = await fetch(`${API}/admin/orders`);
       if (!r.ok) throw new Error(`Failed to load orders (${r.status})`);
       return r.json();
     },
@@ -421,53 +425,108 @@ export default function OrdersPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOrders.map((o: any) => o.id).join(",")]);
 
-  const SECTIONS = [
-    {
-      key: "new",
-      label: "New Orders",
-      emoji: "🔴",
-      headerStyle: { background: "#fef2f2", borderColor: "#fca5a5", color: "#dc2626" },
-      orders: liveOrders.filter((o: any) => o.status === "pending"),
-    },
-    {
-      key: "confirmed",
-      label: "Confirmed & Preparing",
-      emoji: "🔵",
-      headerStyle: { background: "#eff6ff", borderColor: "#93c5fd", color: "#2563eb" },
-      orders: liveOrders.filter((o: any) => ["confirmed","preparing"].includes(o.status)),
-    },
-    {
-      key: "delivery",
-      label: "Out for Delivery",
-      emoji: "🚗",
-      headerStyle: { background: "#fff7ed", borderColor: "#fdba74", color: "#ea580c" },
-      orders: liveOrders.filter((o: any) => ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(o.status)),
-    },
-    {
-      key: "pickup",
-      label: "Ready for Pick Up",
-      emoji: "🛍️",
-      headerStyle: { background: "#fffbeb", borderColor: "#fcd34d", color: "#b45309" },
-      orders: liveOrders.filter((o: any) => o.status === "ready_for_pickup"),
-    },
-    {
-      key: "done",
-      label: "Completed Today",
-      emoji: "✅",
-      headerStyle: { background: "#f0fdf4", borderColor: "#86efac", color: "#16a34a" },
-      orders: liveOrders.filter((o: any) => ["delivered","picked_up"].includes(o.status) && new Date(o.updatedAt).toDateString() === today),
-    },
-    {
-      key: "cancelled",
-      label: "Cancelled / Failed",
-      emoji: "❌",
-      headerStyle: { background: "#f9fafb", borderColor: "#d1d5db", color: "#6b7280" },
-      orders: liveOrders.filter((o: any) => ["cancelled","failed_delivery","refunded"].includes(o.status)),
-    },
+  // ── POS-style filtering ─────────────────────────────────────────────
+  const DATE_FILTERS = [
+    { key: "today", label: "Today" },
+    { key: "yesterday", label: "Yesterday" },
+    { key: "7d", label: "Last 7 Days" },
+    { key: "week", label: "This Week" },
+    { key: "month", label: "This Month" },
+    { key: "lastmonth", label: "Last Month" },
+    { key: "custom", label: "📅 Custom" },
+    { key: "all", label: "All Orders" },
+  ];
+  const TYPE_FILTERS = [
+    { key: "all", label: "All" },
+    { key: "delivery", label: "🚚 Delivery" },
+    { key: "pickup", label: "🏬 Pick Up" },
+    { key: "new", label: "New" },
+    { key: "preparing", label: "Preparing" },
+    { key: "delivering", label: "Delivering" },
+    { key: "ready", label: "Ready for Pick Up" },
+    { key: "completed", label: "Completed" },
+    { key: "cancelled", label: "Cancelled" },
+    { key: "refunded", label: "Refunded" },
   ];
 
-  const todayCompleted = liveOrders.filter((o: any) => o.status === "delivered" && new Date(o.updatedAt).toDateString() === today);
-  const inDelivery = liveOrders.filter((o: any) => ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(o.status));
+  const DAY_MS = 86_400_000;
+  function startOfDay(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+  function inDateRange(o: any): boolean {
+    const t = new Date(o.createdAt).getTime();
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    switch (dateFilter) {
+      case "today":     return t >= todayStart;
+      case "yesterday": return t >= todayStart - DAY_MS && t < todayStart;
+      case "7d":        return t >= todayStart - 6 * DAY_MS;
+      case "week": {    const dow = (now.getDay() + 6) % 7; return t >= todayStart - dow * DAY_MS; }
+      case "month":     return t >= new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      case "lastmonth": {
+        const s0 = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+        const e0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        return t >= s0 && t < e0;
+      }
+      case "custom": {
+        const s0 = customFrom ? new Date(`${customFrom}T00:00:00`).getTime() : 0;
+        const e0 = customTo ? new Date(`${customTo}T23:59:59`).getTime() : Infinity;
+        return t >= s0 && t <= e0;
+      }
+      default: return true;
+    }
+  }
+  function matchTypeFilter(o: any): boolean {
+    switch (typeFilter) {
+      case "delivery":   return o.orderType !== "pickup";
+      case "pickup":     return o.orderType === "pickup";
+      case "new":        return o.status === "pending";
+      case "preparing":  return ["confirmed", "preparing"].includes(o.status);
+      case "delivering": return ["driver_assigned", "driver_at_store", "out_for_delivery", "driver_arriving", "driver_arrived"].includes(o.status);
+      case "ready":      return o.status === "ready_for_pickup";
+      case "completed":  return ["delivered", "picked_up"].includes(o.status);
+      case "cancelled":  return ["cancelled", "failed_delivery"].includes(o.status);
+      case "refunded":   return o.status === "refunded" || o.refundStatus === "succeeded";
+      default: return true;
+    }
+  }
+  function matchSearch(o: any): boolean {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const driverName = DRIVERS.find((d: any) => d.id === o.driverId)?.name ?? "";
+    return [o.orderNumber, o.customerName, o.customerPhone, driverName]
+      .some((v) => String(v ?? "").toLowerCase().includes(q));
+  }
+
+  const filtered = liveOrders
+    .filter((o: any) => inDateRange(o) && matchTypeFilter(o) && matchSearch(o))
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const revenue = filtered
+    .filter((o: any) => !["cancelled", "failed_delivery", "refunded"].includes(o.status))
+    .reduce((a: number, o: any) => a + Number(o.total ?? 0), 0);
+  const visible = filtered.slice(0, visibleCount);
+
+  // Reset pagination when filters change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setVisibleCount(30); }, [dateFilter, typeFilter, search, customFrom, customTo]);
+
+  function dayLabel(dateStr: string): string {
+    const t = startOfDay(new Date(dateStr));
+    const today = startOfDay(new Date());
+    const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+    const d = new Date(dateStr);
+    if (t === today) return `Today — ${d.toLocaleDateString("en-US", opts)}`;
+    if (t === today - DAY_MS) return `Yesterday — ${d.toLocaleDateString("en-US", opts)}`;
+    const withYear = d.getFullYear() !== new Date().getFullYear();
+    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...(withYear ? { year: "numeric" } : {}) });
+  }
+  // Group visible orders by day (list is already newest-first)
+  const groups: { label: string; orders: any[] }[] = [];
+  for (const o of visible) {
+    const label = dayLabel(o.createdAt);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.orders.push(o);
+    else groups.push({ label, orders: [o] });
+  }
+
 
   function renderOrder(order: any) {
     const isExpanded = expandedId === order.id;
@@ -513,6 +572,11 @@ export default function OrdersPage() {
                   {order.readySmsSent && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700 border border-green-200">📱 SMS Sent ✓</span>}
                 </>
               )}
+              {(() => {
+                const paid = !!(order.stripePaymentIntentId || order.paypalOrderId) || order.paymentMethod === "gift_card";
+                if (order.status === "refunded" || order.refundStatus === "succeeded") return <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700">↩ Refunded</span>;
+                return <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${paid ? "bg-green-50 text-green-700 border border-green-200" : "bg-yellow-50 text-yellow-700 border border-yellow-200"}`}>{paid ? "💳 Paid" : "Unpaid"}</span>;
+              })()}
               {order.driverId && (
                 <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">
                   🚗 {DRIVERS.find((d: any) => d.id === order.driverId)?.name ?? order.driverId}
@@ -889,29 +953,69 @@ export default function OrdersPage() {
             <button onClick={() => refetch()} className="p-2 text-gray-500 border rounded-lg hover:bg-gray-50">
               <RefreshCw size={14} />
             </button>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className="flex-1 sm:flex-none border rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-              <option value="">All Orders</option>
-              {Object.keys(STATUS_COLORS).map(s => (
-                <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
-              ))}
-            </select>
+
           </div>
         </div>
 
-        {/* Stats Bar */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-3">
-          {[
-            { label: "New", value: pendingOrders.length, color: "#dc2626", bg: "#fef2f2", emoji: "🔴" },
-            { label: "Delivering", value: inDelivery.length, color: "#ea580c", bg: "#fff7ed", emoji: "🚗" },
-            { label: "Done Today", value: todayCompleted.length, color: "#16a34a", bg: "#f0fdf4", emoji: "✅" },
-            { label: "Online", value: onlineDrivers.length, color: onlineDrivers.length > 0 ? "#2563eb" : "#dc2626", bg: onlineDrivers.length > 0 ? "#eff6ff" : "#fef2f2", emoji: "👤" },
-          ].map(({ label, value, color, bg, emoji }) => (
-            <div key={label} className="rounded-xl border p-2 sm:p-4 text-center" style={{ background: bg, borderColor: `${color}40` }}>
-              <p className="text-base sm:text-2xl font-black" style={{ color }}>{emoji} {value}</p>
-              <p className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5">{label}</p>
-            </div>
+        {/* Search */}
+        <div className="relative mb-2">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search order #, customer, phone, driver…"
+            className="w-full bg-white border rounded-xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">✕</button>
+          )}
+        </div>
+
+        {/* Date filter chips */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {DATE_FILTERS.map(f => (
+            <button key={f.key} onClick={() => setDateFilter(f.key)}
+              className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full border-[1.5px] whitespace-nowrap transition-colors ${
+                dateFilter === f.key ? "bg-brand-500 border-brand-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-brand-300"
+              } ${f.key === "custom" ? "border-dashed" : ""}`}>
+              {f.label}
+            </button>
           ))}
+        </div>
+
+        {/* Custom range inputs */}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2 mt-1.5 mb-1">
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+              className="flex-1 border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-brand-400" />
+            <span className="text-gray-400 text-xs">→</span>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="flex-1 border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-brand-400" />
+          </div>
+        )}
+
+        {/* Type / status chips */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1 mt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {TYPE_FILTERS.map(f => (
+            <button key={f.key} onClick={() => setTypeFilter(f.key)}
+              className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full border-[1.5px] whitespace-nowrap transition-colors ${
+                typeFilter === f.key ? "bg-gray-900 border-gray-900 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-gray-400"
+              }`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Period summary */}
+        <div className="mt-2 flex items-center justify-between bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl px-4 py-2.5">
+          <div>
+            <p className="text-[10px] font-black tracking-wider text-orange-800/70 uppercase">Orders</p>
+            <p className="font-black text-gray-900">{filtered.length}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-black tracking-wider text-orange-800/70 uppercase">Revenue</p>
+            <p className="font-black text-brand-600 text-lg tabular-nums">${revenue.toFixed(2)}</p>
+          </div>
         </div>
       </div>
 
@@ -926,22 +1030,33 @@ export default function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-1">
-          {SECTIONS.map(section => {
-            if (section.orders.length === 0) return null;
-            return (
-              <div key={section.key} className="mb-4">
-                <div className="flex items-center gap-2 rounded-xl border px-4 py-2.5 mb-2" style={section.headerStyle}>
-                  <span className="font-bold text-sm">{section.emoji} {section.label}</span>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/60">
-                    {section.orders.length}
-                  </span>
+          {filtered.length === 0 ? (
+            <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
+              <Package size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No orders match these filters</p>
+            </div>
+          ) : (
+            <>
+              {groups.map(group => (
+                <div key={group.label} className="mb-3">
+                  <div className="flex items-center gap-2 px-1 mb-1.5">
+                    <span className="text-[11px] font-black tracking-widest text-gray-400 uppercase whitespace-nowrap">{group.label}</span>
+                    <span className="text-[10px] font-bold text-gray-300">({group.orders.length})</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <div className="space-y-2">
+                    {group.orders.map((order: any) => renderOrder(order))}
+                  </div>
                 </div>
-                <div className="space-y-2 pl-2 border-l-2 ml-2" style={{ borderColor: section.headerStyle.borderColor }}>
-                  {section.orders.map((order: any) => renderOrder(order))}
-                </div>
-              </div>
-            );
-          })}
+              ))}
+              {filtered.length > visibleCount && (
+                <button onClick={() => setVisibleCount(c => c + 30)}
+                  className="w-full border-2 border-dashed border-gray-200 text-gray-500 hover:border-brand-300 hover:text-brand-600 font-bold text-xs py-3 rounded-xl transition-colors">
+                  ▾ Load more ({filtered.length - visibleCount} older orders)
+                </button>
+              )}
+            </>
+          )}
 
           {/* Test Orders — collapsed by default, shown only when test orders exist */}
           {testOrders.length > 0 && (
