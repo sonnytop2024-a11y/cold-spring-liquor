@@ -169,7 +169,8 @@ export function RegisterForm() {
               <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input required type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)}
                 max={new Date(new Date().setFullYear(new Date().getFullYear() - 21)).toISOString().split("T")[0]}
-                className="w-full pl-9 pr-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                className="block w-full min-w-0 max-w-full appearance-none bg-white pl-9 pr-4 py-2.5 min-h-[42px] border rounded-xl text-sm text-left focus:outline-none focus:ring-2 focus:ring-brand-500"
+                style={{ WebkitAppearance: "none" }} />
             </div>
             {form.dob && (
               <p className={`text-xs mt-1 font-medium ${isUnder21 ? "text-red-500" : "text-green-600"}`}>
