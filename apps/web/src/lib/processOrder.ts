@@ -92,7 +92,7 @@ export async function processOrder(
     // Admin kill-switch: no drivers available → Pick Up only
     if (settings.deliveryEnabled === false) {
       return {
-        error: "Delivery is currently unavailable. Please choose Pick Up In Store to continue your order.",
+        error: "We are sorry! Delivery is temporarily unavailable. Please choose Pick Up In Store for today — we’ll be happy to deliver your next order!",
         status: 422,
       };
     }

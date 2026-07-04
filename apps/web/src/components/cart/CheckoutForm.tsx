@@ -972,7 +972,10 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       {deliveryDisabled && (
         <div className="flex items-start gap-2.5 bg-amber-50 border-[1.5px] border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800">
           <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-500" />
-          <span><strong>Delivery is currently unavailable.</strong> Please choose Pick Up In Store to continue your order.</span>
+          <span>
+            <strong>We are sorry! Delivery is temporarily unavailable.</strong><br />
+            Thank you for your understanding. Please choose <strong>Pick Up In Store</strong> for today — we&apos;ll be happy to deliver your next order! 🧡
+          </span>
         </div>
       )}
 
