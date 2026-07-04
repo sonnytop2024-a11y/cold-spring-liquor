@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "../../../_mock/store";
-import { dbGetOrder, dbUpdateOrder } from "@/lib/db";
+import { dbGetOrder, dbUpdateOrder, dbGetSettings } from "@/lib/db";
 import { sendPickupReady } from "@/lib/email";
 import { sendSms } from "@/lib/sms";
 import type { OrderStatus } from "../../../_mock/store";
@@ -44,7 +44,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // Set ETA only when order is first accepted (pending → confirmed) for same-day delivery orders
   if (status === "confirmed" && order.orderType !== "pickup" && order.deliveryType === "same-day" && !order.estimatedDelivery) {
-    patch.estimatedDelivery = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const settings = await dbGetSettings();
+    const maxMin = Number(settings.deliveryTimeMax) > 0 ? Number(settings.deliveryTimeMax) : 30;
+    patch.estimatedDelivery = new Date(Date.now() + maxMin * 60 * 1000).toISOString();
   }
   if (status === "picked_up") patch.pickedUpAt = now;
 

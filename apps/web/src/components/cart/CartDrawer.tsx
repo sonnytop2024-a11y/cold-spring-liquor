@@ -4,6 +4,7 @@ import { X, Trash2, Plus, Minus, Truck, ShoppingBag, ChevronRight, AlertCircle }
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { formatCurrency, calcCartTotals, calcPointsEarned, calcPointsValue, MIN_ORDER } from "@/lib/utils";
@@ -52,9 +53,19 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const { tax, total } = calcCartTotals(subtotal, couponDiscount + bundleDiscount, rewardsDiscount, giftCardAmount);
   const pointsEarned = calcPointsEarned(subtotal);
 
-  const meetsMinimum = subtotal >= MIN_ORDER;
-  const amountToMin = Math.max(0, MIN_ORDER - subtotal);
-  const progressPct = Math.min(100, (subtotal / MIN_ORDER) * 100);
+  const { data: storeCfg } = useQuery({
+    queryKey: ["delivery-status"],
+    queryFn: async () => {
+      const r = await fetch("/api/delivery/status");
+      if (!r.ok) throw new Error("status failed");
+      return r.json() as Promise<{ minOrder: number; timeMin: number; timeMax: number; freeDelivery: boolean; noTipRequired: boolean }>;
+    },
+    refetchInterval: 10_000,
+  });
+  const minOrder = storeCfg?.minOrder ?? MIN_ORDER;
+  const meetsMinimum = subtotal >= minOrder;
+  const amountToMin = Math.max(0, minOrder - subtotal);
+  const progressPct = Math.min(100, (subtotal / minOrder) * 100);
 
   // Suggest items not already in cart
   const suggestions = ADDONS.filter(a => !items.find(i => i.product.id === a.id)).slice(0, 2);
@@ -74,7 +85,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
             {meetsMinimum ? (
               <div className="flex items-center gap-2 text-green-700 text-sm font-semibold">
                 <Truck size={16} />
-                <span>🎉 FREE Delivery · NO Tip Required · 10–30 Minutes</span>
+                <span>🎉 {[storeCfg?.freeDelivery !== false && "FREE Delivery", storeCfg?.noTipRequired !== false && "NO Tip Required", `${storeCfg?.timeMin ?? 10}–${storeCfg?.timeMax ?? 30} Minutes`].filter(Boolean).join(" · ")}</span>
               </div>
             ) : (
               <div>
@@ -82,13 +93,13 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   <span className="text-amber-700 flex items-center gap-1.5">
                     <AlertCircle size={13} /> Add <strong>{formatCurrency(amountToMin)}</strong> more to get delivery to you
                   </span>
-                  <span className="text-gray-500">${subtotal.toFixed(2)} / $20</span>
+                  <span className="text-gray-500">${subtotal.toFixed(2)} / ${minOrder}</span>
                 </div>
                 <div className="bg-amber-200 rounded-full h-2">
                   <div className="bg-amber-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
                 </div>
                 <p className="text-xs text-amber-700 font-semibold mt-1.5">
-                  ⚠️ Minimum order is $20.00 · Delivery always FREE
+                  ⚠️ Minimum order is ${minOrder.toFixed(2)}{storeCfg?.freeDelivery !== false ? " · Delivery always FREE" : ""}
                 </p>
               </div>
             )}

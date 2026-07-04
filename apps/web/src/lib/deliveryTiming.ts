@@ -39,7 +39,11 @@ function nextOpenMorning(from: Date): Date {
   return new Date(central.getTime() + offset);
 }
 
-export function getDeliveryTiming(now: Date = new Date()): DeliveryTiming {
+export interface DeliveryTimeRange { timeMin?: number; timeMax?: number }
+
+export function getDeliveryTiming(now: Date = new Date(), range: DeliveryTimeRange = {}): DeliveryTiming {
+  const timeMin = range.timeMin && range.timeMin > 0 ? range.timeMin : 10;
+  const timeMax = range.timeMax && range.timeMax > 0 ? range.timeMax : 30;
   // Always compute in Central Time — Vercel servers run UTC
   const central = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
   const day  = central.getDay();
@@ -100,14 +104,13 @@ export function getDeliveryTiming(now: Date = new Date()): DeliveryTiming {
     };
   }
 
-  // Normal same-day delivery — 10–30 minutes
-  const etaMin = new Date(now.getTime() + 10 * 60 * 1000);
-  const etaMax = new Date(now.getTime() + 30 * 60 * 1000);
+  // Normal same-day delivery — admin-configurable range
+  const etaMax = new Date(now.getTime() + timeMax * 60 * 1000);
   return {
     type: "same-day",
     estimatedDelivery: etaMax,
-    label: "10–30 minutes",
-    message: `Estimated delivery: 10–30 minutes.`,
+    label: `${timeMin}–${timeMax} minutes`,
+    message: `Estimated delivery: ${timeMin}–${timeMax} minutes.`,
     isStoreClosed: false,
   };
 }

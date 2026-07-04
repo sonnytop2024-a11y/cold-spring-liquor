@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { estimateDeliveryFromStoreAsync } from "@/lib/deliveryEstimate";
-
-const MAX_DELIVERY_MILES = 10;
+import { dbGetSettings } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -24,10 +23,12 @@ export async function POST(req: NextRequest) {
   if (PICKUP_WORDS.some((w: string) => streetLower.includes(w))) {
     return NextResponse.json({
       inRange: false,
-      error: "We are a delivery-only service — in-store pickup is not available. Please enter a valid street address for delivery.",
+      error: "Looking to pick up in store? Use our Pick Up checkout and save 5% — or enter a valid street address for delivery.",
     });
   }
 
+  const settings = await dbGetSettings();
+  const MAX_DELIVERY_MILES = Number(settings.deliveryRadius) > 0 ? Number(settings.deliveryRadius) : 10;
   const { distanceMiles } = await estimateDeliveryFromStoreAsync({ street, city, state, zip });
 
   if (distanceMiles > MAX_DELIVERY_MILES) {

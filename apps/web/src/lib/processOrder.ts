@@ -77,12 +77,19 @@ export async function processOrder(
   let distanceMiles = 0;
   let etaMinutes = 0;
 
+  const settings = await dbGetSettings();
+
+  // Minimum order (admin-configurable, applies to delivery and pickup)
+  const minOrder = Number(settings.minOrderAmount) >= 0 ? Number(settings.minOrderAmount) : 20;
+  if (subtotal < minOrder) {
+    return { error: `Minimum order is $${minOrder}. Please add more items to your cart.`, status: 422 };
+  }
+
   if (isPickup) {
     const winError = validatePickupWindow(body.pickupWindow);
     if (winError) return { error: winError, status: 422 };
   } else {
     // Admin kill-switch: no drivers available → Pick Up only
-    const settings = await dbGetSettings();
     if (settings.deliveryEnabled === false) {
       return {
         error: "Delivery is currently unavailable. Please choose Pick Up In Store to continue your order.",
@@ -111,9 +118,10 @@ export async function processOrder(
     const est = await estimateDeliveryFromStoreAsync(deliveryAddress ?? {});
     distanceMiles = est.distanceMiles;
     etaMinutes = est.etaMinutes;
-    if (distanceMiles > 10) {
+    const radius = Number(settings.deliveryRadius) > 0 ? Number(settings.deliveryRadius) : 10;
+    if (distanceMiles > radius) {
       return {
-        error: `Sorry, we only deliver within 10 miles of our store. Your address is ${distanceMiles} miles away.`,
+        error: `Sorry, we only deliver within ${radius} miles of our store. Your address is ${distanceMiles} miles away.`,
         status: 422,
       };
     }
@@ -121,7 +129,7 @@ export async function processOrder(
 
   const nowDate = new Date();
   const nowStr = nowDate.toISOString();
-  const timing = getDeliveryTiming(nowDate);
+  const timing = getDeliveryTiming(nowDate, { timeMin: Number(settings.deliveryTimeMin) || 10, timeMax: Number(settings.deliveryTimeMax) || 30 });
 
   const order: MockOrder = {
     id: `order_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,

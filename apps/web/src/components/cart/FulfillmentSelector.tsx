@@ -13,11 +13,17 @@ export function FulfillmentSelector({
   mode,
   onChange,
   deliveryDisabled = false,
+  freeDelivery = true,
+  noTipRequired = true,
 }: {
   mode: FulfillmentMode;
   onChange: (m: FulfillmentMode) => void;
   deliveryDisabled?: boolean;
+  freeDelivery?: boolean;
+  noTipRequired?: boolean;
 }) {
+  const deliverySub = [freeDelivery && "FREE Delivery", noTipRequired && "No Tip Required"]
+    .filter(Boolean).join(" · ") || "Fast local delivery";
   const isPickup = mode === "pickup";
 
   function go(target: FulfillmentMode) {
@@ -48,7 +54,7 @@ export function FulfillmentSelector({
           <span className="text-2xl leading-none">🚚</span>
           <span className="min-w-0">
             <span className="block font-black text-gray-900 text-sm">Delivery</span>
-            <span className="block text-xs text-gray-500 leading-tight">{deliveryDisabled ? "Temporarily unavailable" : "FREE Delivery · No Tip Required"}</span>
+            <span className="block text-xs text-gray-500 leading-tight">{deliveryDisabled ? "Temporarily unavailable" : deliverySub}</span>
           </span>
         </button>
 
@@ -81,7 +87,7 @@ export function FulfillmentSelector({
         <button type="button" onClick={() => go("delivery")} disabled={deliveryDisabled}
           className={`relative z-10 py-2 px-2 text-center rounded-xl transition-transform duration-150 motion-reduce:transition-none [-webkit-tap-highlight-color:transparent] ${deliveryDisabled ? "opacity-40 cursor-not-allowed" : "active:scale-[.94]"}`}>
           <span className={`block text-[13px] font-black transition-colors duration-200 ${!isPickup && !deliveryDisabled ? "text-brand-600" : "text-gray-500"}`}>🚚 Delivery</span>
-          <span className={`block text-[10px] font-extrabold transition-colors duration-200 ${deliveryDisabled ? "text-gray-400" : !isPickup ? "text-green-600" : "text-gray-400"}`}>{deliveryDisabled ? "UNAVAILABLE" : "FREE"}</span>
+          <span className={`block text-[10px] font-extrabold transition-colors duration-200 ${deliveryDisabled ? "text-gray-400" : !isPickup ? "text-green-600" : "text-gray-400"}`}>{deliveryDisabled ? "UNAVAILABLE" : freeDelivery ? "FREE" : "FAST"}</span>
         </button>
         <button type="button" onClick={() => go("pickup")}
           className="relative z-10 py-2 px-2 text-center rounded-xl transition-transform duration-150 active:scale-[.94] motion-reduce:transition-none [-webkit-tap-highlight-color:transparent]">

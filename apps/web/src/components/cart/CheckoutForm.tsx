@@ -351,11 +351,17 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     queryFn: async () => {
       const r = await fetch("/api/delivery/status");
       if (!r.ok) throw new Error("status failed");
-      return r.json() as Promise<{ deliveryEnabled: boolean }>;
+      return r.json() as Promise<{
+        deliveryEnabled: boolean; radiusMiles: number; timeMin: number; timeMax: number;
+        minOrder: number; freeDelivery: boolean; noTipRequired: boolean;
+      }>;
     },
     refetchInterval: 10_000,
   });
   const deliveryDisabled = deliveryStatus?.deliveryEnabled === false;
+  const minOrder = deliveryStatus?.minOrder ?? MIN_ORDER;
+  const showFree = deliveryStatus?.freeDelivery !== false;
+  const showNoTip = deliveryStatus?.noTipRequired !== false;
   // Customer on the Delivery form when it goes offline → move them to Pick Up
   useEffect(() => {
     if (deliveryDisabled && mode === "delivery") setFulfillmentMode("pickup");
@@ -510,8 +516,11 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     }
   }, [user?.points, rewardsPointsToRedeem, setRewardsRedeem]);
 
-  // Delivery timing — computed once per render (updates each page load)
-  const timing = useMemo(() => getDeliveryTiming(), []);
+  // Delivery timing — recomputes when admin changes the time range
+  const timing = useMemo(
+    () => getDeliveryTiming(new Date(), { timeMin: deliveryStatus?.timeMin, timeMax: deliveryStatus?.timeMax }),
+    [deliveryStatus?.timeMin, deliveryStatus?.timeMax],
+  );
 
   // Bundle tiers — fetched once from store (admin-configurable)
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; sortOrder: number }[]>([]);
@@ -536,8 +545,8 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const pointsEarned = Math.floor(total); // 1 pt per $1
   const userPoints = user?.points ?? 0;
   const bestEligibleTier = [1000, 500, 250].find(t => userPoints >= t) ?? 0;
-  const meetsMinimum = subtotal >= MIN_ORDER;
-  const amountToMin = Math.max(0, MIN_ORDER - subtotal);
+  const meetsMinimum = subtotal >= minOrder;
+  const amountToMin = Math.max(0, minOrder - subtotal);
 
   async function applyPromo() {
     const code = promoInput.trim().toUpperCase();
@@ -958,7 +967,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       <CheckoutSteps current={1} />
 
       {/* Delivery / Pick Up selector — always visible, sticky tabs on mobile */}
-      <FulfillmentSelector mode={mode} onChange={switchMode} deliveryDisabled={deliveryDisabled} />
+      <FulfillmentSelector mode={mode} onChange={switchMode} deliveryDisabled={deliveryDisabled} freeDelivery={showFree} noTipRequired={showNoTip} />
 
       {deliveryDisabled && (
         <div className="flex items-start gap-2.5 bg-amber-50 border-[1.5px] border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800">
@@ -1006,7 +1015,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
                 </>
               ) : (
                 <>
-                  <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+                  {showFree && <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>}
                 </>
               )}
               <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(tax)}</span></div>
@@ -1286,8 +1295,8 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
                 </>
               ) : (
                 <>
-                  <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-                  <div className="flex justify-between text-green-600 font-medium"><span>💰 Tip</span><span>NOT Required</span></div>
+                  {showFree && <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>}
+                  {showNoTip && <div className="flex justify-between text-green-600 font-medium"><span>💰 Tip</span><span>NOT Required</span></div>}
                 </>
               )}
               <div className="flex justify-between text-gray-500"><span>Tax (8.25%)</span><span>{formatCurrency(tax)}</span></div>
@@ -1323,7 +1332,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
           <p className="font-bold text-amber-800 mb-1">⚠️ Minimum order not met</p>
           <p className="text-amber-700 text-sm mb-3">
-            Add <strong>{formatCurrency(amountToMin)}</strong> more in items · Minimum cart value is $20 (gift cards &amp; discounts don&apos;t count toward the minimum).
+            Add <strong>{formatCurrency(amountToMin)}</strong> more in items · Minimum cart value is ${minOrder} (gift cards &amp; discounts don&apos;t count toward the minimum).
           </p>
           <Link href="/products" className="inline-block bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors">+ Add More Items</Link>
         </div>

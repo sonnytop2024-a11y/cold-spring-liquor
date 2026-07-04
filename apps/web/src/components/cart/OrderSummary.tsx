@@ -40,11 +40,15 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
     queryFn: async () => {
       const r = await fetch("/api/delivery/status");
       if (!r.ok) throw new Error("status failed");
-      return r.json() as Promise<{ deliveryEnabled: boolean }>;
+      return r.json() as Promise<{
+        deliveryEnabled: boolean; minOrder: number; freeDelivery: boolean; noTipRequired: boolean;
+      }>;
     },
     refetchInterval: 10_000,
   });
   const deliveryDisabled = deliveryStatus?.deliveryEnabled === false;
+  const showFree = deliveryStatus?.freeDelivery !== false;
+  const showNoTip = deliveryStatus?.noTipRequired !== false;
   // Pick Up In Store: automatic discount, tax on the discounted subtotal
   const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
   const tax = (subtotal - pickupDiscount) * TAX_RATE;
@@ -102,8 +106,8 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
                 <div className="flex justify-between text-gray-400"><span>🚚 Delivery</span><span className="font-bold italic">Unavailable</span></div>
               ) : (
                 <>
-                  <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
-                  <div className="flex justify-between text-green-600 font-medium"><span>💰 Driver Tip</span><span>NOT Required ✓</span></div>
+                  {showFree && <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>}
+                  {showNoTip && <div className="flex justify-between text-green-600 font-medium"><span>💰 Driver Tip</span><span>NOT Required ✓</span></div>}
                 </>
               )}
             </>

@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SERVICE_CITIES } from "../../_mock/data";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
+import { dbGetSettings } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const { address, city } = await req.json();
   const input = (city || address || "").toLowerCase();
   const available = SERVICE_CITIES.some(c => input.includes(c));
-  const timing = getDeliveryTiming();
+  const settings = await dbGetSettings();
+  const timing = getDeliveryTiming(new Date(), {
+    timeMin: Number(settings.deliveryTimeMin) || 10,
+    timeMax: Number(settings.deliveryTimeMax) || 30,
+  });
 
   return NextResponse.json({
     available,
