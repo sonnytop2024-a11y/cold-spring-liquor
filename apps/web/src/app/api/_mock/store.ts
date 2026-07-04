@@ -91,6 +91,8 @@ export interface MockProduct {
   country: string; stockQty: number; inStock: boolean; featured: boolean;
   active: boolean; rating: number; reviewCount: number; description: string;
   imageUrl: string | null; bundleEligible: boolean;
+  // Precomputed catalog order: hasImage → brand/name group → name (see computeProductSortKey)
+  sortKey?: string;
 }
 
 export interface SavedAddress {

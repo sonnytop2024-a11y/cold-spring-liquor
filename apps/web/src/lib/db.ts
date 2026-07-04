@@ -30,7 +30,10 @@ export async function dbGetProductsPage(opts: {
   if (t) {
     try {
       let countQ = t.select("id", { count: "exact", head: true });
-      let dataQ  = t.select("data").range(offset, offset + limit - 1);
+      let dataQ  = t.select("data")
+        .order("data->>sortKey", { ascending: true, nullsFirst: false })
+        .order("data->>name", { ascending: true })
+        .range(offset, offset + limit - 1);
       if (category) {
         countQ = countQ.filter("data->>category", "eq", category);
         dataQ  = dataQ.filter("data->>category", "eq", category);
@@ -76,6 +79,7 @@ export async function dbGetProductsPage(opts: {
   if (stock === "out") all = all.filter(p => p.inStock === false || p.stockQty <= 0);
   if (bundleEligible === true) all = all.filter(p => p.bundleEligible);
   if (featured === true) all = all.filter(p => p.featured);
+  all = [...all].sort((a, b) => computeProductSortKey(a).localeCompare(computeProductSortKey(b)));
   return { products: all.slice(offset, offset + limit), total: all.length };
 }
 
@@ -96,7 +100,7 @@ export async function dbGetAllProducts(): Promise<MockProduct[]> {
         from += PAGE;
       }
       if (all.length > 0) {
-        return all;
+        return all.sort((a, b) => computeProductSortKey(a).localeCompare(computeProductSortKey(b)));
       }
     } catch (e) {
       console.error("[db] getAllProducts exception:", e);
@@ -120,7 +124,18 @@ export async function dbGetProduct(idOrSlug: string): Promise<MockProduct | unde
   return all.find((p) => p.id === idOrSlug || p.slug === idOrSlug);
 }
 
+// Catalog display order: products WITH an image first, then grouped by brand
+// (falls back to name — imported items carry the brand in the name prefix,
+// e.g. "Deep Eddy Peach Vodka"), then alphabetical A→Z.
+// Stored on each row so Supabase can ORDER BY it and pagination stays correct.
+export function computeProductSortKey(p: MockProduct): string {
+  const img = p.imageUrl && String(p.imageUrl).trim() ? "0" : "1";
+  const group = ((p.brand ?? "").trim() || p.name || "").toLowerCase();
+  return `${img}|${group}|${(p.name ?? "").toLowerCase()}`;
+}
+
 export async function dbSaveProduct(product: MockProduct): Promise<void> {
+  product = { ...product, sortKey: computeProductSortKey(product) };
   const t = tbl("csl_products");
   if (t) {
     // Upsert with only id + data — no updated_at dependency
@@ -142,6 +157,7 @@ export async function dbUpdateProduct(id: string, patch: Partial<MockProduct>): 
     const { data: row, error: getErr } = await t.select("data").eq("id", id).maybeSingle();
     if (!getErr && row?.data) {
       const merged: MockProduct = { ...(row.data as MockProduct), ...patch };
+      merged.sortKey = computeProductSortKey(merged);
       const { error: updateErr } = await t.update({ data: merged }).eq("id", id);
       if (!updateErr) {
         return merged;
