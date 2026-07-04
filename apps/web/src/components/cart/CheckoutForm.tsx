@@ -1390,8 +1390,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
   const [payError, setPayError] = useState("");
   const [reviewing, setReviewing] = useState(false);
   const [pmInfo, setPmInfo] = useState<{ id: string; type: string; brand?: string; last4?: string } | null>(null);
-  // Pickup has no delivery address — show billing fields by default so the card address can be entered
-  const [diffBilling, setDiffBilling] = useState(isPickup);
+  const [diffBilling, setDiffBilling] = useState(false);
   const [billAddr, setBillAddr] = useState({
     street: reviewData.billingAddress.street,
     city: reviewData.billingAddress.city,
@@ -1639,23 +1638,33 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
           <h2 className="font-bold text-base text-gray-800 mb-3 flex items-center gap-2">
             🏠 Billing Address{isPickup ? " (for your card)" : ""}
           </h2>
-          <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700 mb-3">
-            <p className="font-medium">{billAddr.street}</p>
-            <p className="text-gray-500">{billAddr.city}, {billAddr.state} {billAddr.zip}</p>
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={diffBilling}
-              onChange={e => setDiffBilling(e.target.checked)}
-              className="w-4 h-4 accent-brand-500 cursor-pointer"
-            />
-            <span className="text-sm text-gray-600">My card uses a different billing address</span>
-          </label>
-          {diffBilling && (
-            <div className="mt-3">
+          {isPickup ? (
+            <>
+              {/* Pickup has no delivery address — the card's billing address must be typed in */}
+              <p className="text-xs text-gray-400 mb-3">Enter the billing address on file with your card.</p>
               <AddressFields addr={billAddr} onChange={setBillAddr} prefix="billing-payment" />
-            </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700 mb-3">
+                <p className="font-medium">{billAddr.street}</p>
+                <p className="text-gray-500">{billAddr.city}, {billAddr.state} {billAddr.zip}</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={diffBilling}
+                  onChange={e => setDiffBilling(e.target.checked)}
+                  className="w-4 h-4 accent-brand-500 cursor-pointer"
+                />
+                <span className="text-sm text-gray-600">My card uses a different billing address</span>
+              </label>
+              {diffBilling && (
+                <div className="mt-3">
+                  <AddressFields addr={billAddr} onChange={setBillAddr} prefix="billing-payment" />
+                </div>
+              )}
+            </>
           )}
         </div>
 
