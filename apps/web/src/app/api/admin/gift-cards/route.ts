@@ -20,15 +20,16 @@ const settings = await dbGetSettings();
 export async function POST(req: NextRequest) {
 const { amount, recipientEmail, senderName = "Cold Spring Liquor", message = "", sendEmail = true } = await req.json();
 
-  const VALID = [25, 50, 100, 250];
-  if (!VALID.includes(amount)) return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  // Accept any sane amount so UI presets can change without touching this route
+  const amt = Number(amount);
+  if (!(amt > 0 && amt <= 500)) return NextResponse.json({ error: "Invalid amount (must be \$1–\$500)" }, { status: 400 });
   if (!recipientEmail) return NextResponse.json({ error: "recipientEmail required" }, { status: 400 });
 
   const code = genCode();
   const card: GiftCard = {
     code,
-    originalAmount: amount,
-    remainingBalance: amount,
+    originalAmount: amt,
+    remainingBalance: amt,
     recipientEmail,
     senderName,
     message,
@@ -38,7 +39,7 @@ const { amount, recipientEmail, senderName = "Cold Spring Liquor", message = "",
   };
 
   await dbSaveGiftCard(card);
-  if (sendEmail) sendGiftCardEmail(code, amount, recipientEmail, senderName, message).catch(() => {});
+  if (sendEmail) sendGiftCardEmail(code, amt, recipientEmail, senderName, message).catch(() => {});
 
   return NextResponse.json(card, { status: 201 });
 }
