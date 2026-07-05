@@ -6,6 +6,7 @@ import { Plus, Check, Minus, Heart } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
+import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
 
 interface ProductCardProps {
   product: Product;
@@ -85,62 +86,15 @@ export function ProductCard({ product }: ProductCardProps) {
               onError={() => setImgError(true)}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center relative overflow-hidden"
-              style={{ background: "linear-gradient(160deg,#061a0e,#0d2f1a,#0a2214)" }}>
-              {/* gold ambient glow */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-28 h-28 rounded-full animate-pulse-glow"
-                  style={{ background: "radial-gradient(circle, rgba(212,175,55,0.18) 0%, transparent 70%)" }} />
-              </div>
-              {/* shimmer sweep */}
-              <div className="absolute inset-0 pointer-events-none animate-shimmer"
-                style={{ background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.07) 50%, transparent 60%)" }} />
-              {/* champagne bottle */}
-              <div className="relative z-10 animate-bottle-float">
-                <svg width="46" height="96" viewBox="0 0 46 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* foil cap */}
-                  <rect x="17" y="1" width="12" height="12" rx="3" fill="#b8962e"/>
-                  <rect x="17" y="1" width="5" height="12" rx="1.5" fill="#d4af37" opacity="0.7"/>
-                  {/* wire cage */}
-                  <line x1="17" y1="4" x2="29" y2="4" stroke="#d4af37" strokeWidth="0.8" opacity="0.9"/>
-                  <line x1="17" y1="7" x2="29" y2="7" stroke="#d4af37" strokeWidth="0.8" opacity="0.7"/>
-                  <line x1="17" y1="10" x2="29" y2="10" stroke="#d4af37" strokeWidth="0.6" opacity="0.5"/>
-                  <line x1="20" y1="1" x2="20" y2="13" stroke="#d4af37" strokeWidth="0.6" opacity="0.6"/>
-                  <line x1="23" y1="1" x2="23" y2="13" stroke="#d4af37" strokeWidth="0.6" opacity="0.6"/>
-                  <line x1="26" y1="1" x2="26" y2="13" stroke="#d4af37" strokeWidth="0.6" opacity="0.6"/>
-                  {/* long slender neck */}
-                  <rect x="19" y="13" width="8" height="28" rx="2" fill="#1a4a2e"/>
-                  <rect x="19" y="13" width="3" height="28" rx="1" fill="white" opacity="0.08"/>
-                  {/* shoulder curve */}
-                  <path d="M19 41 Q10 50 9 58 L37 58 Q36 50 27 41 Z" fill="#1a4a2e"/>
-                  <path d="M19 41 Q13 46 12 53 L16 53 Q17 47 21 43 Z" fill="white" opacity="0.07"/>
-                  {/* body */}
-                  <rect x="9" y="58" width="28" height="34" rx="4" fill="#1a4a2e"/>
-                  {/* label — cream/gold */}
-                  <rect x="12" y="63" width="22" height="22" rx="2" fill="#f5f0dc" opacity="0.95"/>
-                  <rect x="12" y="63" width="22" height="4" rx="1.5" fill="#d4af37" opacity="0.9"/>
-                  <rect x="15" y="70" width="16" height="1.5" rx="0.75" fill="#5a3e00" opacity="0.5"/>
-                  <rect x="17" y="73" width="12" height="1.5" rx="0.75" fill="#5a3e00" opacity="0.4"/>
-                  <rect x="15" y="76" width="16" height="1" rx="0.5" fill="#5a3e00" opacity="0.3"/>
-                  <rect x="17" y="79" width="12" height="1" rx="0.5" fill="#5a3e00" opacity="0.25"/>
-                  {/* shine streak */}
-                  <rect x="10" y="58" width="3" height="34" rx="1.5" fill="white" opacity="0.09"/>
-                  {/* base */}
-                  <rect x="9" y="90" width="28" height="3" rx="1.5" fill="#0d2518"/>
-                  {/* bubbles */}
-                  <circle cx="22" cy="68" r="1" fill="white" opacity="0.15"/>
-                  <circle cx="28" cy="74" r="0.8" fill="white" opacity="0.12"/>
-                  <circle cx="19" cy="79" r="0.7" fill="white" opacity="0.1"/>
-                </svg>
-              </div>
-              {/* drop shadow */}
-              <div className="absolute bottom-3 w-8 h-2 rounded-full animate-bottle-shadow"
-                style={{ background: "radial-gradient(ellipse, rgba(0,0,0,0.5) 0%, transparent 70%)" }} />
-              {/* badge */}
-              <span className="absolute bottom-2 right-2 text-white font-bold rounded-full z-10"
-                style={{ background: "rgba(180,140,30,0.92)", fontSize: "8px", padding: "3px 7px", letterSpacing: "0.5px" }}>
-                PHOTO SOON
-              </span>
+            <div className="w-full h-full flex items-center justify-center bg-white">
+              {/* Category illustration placeholder — replaced automatically once a real photo is uploaded */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={categoryPlaceholder(product.category)}
+                alt={product.name}
+                className="w-[64%] h-[64%] object-contain group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+              />
             </div>
           )}
         </Link>

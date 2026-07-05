@@ -1,0 +1,17 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="170" rx="52" ry="9" fill="#0f172a" opacity=".07"/>
+<g transform="translate(-12,0)">
+<path d="M64 44 L120 44 Q120 96 92 104 L92 146 L108 146 Q112 146 112 150 L112 154 L72 154 L72 150 Q72 146 76 146 L92 146 L92 104 Q64 96 64 44 Z" fill="#eef2f7" opacity=".9"/>
+<path d="M67 56 Q68 92 92 99 Q116 92 117 56 Z" fill="#a33045"/>
+<path d="M67 56 Q68 92 92 99 L92 56 Z" fill="#7e2436" opacity=".55"/>
+<path d="M70 48 L114 48" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity=".5"/>
+</g>
+<g transform="translate(24,10)">
+<circle cx="118" cy="104" r="12" fill="#5e3a6e"/><circle cx="102" cy="112" r="12" fill="#6d4680"/>
+<circle cx="132" cy="116" r="12" fill="#6d4680"/><circle cx="112" cy="128" r="12" fill="#5e3a6e"/>
+<circle cx="126" cy="138" r="11" fill="#7b5490"/><circle cx="98" cy="134" r="11" fill="#7b5490"/>
+<circle cx="112" cy="148" r="10" fill="#6d4680"/>
+<circle cx="98" cy="108" r="3.5" fill="#b895c9" opacity=".8"/><circle cx="114" cy="100" r="3.5" fill="#b895c9" opacity=".8"/>
+<path d="M114 92 Q112 76 120 66" stroke="#6b9e4e" stroke-width="5" stroke-linecap="round" fill="none"/>
+<path d="M120 66 C132 60 144 62 150 54 C138 50 126 54 120 66 Z" fill="#6b9e4e"/>
+</g>
+</svg>
