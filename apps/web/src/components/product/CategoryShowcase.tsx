@@ -31,6 +31,7 @@ const DESCRIPTIONS: Record<string, string> = {
   mixer:     "Tonic, Soda, Juice & more",
   liqueur:   "Cream, Fruit, Herbal & more",
   rare:      "Rare, Limited & Exclusive",
+  sake_soju: "Japanese Sake & Korean Soju",
   other:     "Other Spirits & More",
 };
 

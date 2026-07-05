@@ -3,7 +3,7 @@
 // Real product photos always take priority — these only show when imageUrl is empty.
 const KNOWN = new Set([
   "whiskey", "scotch", "vodka", "tequila", "gin", "rum", "wine", "champagne",
-  "beer", "cognac", "rtd", "mixer", "liqueur", "rare", "other",
+  "beer", "cognac", "rtd", "mixer", "liqueur", "rare", "sake_soju", "other",
 ]);
 
 export function categoryPlaceholder(category?: string | null): string {

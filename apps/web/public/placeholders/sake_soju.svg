@@ -1,0 +1,16 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="170" rx="52" ry="9" fill="#0f172a" opacity=".07"/>
+<g transform="translate(-14,0)">
+<path d="M96 46 Q92 58 92 66 Q78 76 74 96 Q70 118 78 140 Q84 156 100 156 Q116 156 122 140 Q130 118 126 96 Q122 76 108 66 Q108 58 104 46 Z" fill="#eef2f7"/>
+<path d="M96 46 Q92 58 92 66 Q78 76 74 96 Q70 118 78 140 Q84 156 100 156 L100 46 Z" fill="#dde6ef" opacity=".7"/>
+<rect x="92" y="40" width="16" height="8" rx="3" fill="#b0bccb"/>
+<path d="M80 100 Q78 118 84 136" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".7" fill="none"/>
+<rect x="84" y="96" width="32" height="26" rx="4" fill="#f8fafc" stroke="#dbe4ee" stroke-width="1.5"/>
+<path d="M94 104 Q100 100 106 104 Q106 112 100 115 Q94 112 94 104 Z" fill="#c2554f"/>
+</g>
+<g transform="translate(34,0)">
+<path d="M96 128 Q94 142 98 152 Q100 158 108 158 Q116 158 118 152 Q122 142 120 128 Z" fill="#eef2f7"/>
+<path d="M96 128 Q94 142 98 152 Q100 158 108 158 L108 128 Z" fill="#dde6ef" opacity=".7"/>
+<ellipse cx="108" cy="128" rx="12" ry="3.5" fill="#dbe4ee"/>
+<ellipse cx="108" cy="129" rx="9" ry="2.5" fill="#f5efdf"/>
+</g>
+</svg>
