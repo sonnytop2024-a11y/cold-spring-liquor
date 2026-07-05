@@ -43,3 +43,6 @@ Thumbs.db
 .vercel/
 .vercel
 .env*
+
+# TypeScript incremental build info — build artifacts, not source
+*.tsbuildinfo
