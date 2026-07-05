@@ -283,32 +283,6 @@ export function Header() {
           </div>
         </div>
 
-        {/* July 4th banner — mobile only */}
-        <div className="md:hidden w-full relative" style={{ isolation: "isolate" }}>
-          {/* Full banner image, natural ratio, no cropping */}
-          <Image
-            src="/july4-banner.jpg"
-            alt="Happy July 4th – Independence Day"
-            width={2376}
-            height={398}
-            className="w-full h-auto block"
-            priority
-          />
-          {/* CSS firework bursts on right side */}
-          <div className="absolute pointer-events-none" style={{ right: "8%", top: "15%", zIndex: 2 }}>
-            <div className="animate-fw1" style={{ width: 28, height: 28, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,200,50,0.9) 0%, rgba(255,80,80,0.5) 40%, transparent 70%)" }} />
-          </div>
-          <div className="absolute pointer-events-none" style={{ right: "3%", top: "40%", zIndex: 2 }}>
-            <div className="animate-fw2" style={{ width: 22, height: 22, borderRadius: "50%", background: "radial-gradient(circle, rgba(200,220,255,0.9) 0%, rgba(80,120,255,0.5) 40%, transparent 70%)" }} />
-          </div>
-          <div className="absolute pointer-events-none" style={{ right: "15%", top: "50%", zIndex: 2 }}>
-            <div className="animate-fw3" style={{ width: 18, height: 18, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,100,100,0.4) 40%, transparent 70%)" }} />
-          </div>
-          {/* Patriotic color-cycling border top & bottom */}
-          <div className="absolute top-0 left-0 right-0 animate-patriot-border" style={{ height: 3, zIndex: 3 }} />
-          <div className="absolute bottom-0 left-0 right-0 animate-patriot-border" style={{ height: 3, zIndex: 3, animationDelay: "0.8s" }} />
-        </div>
-
         {/* Mobile search bar — always visible below header row */}
         <div className="md:hidden px-3 pt-2 pb-3 overflow-hidden">
           <HeaderSearch mobile />

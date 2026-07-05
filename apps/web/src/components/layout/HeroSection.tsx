@@ -223,48 +223,10 @@ const heroCSS = `
   }
 
   /* ── US Flag · mobile only ─────────────────────────── */
-  .us-flag-wrap {
-    position: absolute;
-    left: 38%;
-    top: 63%;
-    z-index: 15;
-    pointer-events: none;
-  }
   @media (min-width: 768px) {
-    .us-flag-wrap { display: none; }
   }
 
-  .us-flag-pole {
-    position: absolute;
-    left: 3px;
-    top: 0;
-    width: 2px;
-    height: 104px;
-    background: linear-gradient(to right, #aaa 0%, #e8e0c8 40%, #bdb49a 100%);
-    border-radius: 1px;
-    box-shadow: 1px 0 3px rgba(0,0,0,0.5);
-  }
-  .us-flag-pole::before {
-    content: '';
-    position: absolute;
-    top: -5px; left: -3px;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, #ffe082, #c8a830);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
-  }
 
-  .us-flag-cloth {
-    position: absolute;
-    top: 0;
-    left: 5px;
-    width: 64px;
-    height: 34px;
-    transform-origin: 0% 0%;
-    animation: usFlagWave 3.2s ease-in-out infinite;
-    will-change: transform;
-    filter: drop-shadow(2px 3px 8px rgba(0,0,0,0.55));
-  }
   @keyframes usFlagWave {
     0%   { transform: skewX(0deg)    skewY(0deg)    scaleX(1.00); }
     8%   { transform: skewX(-3deg)   skewY(0.5deg)  scaleX(0.97); }
@@ -277,7 +239,6 @@ const heroCSS = `
     100% { transform: skewX(0deg)    skewY(0deg)    scaleX(1.00); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .us-flag-cloth { animation: none !important; }
   }
 
   /* ══════════════════════════════════════════════════════════════════
@@ -340,71 +301,6 @@ export function HeroSection() {
       <div className="hero-gradient absolute inset-0 pointer-events-none" />
       <HeroTruckAnimation />
 
-      {/* US Flag — mobile only, 4th of July */}
-      <div className="us-flag-wrap" aria-hidden="true">
-        <div className="us-flag-pole" />
-        <svg className="us-flag-cloth" viewBox="0 0 190 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="flagShadeH" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%"   stopColor="rgba(0,0,0,0)"/>
-              <stop offset="65%"  stopColor="rgba(0,0,0,0)"/>
-              <stop offset="100%" stopColor="rgba(0,0,0,0.18)"/>
-            </linearGradient>
-            <linearGradient id="flagShadeV" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="rgba(255,255,255,0.06)"/>
-              <stop offset="50%"  stopColor="rgba(0,0,0,0)"/>
-              <stop offset="100%" stopColor="rgba(0,0,0,0.08)"/>
-            </linearGradient>
-          </defs>
-          {/* 13 stripes */}
-          <rect width="190" height="100" fill="#B22234"/>
-          <rect y="7.69"  width="190" height="7.69" fill="#fff"/>
-          <rect y="23.08" width="190" height="7.69" fill="#fff"/>
-          <rect y="38.46" width="190" height="7.69" fill="#fff"/>
-          <rect y="53.85" width="190" height="7.69" fill="#fff"/>
-          <rect y="69.23" width="190" height="7.69" fill="#fff"/>
-          <rect y="84.62" width="190" height="7.69" fill="#fff"/>
-          {/* Canton */}
-          <rect width="76" height="53.85" fill="#3C3B6E"/>
-          {/* Stars row 1 */}
-          <circle cx="8"  cy="7"  r="3.2" fill="#fff"/>
-          <circle cx="21" cy="7"  r="3.2" fill="#fff"/>
-          <circle cx="34" cy="7"  r="3.2" fill="#fff"/>
-          <circle cx="47" cy="7"  r="3.2" fill="#fff"/>
-          <circle cx="60" cy="7"  r="3.2" fill="#fff"/>
-          <circle cx="73" cy="7"  r="3.2" fill="#fff"/>
-          {/* Stars row 2 offset */}
-          <circle cx="14" cy="17" r="3.2" fill="#fff"/>
-          <circle cx="27" cy="17" r="3.2" fill="#fff"/>
-          <circle cx="40" cy="17" r="3.2" fill="#fff"/>
-          <circle cx="53" cy="17" r="3.2" fill="#fff"/>
-          <circle cx="66" cy="17" r="3.2" fill="#fff"/>
-          {/* Stars row 3 */}
-          <circle cx="8"  cy="27" r="3.2" fill="#fff"/>
-          <circle cx="21" cy="27" r="3.2" fill="#fff"/>
-          <circle cx="34" cy="27" r="3.2" fill="#fff"/>
-          <circle cx="47" cy="27" r="3.2" fill="#fff"/>
-          <circle cx="60" cy="27" r="3.2" fill="#fff"/>
-          <circle cx="73" cy="27" r="3.2" fill="#fff"/>
-          {/* Stars row 4 offset */}
-          <circle cx="14" cy="37" r="3.2" fill="#fff"/>
-          <circle cx="27" cy="37" r="3.2" fill="#fff"/>
-          <circle cx="40" cy="37" r="3.2" fill="#fff"/>
-          <circle cx="53" cy="37" r="3.2" fill="#fff"/>
-          <circle cx="66" cy="37" r="3.2" fill="#fff"/>
-          {/* Stars row 5 */}
-          <circle cx="8"  cy="47" r="3.2" fill="#fff"/>
-          <circle cx="21" cy="47" r="3.2" fill="#fff"/>
-          <circle cx="34" cy="47" r="3.2" fill="#fff"/>
-          <circle cx="47" cy="47" r="3.2" fill="#fff"/>
-          <circle cx="60" cy="47" r="3.2" fill="#fff"/>
-          <circle cx="73" cy="47" r="3.2" fill="#fff"/>
-          {/* Cloth shading */}
-          <rect width="190" height="100" fill="url(#flagShadeH)"/>
-          <rect width="190" height="100" fill="url(#flagShadeV)"/>
-          <rect width="190" height="100" fill="rgba(0,0,0,0.06)"/>
-        </svg>
-      </div>
 
       <div className="container-main relative z-10">
         <div className="hero-card">
