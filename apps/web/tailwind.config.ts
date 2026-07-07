@@ -19,11 +19,11 @@ const config: Config = {
           950: "#431207",
         },
         dark: {
-          DEFAULT: "#1a1a1a",
+          DEFAULT: "#121212",
           50: "#f5f5f5",
           100: "#e8e8e8",
           800: "#2d2d2d",
-          900: "#1a1a1a",
+          900: "#121212", // 30% darker than the previous #1a1a1a
         },
       },
       fontFamily: {
