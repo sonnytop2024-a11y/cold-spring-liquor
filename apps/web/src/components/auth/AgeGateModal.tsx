@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 
 export function AgeGateModal() {
   const [show, setShow] = useState(false);
@@ -24,7 +25,7 @@ export function AgeGateModal() {
   return (
     <div className="fixed inset-0 z-[9999] bg-dark-900/95 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-md w-full p-8 text-center shadow-2xl">
-        <div className="text-6xl mb-4">🍾</div>
+        <Image src="/logo-transparent.png" alt="Cold Spring Liquor" width={96} height={96} className="mx-auto mb-4 w-24 h-auto" priority />
         <h2 className="font-heading text-2xl font-bold mb-2">Welcome to Cold Spring Liquor</h2>
         <p className="text-gray-600 mb-6">
           You must be <strong>21 years or older</strong> to enter this website.
