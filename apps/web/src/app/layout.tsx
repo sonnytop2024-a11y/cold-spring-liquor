@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display, Montserrat, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -26,6 +26,12 @@ export const metadata: Metadata = {
     shortcut: "/Logo.PNG",
     apple: "/Logo.PNG",
   },
+};
+
+// iOS Safari tints the status bar / notch area from this — without it the
+// area around the camera cutout defaults to white regardless of page content.
+export const viewport: Viewport = {
+  themeColor: "#000000",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
