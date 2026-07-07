@@ -50,7 +50,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WelcomeBonus />
           <StickyBanner />
           <Header />
-          <main className="min-h-screen">{children}</main>
+          {/* Explicit white background — every page below assumes a light page
+              behind its (mostly dark) text. Without this they'd inherit body's
+              dark-900, making dark text invisible on any page that doesn't set
+              its own background (most of them don't). */}
+          <main className="min-h-screen bg-white">{children}</main>
           <Footer />
         </Providers>
       </body>
