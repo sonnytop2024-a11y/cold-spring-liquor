@@ -40,7 +40,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${playfair.variable} ${montserrat.variable} ${sourceSans.variable} font-sans bg-white text-gray-900`}>
+      {/* bg-dark-900 on <html> shows through iOS Safari's overscroll "bounce" gap
+          above the page — must stay dark or that gap flashes white. Actual page
+          content still sits on its own white/gray backgrounds as before. */}
+      <body className={`${inter.variable} ${playfair.variable} ${montserrat.variable} ${sourceSans.variable} font-sans bg-dark-900 text-gray-900`}>
         <Providers>
           <CartSyncProvider />
           <AgeGateModal />
