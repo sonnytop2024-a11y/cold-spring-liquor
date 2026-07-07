@@ -30,8 +30,11 @@ export const metadata: Metadata = {
 
 // iOS Safari tints the status bar / notch area from this — without it the
 // area around the camera cutout defaults to white regardless of page content.
+// viewportFit "cover" is required alongside themeColor for Safari to extend
+// the tint into the notch/Dynamic Island safe area instead of just the tab bar.
 export const viewport: Viewport = {
   themeColor: "#000000",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
