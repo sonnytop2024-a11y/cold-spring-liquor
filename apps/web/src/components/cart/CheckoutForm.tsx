@@ -366,7 +366,8 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   useEffect(() => {
     if (deliveryDisabled && mode === "delivery") setFulfillmentMode("pickup");
   }, [deliveryDisabled, mode, setFulfillmentMode]);
-  const { items, clearCart, rewardsPointsToRedeem, setRewardsRedeem, giftCardCode, giftCardAmount, setGiftCard } = useCartStore();
+  const { items, clearCart, removeItem, rewardsPointsToRedeem, setRewardsRedeem, giftCardCode, giftCardAmount, setGiftCard } = useCartStore();
+  const pickupOnlyConflictItems = items.filter(i => i.product.pickupOnly && !isPickup);
   const { user, isLoggedIn } = useAuthStore();
   const router = useRouter();
 
@@ -530,7 +531,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
 
   // Totals — delivery always FREE, minimum order $20
   const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal } = calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
   );
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
@@ -1330,6 +1331,27 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         </div>
       ))}
 
+      {/* Pickup Only conflict — blocks checkout in Delivery mode */}
+      {pickupOnlyConflictItems.length > 0 && (
+        <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
+          <p className="font-bold text-blue-800 mb-1">🏬 Pickup Only item{pickupOnlyConflictItems.length > 1 ? "s" : ""} in your cart</p>
+          <p className="text-blue-700 text-sm mb-3">
+            The following item{pickupOnlyConflictItems.length > 1 ? "s are" : " is"} only available for Pick Up In Store. Remove {pickupOnlyConflictItems.length > 1 ? "them" : "it"} or switch to Pick Up to continue.
+          </p>
+          <div className="space-y-2">
+            {pickupOnlyConflictItems.map(({ product }) => (
+              <div key={product.id} className="flex items-center justify-between bg-white rounded-lg border border-blue-200 px-3 py-2">
+                <span className="text-sm text-gray-700 truncate">{product.name}</span>
+                <button type="button" onClick={() => removeItem(product.id)}
+                  className="text-xs font-bold text-red-600 hover:text-red-700 shrink-0 ml-3">
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Min order */}
       {!meetsMinimum && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
@@ -1344,7 +1366,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       </div>
 
       {!clientSecret && (
-        <button type="submit" disabled={submitting || items.length === 0 || !meetsMinimum}
+        <button type="submit" disabled={submitting || items.length === 0 || !meetsMinimum || pickupOnlyConflictItems.length > 0}
           className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-base transition-all shadow-lg shadow-brand-500/25">
           {submitting
             ? <><Loader2 size={18} className="animate-spin" /> Processing...</>

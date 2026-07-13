@@ -9,6 +9,7 @@ export interface DiscountItem {
   price: number;
   salePrice?: number | null;
   bundleEligible?: boolean;
+  couponExcluded?: boolean;
   quantity: number;
 }
 
@@ -56,7 +57,7 @@ export function calcDiscounts(
     } else if (item.bundleEligible) {
       bundleQty += item.quantity;
       bundleSubtotal += item.price * item.quantity;
-    } else {
+    } else if (!item.couponExcluded) {
       promoBaseSubtotal += item.price * item.quantity;
     }
   }

@@ -9,6 +9,7 @@ import { verifySessionToken } from "./session";
 import { estimateDeliveryFromStoreAsync } from "./deliveryEstimate";
 import { calcDiscounts } from "./discountRules";
 import { validatePickupWindow, calcPickupDiscount } from "./pickupWindows";
+import { scheduleMissedCallCheck } from "./missedCallAlert";
 import type { MockOrder } from "../app/api/_mock/store";
 
 export interface OrderInput {
@@ -60,15 +61,25 @@ export async function processOrder(
   const sessionUser = userId ? await dbGetUserById(userId) : null;
   const customerId = sessionUser?.id ?? body.customerId ?? null;
 
-  const enrichedItems = items.map((i: any) => {
-    const product = store.getProduct(i.productId);
-    return { price: i.price, salePrice: null, bundleEligible: product?.bundleEligible ?? false, quantity: i.quantity };
-  });
+  const enrichedItems = await Promise.all(items.map(async (i: any) => {
+    const product = await dbGetProduct(i.productId);
+    return {
+      price: i.price,
+      salePrice: null,
+      bundleEligible: product?.bundleEligible ?? false,
+      couponExcluded: product?.couponExcluded ?? false,
+      pickupOnly: product?.pickupOnly ?? false,
+      quantity: i.quantity,
+    };
+  }));
   const bundleTiers = store.getActiveBundleTiers();
   const { subtotal, bundleDiscount } = calcDiscounts(enrichedItems, bundleTiers);
   const safeBundleDiscount = Math.round(bundleDiscount * 100) / 100;
 
   const isPickup = body.orderType === "pickup";
+  if (!isPickup && enrichedItems.some(i => i.pickupOnly)) {
+    return { error: "Your cart contains a Pick Up Only item — please remove it or switch to Pick Up In Store.", status: 422 };
+  }
   // Pick Up In Store: automatic discount, tax computed on the discounted subtotal
   const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
   const tax = Math.round((subtotal - pickupDiscount) * TAX_RATE * 100) / 100;
@@ -192,6 +203,7 @@ export async function processOrder(
   }
   await notifyNewOrder(order).catch(() => {});
   sendOrderConfirmation(order).catch(() => {});
+  scheduleMissedCallCheck(order.id, 1, settings).catch(() => {});
 
   if (couponCode) store.incrementCouponUsage(couponCode);
 

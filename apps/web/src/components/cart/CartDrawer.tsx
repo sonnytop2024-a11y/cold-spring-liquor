@@ -23,7 +23,7 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
-  const { items, updateQuantity, removeItem, addItem, couponDiscount, giftCardAmount, rewardsPointsToRedeem, setRewardsRedeem } = useCartStore();
+  const { items, updateQuantity, removeItem, addItem, couponCode, couponDiscount, giftCardAmount, rewardsPointsToRedeem, setRewardsRedeem } = useCartStore();
   const { user } = useAuthStore();
 
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
@@ -45,7 +45,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   }, [open]);
 
   const { subtotal, flashSavings, bundleDiscount, bundleQty } = calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
   );
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
@@ -137,7 +137,15 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold line-clamp-1">{product.name}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold line-clamp-1">{product.name}</p>
+                      {product.pickupOnly && (
+                        <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold shrink-0">PICKUP ONLY</span>
+                      )}
+                    </div>
+                    {product.couponExcluded && couponCode && (
+                      <p className="text-[10px] text-gray-400 italic">Coupon not applicable</p>
+                    )}
                     <p className="text-sm font-bold text-brand-600 mt-0.5">{formatCurrency((product.salePrice ?? product.price) * quantity)}</p>
                     <div className="flex items-center gap-2 mt-1.5">
                       <button onClick={() => updateQuantity(product.id, quantity - 1)} className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100">

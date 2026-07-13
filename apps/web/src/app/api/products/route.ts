@@ -95,6 +95,8 @@ export async function POST(req: NextRequest) {
     inStock: (Number(body.stockQty) || 0) > 0,
     featured: Boolean(body.featured),
     bundleEligible: Boolean(body.bundleEligible),
+    couponExcluded: Boolean(body.couponExcluded),
+    pickupOnly: Boolean(body.pickupOnly),
     active: body.active !== false,
     rating: 0,
     reviewCount: 0,

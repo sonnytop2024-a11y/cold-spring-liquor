@@ -32,6 +32,7 @@ type Settings = {
   deliveryCutoffHour: number; deliveryCutoffMinute: number;
   nextMorningMessage: string; sundayClosedMessage: string;
   notifySmsEnabled: boolean; notifyEmailEnabled: boolean; notifyPushEnabled: boolean;
+  notifyCallEnabled?: boolean; adminCallPhone?: string; callMaxAttempts?: number;
   waitTimerMinutes: number;
   msgOnTheWay: string; msgArrivingSoon: string; msgArrived: string;
   telegramBotToken?: string; telegramChatId?: string;
@@ -196,7 +197,7 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (data && !form) setForm(data);
+    if (data && !form) setForm({ ...data, adminCallPhone: data.adminCallPhone ?? data.storeTextPhone ?? "" });
   }, [data, form]);
 
   const saveMutation = useMutation({
@@ -734,6 +735,14 @@ export default function SettingsPage() {
                     {pushStatus === "working" ? "…" : pushStatus === "on" ? "Disable" : "Enable"}
                   </button>
                 </div>
+              </SectionCard>
+
+              <SectionCard title="Missed Order Phone Call Alert" icon={Phone}>
+                <Toggle checked={form.notifyCallEnabled ?? false} onChange={v => set("notifyCallEnabled", v)}
+                  label="Call Admin on Missed Order" description="If a new order isn't accepted within 60 seconds, automatically place a phone call to the number below (up to 3 attempts, 60s apart)" />
+                <Field label="Admin Alert Phone Number" description="Where the automatic call is placed — e.g. (512) 555-0100">
+                  <Input value={form.adminCallPhone ?? ""} onChange={v => set("adminCallPhone", v)} type="text" placeholder="(512) 555-0100" />
+                </Field>
               </SectionCard>
 
               <SectionCard title="Delivery Notification Messages" icon={Phone}>

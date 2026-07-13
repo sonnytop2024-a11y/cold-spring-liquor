@@ -9,6 +9,8 @@ const { searchParams } = req.nextUrl;
   const stock    = searchParams.get("stock") ?? undefined;
   const featured = searchParams.get("featured") === "true";
   const bundle   = searchParams.get("bundle")   === "true";
+  const couponExcluded = searchParams.get("couponExcluded") === "true";
+  const pickupOnly     = searchParams.get("pickupOnly")     === "true";
   const limitStr = searchParams.get("limit");
   const pageStr  = searchParams.get("page");
 
@@ -18,12 +20,14 @@ const { searchParams } = req.nextUrl;
     const page   = Math.max(Number(pageStr) || 1, 1);
     const offset = (page - 1) * limit;
 
-    if (featured || bundle) {
-      // featured/bundle require in-memory filtering — fetch all then paginate
+    if (featured || bundle || couponExcluded || pickupOnly) {
+      // featured/bundle/couponExcluded/pickupOnly require in-memory filtering — fetch all then paginate
       const { products: all } = await dbGetProductsPage({ limit: 2000, offset: 0, q, stock });
       let filtered = all;
       if (featured) filtered = filtered.filter(p => p.featured);
       if (bundle)   filtered = filtered.filter(p => p.bundleEligible);
+      if (couponExcluded) filtered = filtered.filter(p => p.couponExcluded);
+      if (pickupOnly)     filtered = filtered.filter(p => p.pickupOnly);
       const total = filtered.length;
       const sliced = filtered.slice(offset, offset + limit);
       return NextResponse.json({ products: sliced, total, page, totalPages: Math.ceil(total / limit), limit });
@@ -39,6 +43,8 @@ const { searchParams } = req.nextUrl;
   if (category)      products = products.filter((p) => p.category === category);
   if (featured)      products = products.filter((p) => p.featured);
   if (bundle)        products = products.filter((p) => p.bundleEligible);
+  if (couponExcluded) products = products.filter((p) => p.couponExcluded);
+  if (pickupOnly)     products = products.filter((p) => p.pickupOnly);
   if (stock === "in")  products = products.filter((p) => p.inStock !== false && p.stockQty > 0);
   if (stock === "out") products = products.filter((p) => p.inStock === false || p.stockQty <= 0);
   return NextResponse.json({ products, total: products.length });
@@ -67,6 +73,8 @@ const body = await req.json();
     inStock: stockQty > 0,
     featured: Boolean(body.featured),
     bundleEligible: Boolean(body.bundleEligible),
+    couponExcluded: Boolean(body.couponExcluded),
+    pickupOnly: Boolean(body.pickupOnly),
     active: stockQty > 0,
     rating: 0,
     reviewCount: 0,

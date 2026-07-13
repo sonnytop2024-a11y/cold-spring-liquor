@@ -622,18 +622,22 @@ interface Product {
   description: string;
   imageUrl: string | null;
   bundleEligible: boolean;
+  couponExcluded: boolean;
+  pickupOnly: boolean;
 }
 
 const EMPTY: Omit<Product, "id" | "slug"> = {
   name: "", brand: "", category: "whiskey", price: 0, salePrice: null,
   volume: "750ml", abv: 40, country: "USA", stockQty: 0,
   inStock: false, featured: false, active: false, description: "", imageUrl: null, bundleEligible: false,
+  couponExcluded: false, pickupOnly: false,
 };
 
 const PAGE_SIZE = 50;
 
 async function fetchProductsPage(opts: {
   page: number; q: string; category?: string; stock: string; featured?: boolean; bundle?: boolean;
+  couponExcluded?: boolean; pickupOnly?: boolean;
 }): Promise<{ products: Product[]; total: number; totalPages: number }> {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE), page: String(opts.page) });
   if (opts.q)        params.set("q", opts.q);
@@ -641,6 +645,8 @@ async function fetchProductsPage(opts: {
   if (opts.stock)    params.set("stock", opts.stock);
   if (opts.featured) params.set("featured", "true");
   if (opts.bundle)   params.set("bundle", "true");
+  if (opts.couponExcluded) params.set("couponExcluded", "true");
+  if (opts.pickupOnly)     params.set("pickupOnly", "true");
   const res = await fetch(`${API}/admin/products?${params}`);
   if (!res.ok) throw new Error(`Failed to load products (${res.status})`);
   const data = await res.json();
@@ -708,6 +714,8 @@ function ProductModal({ product, onClose, onSave, saving, categories }: ProductM
     inStock: product?.inStock ?? EMPTY.inStock,
     featured: product?.featured ?? EMPTY.featured,
     bundleEligible: product?.bundleEligible ?? EMPTY.bundleEligible,
+    couponExcluded: product?.couponExcluded ?? EMPTY.couponExcluded,
+    pickupOnly: product?.pickupOnly ?? EMPTY.pickupOnly,
     active: product?.active ?? EMPTY.active,
     description: product?.description ?? EMPTY.description,
     imageUrl: product?.imageUrl ?? EMPTY.imageUrl,
@@ -1093,6 +1101,53 @@ function ProductModal({ product, onClose, onSave, saving, categories }: ProductM
             </button>
           </div>
 
+          {/* Coupon exclusion & Pickup Only — shown side by side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col justify-between rounded-xl border px-4 py-3 bg-red-50 border-red-200">
+              <div>
+                <p className="text-sm font-semibold text-red-800">🚫 Exclude from Coupon Codes</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  {form.couponExcluded
+                    ? "Never discounted by coupon codes, even with a valid code applied"
+                    : "Bật để loại sản phẩm này khỏi mọi coupon code"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => set("couponExcluded", !form.couponExcluded)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors mt-2 ${
+                  form.couponExcluded ? "bg-red-600" : "bg-gray-300"
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  form.couponExcluded ? "translate-x-5" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+
+            <div className="flex flex-col justify-between rounded-xl border px-4 py-3 bg-blue-50 border-blue-200">
+              <div>
+                <p className="text-sm font-semibold text-blue-800">🏬 Pickup Only</p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  {form.pickupOnly
+                    ? "Blocked for Delivery — only orderable via Pick Up In Store"
+                    : "Bật để chỉ cho phép đặt hàng Pick Up In Store"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => set("pickupOnly", !form.pickupOnly)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors mt-2 ${
+                  form.pickupOnly ? "bg-blue-600" : "bg-gray-300"
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  form.pickupOnly ? "translate-x-5" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+          </div>
+
           <div className="flex gap-3 pt-2 border-t">
             <button
               type="button"
@@ -1155,12 +1210,15 @@ export default function InventoryPage() {
     toastTimer.current = setTimeout(() => setToast(null), ok ? 2500 : 5000);
   }
 
+  const SYNTHETIC_FILTERS = ["__featured", "__bundle", "__coupon_excluded", "__pickup_only"];
   const queryParams = {
     page,
     q: debouncedSearch,
-    category: (catFilter === "__featured" || catFilter === "__bundle") ? undefined : catFilter,
+    category: SYNTHETIC_FILTERS.includes(catFilter) ? undefined : catFilter,
     featured: catFilter === "__featured" ? true : undefined,
     bundle:   catFilter === "__bundle"   ? true : undefined,
+    couponExcluded: catFilter === "__coupon_excluded" ? true : undefined,
+    pickupOnly:     catFilter === "__pickup_only"     ? true : undefined,
     stock: stockFilter,
   };
 
@@ -1340,6 +1398,8 @@ export default function InventoryPage() {
               <option value="">All Categories</option>
               <option value="__featured">⭐ New Arrivals</option>
               <option value="__bundle">📦 Bundle Eligible</option>
+              <option value="__coupon_excluded">🚫 Coupon Excluded</option>
+              <option value="__pickup_only">🏬 Pickup Only</option>
               {CATEGORIES.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
@@ -1399,6 +1459,8 @@ export default function InventoryPage() {
                       <p className="font-medium text-sm leading-tight text-gray-900 truncate">{p.name}</p>
                       {p.featured && <Star size={11} className="text-yellow-500 fill-yellow-400 shrink-0" />}
                       {p.bundleEligible && <span className="text-[9px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-bold shrink-0">BUNDLE</span>}
+                      {p.couponExcluded && <span className="text-[9px] bg-red-100 text-red-700 px-1 py-0.5 rounded font-bold shrink-0">NO COUPON</span>}
+                      {p.pickupOnly && <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold shrink-0">PICKUP ONLY</span>}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">{p.brand}</p>
                   </div>

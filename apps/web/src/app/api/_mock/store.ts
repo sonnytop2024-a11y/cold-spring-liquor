@@ -83,6 +83,16 @@ export interface MockOrder {
   createdAt: string;
   updatedAt: string;
   estimatedDelivery: string | null;
+  // Missed Order Phone Call Alert
+  missedCallAlerts?: MissedCallAlert[];
+}
+
+export interface MissedCallAlert {
+  attempt: number; // 1, 2, 3...
+  calledAt: string; // ISO
+  status: "sent" | "answered" | "no-answer" | "busy" | "failed";
+  callSid?: string;
+  answeredAt?: string;
 }
 
 export interface MockProduct {
@@ -93,6 +103,10 @@ export interface MockProduct {
   imageUrl: string | null; bundleEligible: boolean;
   // Precomputed catalog order: hasImage → brand/name group → name (see computeProductSortKey)
   sortKey?: string;
+  // Excluded from coupon-code discounts (still eligible for flash sale/bundle)
+  couponExcluded?: boolean;
+  // Orderable via Pick Up In Store only — blocked for Delivery
+  pickupOnly?: boolean;
 }
 
 export interface SavedAddress {
@@ -232,6 +246,10 @@ export interface StoreSettings {
   notifySmsEnabled: boolean;
   notifyEmailEnabled: boolean;
   notifyPushEnabled: boolean;
+  // Missed Order Phone Call Alert
+  notifyCallEnabled?: boolean;
+  adminCallPhone?: string;
+  callMaxAttempts?: number; // default 3
   waitTimerMinutes: number;
   msgOnTheWay: string;
   msgArrivingSoon: string;
@@ -328,6 +346,9 @@ function getDefaultSettings(): StoreSettings {
     notifySmsEnabled: true,
     notifyEmailEnabled: true,
     notifyPushEnabled: false,
+    notifyCallEnabled: false,
+    adminCallPhone: "(512) 720-2489",
+    callMaxAttempts: 3,
     waitTimerMinutes: 5,
     msgOnTheWay: "Your Cold Spring Liquor driver is on the way. Please be ready to meet the driver and show your valid 21+ ID at delivery.",
     msgArrivingSoon: "Your Cold Spring Liquor driver is arriving soon. Please come outside or be ready at the door with your valid 21+ ID.",

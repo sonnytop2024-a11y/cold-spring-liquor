@@ -167,6 +167,30 @@ function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
             {order.refundedAmount != null && <div className="flex justify-between text-red-600 font-medium"><span>↩️ Refunded</span><span>{money(order.refundedAmount)}</span></div>}
           </div>
 
+          {order.missedCallAlerts?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">📞 Missed Order Call Alerts</p>
+              <div className="space-y-1.5">
+                {order.missedCallAlerts.map((c: any, i: number) => {
+                  const label = c.status === "answered" ? "✅ Answered"
+                    : c.status === "sent" ? "📤 Call sent"
+                    : c.status === "no-answer" ? "❌ No answer"
+                    : c.status === "busy" ? "❌ Busy"
+                    : "❌ Failed";
+                  const color = c.status === "answered" ? "text-green-600"
+                    : c.status === "sent" ? "text-gray-500"
+                    : "text-red-600";
+                  return (
+                    <div key={i} className="flex justify-between gap-3 text-xs">
+                      <span className="text-gray-600">Attempt {c.attempt} · {new Date(c.calledAt).toLocaleTimeString()}</span>
+                      <span className={`font-semibold ${color}`}>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {order.adminNote && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-xs text-yellow-800">📝 {order.adminNote}</div>
           )}

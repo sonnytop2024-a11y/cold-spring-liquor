@@ -30,7 +30,7 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
 
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
   const { subtotal, flashSavings, bundlePct, bundleDiscount } = calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
   );
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
@@ -77,6 +77,9 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
                 <div className="flex-1 min-w-0">
                   <p className="text-gray-700 text-xs leading-snug line-clamp-2">{product.name}</p>
                   {hasFlash && <span className="text-[10px] text-red-600 font-bold">⚡ Flash Deal</span>}
+                  {product.couponExcluded && promoCode && (
+                    <p className="text-[10px] text-gray-400 italic">Coupon not applicable</p>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-gray-900 text-sm font-medium">{formatCurrency(effectivePrice * quantity)}</p>

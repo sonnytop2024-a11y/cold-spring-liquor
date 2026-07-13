@@ -18,6 +18,8 @@ export interface Product {
   country?: string;
   featured?: boolean;
   bundleEligible?: boolean;
+  couponExcluded?: boolean;
+  pickupOnly?: boolean;
 }
 
 export interface CartItem {

@@ -29,6 +29,8 @@ const body = await req.json();
     inStock: newQty > 0,
     featured: body.featured ?? existing?.featured ?? false,
     bundleEligible: body.bundleEligible !== undefined ? Boolean(body.bundleEligible) : (existing?.bundleEligible ?? false),
+    couponExcluded: body.couponExcluded !== undefined ? Boolean(body.couponExcluded) : (existing?.couponExcluded ?? false),
+    pickupOnly: body.pickupOnly !== undefined ? Boolean(body.pickupOnly) : (existing?.pickupOnly ?? false),
     active: newQty > 0,
     rating: existing?.rating ?? 0,
     reviewCount: existing?.reviewCount ?? 0,

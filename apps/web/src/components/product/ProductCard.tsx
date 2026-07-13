@@ -126,6 +126,15 @@ export function ProductCard({ product }: ProductCardProps) {
           </span>
         )}
 
+        {/* Pickup Only badge — stacked below discount/bundle badge, mode-independent */}
+        {product.pickupOnly && (
+          <span className={`absolute left-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 bg-blue-600 text-white ${
+            discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-9" : "top-2"
+          }`}>
+            🏬 Pickup Only
+          </span>
+        )}
+
         {/* Out of stock overlay */}
         {!product.inStock && (
           <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center">

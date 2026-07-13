@@ -33,7 +33,7 @@ export function CartView() {
   }, []);
 
   const { subtotal, flashSavings, bundleDiscount, bundleQty, promoBaseSubtotal } = calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, quantity: i.quantity })),
+    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
   );
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
@@ -143,10 +143,18 @@ export function CartView() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <Link href={`/products/${product.slug}`} className="font-semibold hover:text-brand-600 line-clamp-2">
-                {product.name}
-              </Link>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Link href={`/products/${product.slug}`} className="font-semibold hover:text-brand-600 line-clamp-2">
+                  {product.name}
+                </Link>
+                {product.pickupOnly && (
+                  <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold shrink-0">PICKUP ONLY</span>
+                )}
+              </div>
               <p className="text-sm text-gray-500">{product.brand} · {product.volume}</p>
+              {product.couponExcluded && couponCode && (
+                <p className="text-[11px] text-gray-400 italic">Coupon not applicable</p>
+              )}
               <p className="font-bold text-brand-600 mt-1">
                 {formatCurrency((product.salePrice ?? product.price) * quantity)}
               </p>
