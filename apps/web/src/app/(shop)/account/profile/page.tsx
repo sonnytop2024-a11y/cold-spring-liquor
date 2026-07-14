@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, User, Check, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { formatPhoneUS } from "@/lib/phoneUtils";
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
   const { user, updateProfile } = useAuthStore();
 
   const [name, setName] = useState(user?.name ?? "");
-  const [phone, setPhone] = useState(user?.phone ?? "");
+  const [phone, setPhone] = useState(formatPhoneUS(user?.phone ?? ""));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -83,7 +84,7 @@ export default function ProfileSettingsPage() {
           <input
             type="tel"
             value={phone}
-            onChange={e => setPhone(e.target.value)}
+            onChange={e => setPhone(formatPhoneUS(e.target.value))}
             className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             placeholder="(512) 555-0000"
           />

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { API } from "@/lib/api";
+import { formatPhoneUS } from "@/lib/phoneUtils";
 import { enablePushNotifications, disablePushNotifications } from "@/components/PushRegistrar";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -396,10 +397,10 @@ export default function SettingsPage() {
                   <Input value={form.storeAddress} onChange={v => set("storeAddress", v)} placeholder="15609 Ronald Reagan Blvd…" />
                 </Field>
                 <Field label="Phone Number" description="Main call number">
-                  <Input value={form.storePhone} onChange={v => set("storePhone", v)} placeholder="(512) 337-7051" />
+                  <Input value={form.storePhone} onChange={v => set("storePhone", formatPhoneUS(v))} placeholder="(512) 337-7051" />
                 </Field>
                 <Field label="Text Number" description="SMS / text number (optional)">
-                  <Input value={form.storeTextPhone ?? ""} onChange={v => set("storeTextPhone", v)} placeholder="(512) 720-2489" />
+                  <Input value={form.storeTextPhone ?? ""} onChange={v => set("storeTextPhone", formatPhoneUS(v))} placeholder="(512) 720-2489" />
                 </Field>
                 <Field label="Email Address">
                   <Input value={form.storeEmail} onChange={v => set("storeEmail", v)} type="email" placeholder="info@coldspringliquor.com" />
@@ -741,7 +742,7 @@ export default function SettingsPage() {
                 <Toggle checked={form.notifyCallEnabled ?? false} onChange={v => set("notifyCallEnabled", v)}
                   label="Call Admin on Missed Order" description="If a new order isn't accepted within 60 seconds, automatically place a phone call to the number below (up to 3 attempts, 60s apart)" />
                 <Field label="Admin Alert Phone Number" description="Where the automatic call is placed — e.g. (512) 555-0100">
-                  <Input value={form.adminCallPhone ?? ""} onChange={v => set("adminCallPhone", v)} type="text" placeholder="(512) 555-0100" />
+                  <Input value={form.adminCallPhone ?? ""} onChange={v => set("adminCallPhone", formatPhoneUS(v))} type="text" placeholder="(512) 555-0100" />
                 </Field>
               </SectionCard>
 

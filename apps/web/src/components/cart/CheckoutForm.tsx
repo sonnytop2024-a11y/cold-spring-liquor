@@ -9,6 +9,7 @@ import { useCheckoutStore } from "@/store/checkoutStore";
 import { calcDiscounts } from "@/lib/discountRules";
 import { useRouter } from "next/navigation";
 import { formatCurrency, MIN_ORDER, calcPointsValue } from "@/lib/utils";
+import { formatPhoneUS } from "@/lib/phoneUtils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, calcPickupDiscount, PICKUP_DISCOUNT_LABEL, type PickupSlot } from "@/lib/pickupWindows";
 import Link from "next/link";
@@ -506,7 +507,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     const finalDelivery = rp?.deliveryAddress ?? u?.deliveryAddress;
     if (finalName) setName(finalName);
     if (finalEmail) setEmail(finalEmail);
-    if (finalPhone) setPhone(finalPhone);
+    if (finalPhone) setPhone(formatPhoneUS(finalPhone));
     if (finalDelivery?.street) setDelivery(finalDelivery);
   }, [user, reorderPrefill]);
 
@@ -1062,7 +1063,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <Field label="Full Name" value={name} onChange={setName} placeholder="John Smith" error={errors.name} />
           </div>
           <Field label="Email" value={email} onChange={setEmail} placeholder="john@example.com" type="email" error={errors.email} />
-          <Field label="Phone" value={phone} onChange={setPhone} placeholder="(512) 555-0100" type="tel" error={errors.phone} />
+          <Field label="Phone" value={phone} onChange={v => setPhone(formatPhoneUS(v))} placeholder="(512) 555-0100" type="tel" error={errors.phone} />
         </div>
       </div>
 
