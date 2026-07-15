@@ -3,7 +3,7 @@
 import { X, Trash2, Plus, Minus, Truck, ShoppingBag, ChevronRight, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
@@ -44,10 +44,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
     return () => document.body.classList.remove("cart-open");
   }, [open]);
 
-  const { subtotal, flashSavings, bundleDiscount, bundleQty } = calcDiscounts(
+  const { subtotal, flashSavings, bundleDiscount, bundleQty } = useMemo(() => calcDiscounts(
     items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  );
+  ), [items, bundleTiers]);
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   const { tax, total } = calcCartTotals(subtotal, couponDiscount + bundleDiscount, rewardsDiscount, giftCardAmount);
@@ -131,7 +131,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                 <div key={product.id} className="flex gap-3">
                   <div className="relative w-16 h-16 bg-gray-50 rounded-lg overflow-hidden shrink-0">
                     {product.imageUrl ? (
-                      <Image src={product.imageUrl} alt={product.name} fill className="object-contain p-1" />
+                      <Image src={product.imageUrl} alt={product.name} fill sizes="64px" className="object-contain p-1" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-2xl">🍾</div>
                     )}

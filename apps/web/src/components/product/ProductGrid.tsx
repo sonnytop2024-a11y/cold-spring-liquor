@@ -83,8 +83,8 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-        {data.products.map((product) => (
-          <ProductCard key={product.id} product={product} />
+        {data.products.map((product, i) => (
+          <ProductCard key={product.id} product={product} priority={page === 1 && i < 4} />
         ))}
       </div>
 

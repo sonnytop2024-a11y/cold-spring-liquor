@@ -3,17 +3,27 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Plus, Check, Minus, Heart } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
 import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
+import { fetchProductBySlug } from "@/lib/api/products";
 
 interface ProductCardProps {
   product: Product;
+  /** Set true for the first few above-the-fold cards to skip lazy-loading their image */
+  priority?: boolean;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
-  const { items, addItem, updateQuantity, removeItem } = useCartStore();
+function ProductCardImpl({ product, priority = false }: ProductCardProps) {
+  // Narrow selectors — each ProductCard only re-renders when ITS OWN cart
+  // entry changes, not on every add/remove/update anywhere in the cart.
+  const cartItem = useCartStore((s) => s.items.find((i) => i.product.id === product.id));
+  const addItem = useCartStore((s) => s.addItem);
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const queryClient = useQueryClient();
   const [justAdded, setJustAdded] = useState(false);
   const [popping, setPopping] = useState(false);
   const [favorited, setFavorited] = useState(false);
@@ -36,8 +46,15 @@ export function ProductCard({ product }: ProductCardProps) {
     } catch {}
   }
 
-  const cartItem = items.find((i) => i.product.id === product.id);
   const qty = cartItem?.quantity ?? 0;
+
+  function prefetchDetail() {
+    queryClient.prefetchQuery({
+      queryKey: ["product", product.slug],
+      queryFn: () => fetchProductBySlug(product.slug),
+      staleTime: 30_000,
+    });
+  }
 
   const discountPct = product.salePrice
     ? Math.round(((product.price - product.salePrice) / product.price) * 100)
@@ -75,7 +92,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* ── Image ────────────────────────────────────────────────── */}
       <div className="relative mx-2 mt-2 rounded-xl overflow-hidden aspect-square bg-gray-50">
-        <Link href={`/products/${product.slug}`} className="absolute inset-0">
+        <Link href={`/products/${product.slug}`} className="absolute inset-0" onMouseEnter={prefetchDetail}>
           {product.imageUrl && !imgError ? (
             <Image
               src={product.imageUrl}
@@ -83,7 +100,8 @@ export function ProductCard({ product }: ProductCardProps) {
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover rounded-xl group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
+              loading={priority ? undefined : "lazy"}
+              priority={priority}
               onError={() => setImgError(true)}
             />
           ) : (
@@ -150,7 +168,7 @@ export function ProductCard({ product }: ProductCardProps) {
           {product.brand ?? " "}
         </p>
 
-        <Link href={`/products/${product.slug}`} className="flex-1">
+        <Link href={`/products/${product.slug}`} className="flex-1" onMouseEnter={prefetchDetail}>
           <h3 className="font-product text-[14px] font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors line-clamp-2 mb-2" style={{ minHeight: "2.5rem" }}>
             {product.name}
           </h3>
@@ -218,3 +236,5 @@ export function ProductCard({ product }: ProductCardProps) {
     </div>
   );
 }
+
+export const ProductCard = memo(ProductCardImpl);

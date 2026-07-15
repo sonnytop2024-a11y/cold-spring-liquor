@@ -531,10 +531,10 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   }, []);
 
   // Totals — delivery always FREE, minimum order $20
-  const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal } = calcDiscounts(
+  const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal } = useMemo(() => calcDiscounts(
     items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  );
+  ), [items, bundleTiers]);
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   // Pick Up In Store: automatic discount, tax on the discounted subtotal

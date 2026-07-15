@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
@@ -29,10 +29,10 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
   }, []);
 
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
-  const { subtotal, flashSavings, bundlePct, bundleDiscount } = calcDiscounts(
+  const { subtotal, flashSavings, bundlePct, bundleDiscount } = useMemo(() => calcDiscounts(
     items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  );
+  ), [items, bundleTiers]);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   // Admin kill-switch — shares the checkout's 10s poll via the same query key
   const { data: deliveryStatus } = useQuery({

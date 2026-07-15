@@ -84,6 +84,7 @@ export function ProductDetail({ slug }: { slug: string }) {
                 alt={product.name}
                 width={480}
                 height={480}
+                priority
                 className="object-cover rounded-2xl w-full h-full"
                 onError={() => setImgError(true)}
               />

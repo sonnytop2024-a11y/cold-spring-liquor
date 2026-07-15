@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Plus, Minus, Tag, Gift, Star, Truck } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -32,10 +32,10 @@ export function CartView() {
     fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
   }, []);
 
-  const { subtotal, flashSavings, bundleDiscount, bundleQty, promoBaseSubtotal } = calcDiscounts(
+  const { subtotal, flashSavings, bundleDiscount, bundleQty, promoBaseSubtotal } = useMemo(() => calcDiscounts(
     items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  );
+  ), [items, bundleTiers]);
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   const { tax, total, appliedGiftCard } = calcCartTotals(
