@@ -5,9 +5,13 @@ import Image from "next/image";
 import { ShoppingCart, User, Search, Menu, X, Gift, LogOut, ChevronDown, Star, Package } from "lucide-react";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
+import { fetchProducts } from "@/lib/api/products";
 import { CartDrawer } from "@/components/cart/CartDrawer";
+import { SearchSuggestions } from "./SearchSuggestions";
 
 const NAV_LEFT = [
   { href: "/products", label: "Shop All" },
@@ -26,39 +30,84 @@ function HeaderSearchInner({ mobile = false }: { mobile?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   // Clear/sync input whenever URL search params change
   useEffect(() => {
     setQ(searchParams.get("q") ?? "");
   }, [searchParams]);
 
+  // Live suggestions — debounced 200ms, reuses the existing /api/products endpoint
+  const debounceUpdate = useDebouncedCallback((val: string) => setDebouncedQ(val), 200);
+  useEffect(() => { debounceUpdate(q); }, [q, debounceUpdate]);
+
+  const trimmedDebouncedQ = debouncedQ.trim();
+  const { data, isFetching } = useQuery({
+    queryKey: ["search-suggestions", trimmedDebouncedQ],
+    queryFn: () => fetchProducts({ q: trimmedDebouncedQ, limit: 5 }),
+    enabled: trimmedDebouncedQ.length > 0,
+    staleTime: 60_000,
+  });
+
+  // Close the dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setOpen(false);
     const trimmed = q.trim();
     if (trimmed) router.push(`/products?q=${encodeURIComponent(trimmed)}`);
     else router.push("/products");
   }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setQ(val);
+    setOpen(val.trim().length > 0);
+  }
+
   return (
-    <form onSubmit={handleSubmit} className={mobile ? "w-full" : "flex-1 mx-3 max-w-xl"}>
-      <div className="relative flex items-center">
-        <input
-          type="text"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder="What can we help you find today?"
-          className="w-full h-10 pl-4 pr-11 rounded-full text-gray-800 placeholder-gray-400 bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-400 transition-all"
-          style={{ fontSize: "16px" }}
-        />
-        <button
-          type="submit"
-          className="absolute right-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-          style={{ background: "#f97316" }}
-          aria-label="Search"
-        >
-          <Search size={15} className="text-white" />
-        </button>
-      </div>
-    </form>
+    <div ref={wrapRef} className={mobile ? "relative w-full" : "relative flex-1 mx-3 max-w-xl"}>
+      <form onSubmit={handleSubmit}>
+        <div className="relative flex items-center">
+          <input
+            type="text"
+            value={q}
+            onChange={handleChange}
+            onFocus={() => { if (q.trim()) setOpen(true); }}
+            onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
+            placeholder="What can we help you find today?"
+            autoComplete="off"
+            className="w-full h-10 pl-4 pr-11 rounded-full text-gray-800 placeholder-gray-400 bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-400 transition-all"
+            style={{ fontSize: "16px" }}
+          />
+          <button
+            type="submit"
+            className="absolute right-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: "#f97316" }}
+            aria-label="Search"
+          >
+            <Search size={15} className="text-white" />
+          </button>
+        </div>
+      </form>
+      <SearchSuggestions
+        query={trimmedDebouncedQ}
+        open={open && trimmedDebouncedQ.length > 0}
+        products={data?.products ?? []}
+        total={data?.total ?? 0}
+        loading={isFetching}
+        onClose={() => setOpen(false)}
+      />
+    </div>
   );
 }
 
@@ -284,7 +333,7 @@ export function Header() {
         </div>
 
         {/* Mobile search bar — always visible below header row */}
-        <div className="md:hidden px-3 pt-2 pb-3 overflow-hidden">
+        <div className="md:hidden px-3 pt-2 pb-3">
           <HeaderSearch mobile />
         </div>
 
