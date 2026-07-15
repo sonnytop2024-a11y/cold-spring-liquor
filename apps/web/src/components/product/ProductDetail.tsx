@@ -210,12 +210,16 @@ export function ProductDetail({ slug }: { slug: string }) {
                   {qty}
                 </span>
                 <button
-                  onClick={() => setQty((q) => q + 1)}
-                  className="px-3 py-2 hover:bg-gray-50 transition-colors"
+                  onClick={() => setQty((q) => Math.min(effectiveProduct!.stockQty, q + 1))}
+                  disabled={qty >= effectiveProduct!.stockQty}
+                  className="px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Plus size={16} />
                 </button>
               </div>
+              {qty >= effectiveProduct!.stockQty && (
+                <span className="text-xs text-amber-600 font-medium">Only {effectiveProduct!.stockQty} left in stock</span>
+              )}
             </div>
 
             {/* CTAs */}

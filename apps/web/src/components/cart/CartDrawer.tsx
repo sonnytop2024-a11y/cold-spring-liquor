@@ -152,10 +152,14 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                         <Minus size={12} />
                       </button>
                       <span className="text-sm font-medium w-4 text-center">{quantity}</span>
-                      <button onClick={() => updateQuantity(product.id, quantity + 1)} className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100">
+                      <button onClick={() => updateQuantity(product.id, quantity + 1)} disabled={quantity >= product.stockQty}
+                        className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                         <Plus size={12} />
                       </button>
                     </div>
+                    {quantity >= product.stockQty && (
+                      <p className="text-[10px] text-amber-600 font-medium mt-0.5">Only {product.stockQty} left in stock</p>
+                    )}
                   </div>
                   <button onClick={() => removeItem(product.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                 </div>

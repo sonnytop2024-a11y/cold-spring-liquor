@@ -59,6 +59,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
   function handleIncrease(e: React.MouseEvent) {
     e.preventDefault();
+    if (qty >= product.stockQty) return;
     addItem(product);
     triggerPop();
   }
@@ -187,7 +188,12 @@ export function ProductCard({ product }: ProductCardProps) {
               </span>
               <button
                 onClick={handleIncrease}
-                className={`w-6 h-6 flex items-center justify-center rounded-md bg-brand-500 hover:bg-brand-600 text-white transition-colors ${popping ? "animate-add-to-cart" : ""}`}
+                disabled={qty >= product.stockQty}
+                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
+                  qty >= product.stockQty
+                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                    : `bg-brand-500 hover:bg-brand-600 text-white ${popping ? "animate-add-to-cart" : ""}`
+                }`}
               >
                 <Plus size={10} strokeWidth={2.5} />
               </button>

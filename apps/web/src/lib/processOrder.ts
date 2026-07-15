@@ -64,6 +64,9 @@ export async function processOrder(
   const enrichedItems = await Promise.all(items.map(async (i: any) => {
     const product = await dbGetProduct(i.productId);
     return {
+      productId: i.productId,
+      name: product?.name ?? i.productId,
+      stockQty: product?.stockQty ?? 0,
       price: i.price,
       salePrice: null,
       bundleEligible: product?.bundleEligible ?? false,
@@ -72,6 +75,16 @@ export async function processOrder(
       quantity: i.quantity,
     };
   }));
+
+  // Reject if any item's requested quantity exceeds current stock — this is
+  // the authoritative check; client-side qty caps are only a UX nicety and
+  // can be stale (cart snapshots the product at add-to-cart time).
+  const outOfStockItems = enrichedItems.filter(i => i.quantity > i.stockQty);
+  if (outOfStockItems.length > 0) {
+    const list = outOfStockItems.map(i => `${i.name} (only ${i.stockQty} left)`).join(", ");
+    return { error: `Not enough stock for: ${list}. Please update your cart and try again.`, status: 422 };
+  }
+
   const bundleTiers = store.getActiveBundleTiers();
   const { subtotal, bundleDiscount } = calcDiscounts(enrichedItems, bundleTiers);
   const safeBundleDiscount = Math.round(bundleDiscount * 100) / 100;

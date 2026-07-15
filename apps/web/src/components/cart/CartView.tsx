@@ -168,10 +168,14 @@ export function CartView() {
                   <Minus size={14} />
                 </button>
                 <span className="px-3 text-sm font-semibold">{quantity}</span>
-                <button onClick={() => updateQuantity(product.id, quantity + 1)} className="px-2 py-1.5 hover:bg-gray-50">
+                <button onClick={() => updateQuantity(product.id, quantity + 1)} disabled={quantity >= product.stockQty}
+                  className="px-2 py-1.5 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                   <Plus size={14} />
                 </button>
               </div>
+              {quantity >= product.stockQty && (
+                <p className="text-[10px] text-amber-600 font-medium">Only {product.stockQty} left</p>
+              )}
             </div>
           </div>
         ))}
