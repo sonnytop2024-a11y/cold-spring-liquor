@@ -129,20 +129,20 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
               {items.map(({ product, quantity }) => (
                 <div key={product.id} className="flex gap-3">
-                  <div className="relative w-16 h-16 bg-gray-50 rounded-lg overflow-hidden shrink-0">
+                  <Link href={`/products/${product.slug}`} onClick={onClose} className="relative w-16 h-16 bg-gray-50 rounded-lg overflow-hidden shrink-0">
                     {product.imageUrl ? (
                       <Image src={product.imageUrl} alt={product.name} fill sizes="64px" className="object-contain p-1" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-2xl">🍾</div>
                     )}
-                  </div>
+                  </Link>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <Link href={`/products/${product.slug}`} onClick={onClose} className="flex items-center gap-1.5 flex-wrap hover:text-brand-600">
                       <p className="text-sm font-semibold line-clamp-1">{product.name}</p>
                       {product.pickupOnly && (
                         <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold shrink-0">PICKUP ONLY</span>
                       )}
-                    </div>
+                    </Link>
                     {product.couponExcluded && couponCode && (
                       <p className="text-[10px] text-gray-400 italic">Coupon not applicable</p>
                     )}
