@@ -131,7 +131,7 @@ export function ProductDetail({ slug }: { slug: string }) {
                 width={480}
                 height={480}
                 priority
-                className="object-cover rounded-[10px] sm:rounded-2xl w-full h-full"
+                className="object-contain rounded-[10px] sm:rounded-2xl w-full h-full"
                 onError={() => setImgError(true)}
               />
               {/* Decorative champagne bottle — bottom-right corner, subtle watermark */}
