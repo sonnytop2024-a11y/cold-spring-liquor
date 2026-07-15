@@ -838,7 +838,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
           </div>
           <p className="text-xs text-gray-400 mb-5">Select how you&apos;d like to pay — you&apos;ll review your order before confirming</p>
-          <div role="radiogroup" aria-label="Payment method" className="space-y-[18px]">
+          <div role="radiogroup" aria-label="Payment method" className="space-y-3">
             <PaymentMethodCard
               variant="gold"
               selected={selectedMethod === "stripe"}
