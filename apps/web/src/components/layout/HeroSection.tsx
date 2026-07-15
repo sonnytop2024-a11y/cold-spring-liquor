@@ -246,7 +246,7 @@ const heroCSS = `
   ══════════════════════════════════════════════════════════════════ */
   @media (min-width: 768px) {
     .hero-section { min-height: 520px; }
-    .hero-bg-img  { object-position: 55% 42%; }
+    .hero-bg-img  { object-position: 55% 20%; }
     .hero-gradient {
       background: linear-gradient(
         to right,
