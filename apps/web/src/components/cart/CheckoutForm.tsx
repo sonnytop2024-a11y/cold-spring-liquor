@@ -17,6 +17,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { PayPalPaymentForm } from "./PayPalPaymentForm";
 import { FulfillmentSelector } from "./FulfillmentSelector";
+import { PaymentMethodCard, CardOutlineIcon, PayPalPIcon, CARD_BRAND_LOGOS, PAYPAL_BRAND_LOGOS } from "./PaymentMethodCard";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -441,6 +442,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
   const [paymentStep, setPaymentStep] = useState<null | "select" | "paypal" | "review-free">(null);
+  const [selectedMethod, setSelectedMethod] = useState<null | "stripe" | "paypal">(null);
   const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null } | null>(null);
   const [rewardsDismissed, setRewardsDismissed] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
@@ -836,35 +838,29 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
           </div>
           <p className="text-xs text-gray-400 mb-5">Select how you&apos;d like to pay — you&apos;ll review your order before confirming</p>
-          <div className="space-y-3">
-            <button onClick={selectStripe} disabled={submitting}
-              className="w-full flex items-center gap-3 bg-white border-2 border-gray-200 hover:border-brand-400 rounded-2xl p-4 text-left transition-all">
-              <div className="w-11 h-11 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
-                <CreditCard size={20} className="text-brand-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-800 text-sm">Card · Apple Pay · Klarna</p>
-                <p className="text-xs text-gray-400 mt-0.5">Credit/debit, Apple Pay, Google Pay, or pay later</p>
-              </div>
-              <div className="hidden sm:flex gap-1.5 shrink-0">
-                {["💳", "🍎", "K"].map(icon => (
-                  <span key={icon} className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-bold text-gray-600">{icon}</span>
-                ))}
-              </div>
-            </button>
-            <button onClick={() => setPaymentStep("paypal")}
-              className="w-full flex items-center gap-3 bg-white border-2 border-gray-200 hover:border-[#0070BA] rounded-2xl p-4 text-left transition-all">
-              <div className="w-11 h-11 bg-[#003087] rounded-xl flex items-center justify-center shrink-0">
-                <span className="text-white font-black text-lg">P</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-800 text-sm">PayPal · Venmo</p>
-                <p className="text-xs text-gray-400 mt-0.5">Pay with your PayPal balance, bank, or Venmo</p>
-              </div>
-            </button>
+          <div role="radiogroup" aria-label="Payment method" className="space-y-[18px]">
+            <PaymentMethodCard
+              variant="gold"
+              selected={selectedMethod === "stripe"}
+              disabled={submitting}
+              onSelect={() => { setSelectedMethod("stripe"); selectStripe(); }}
+              title="Card · Apple Pay · Klarna"
+              subtitle="Credit & debit cards, Apple Pay, Google Pay, or pay later with Klarna."
+              icon={<CardOutlineIcon />}
+              logos={CARD_BRAND_LOGOS}
+            />
+            <PaymentMethodCard
+              variant="blue"
+              selected={selectedMethod === "paypal"}
+              onSelect={() => { setSelectedMethod("paypal"); setPaymentStep("paypal"); }}
+              title="PayPal · Venmo"
+              subtitle="Pay with your PayPal balance, bank account, or Venmo."
+              icon={<PayPalPIcon />}
+              logos={PAYPAL_BRAND_LOGOS}
+            />
           </div>
         </div>
-        <button type="button" onClick={() => { setPaymentStep(null); setOrderPayload(null); }}
+        <button type="button" onClick={() => { setPaymentStep(null); setOrderPayload(null); setSelectedMethod(null); }}
           className="w-full border border-gray-200 text-gray-600 text-sm font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors">
           ← Back to your details
         </button>
