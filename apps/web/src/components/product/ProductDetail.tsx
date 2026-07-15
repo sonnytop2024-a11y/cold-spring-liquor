@@ -24,46 +24,6 @@ export function ProductDetail({ slug }: { slug: string }) {
   const [cartPop, triggerCart] = useBtnPop();
   const [buyPop, triggerBuy] = useBtnPop();
   const [imgError, setImgError] = useState(false);
-  // Flat packshots (e.g. a wine box on a plain background, often with baked-in
-  // padding from the source photo) get cropped badly by object-fit: cover at a
-  // short mobile height — but cover is what makes styled lifestyle photos (e.g.
-  // a bottle shot on a bar) look like a proper full-bleed hero image. Since
-  // every catalog image is stored as an 800x800 square regardless of type,
-  // aspect ratio can't tell them apart — sample the loaded pixels instead: a
-  // packshot has a bright, fairly uniform border around a busier center.
-  const [imgFit, setImgFit] = useState<"cover" | "contain">("cover");
-  function detectImageFit(img: HTMLImageElement) {
-    try {
-      const SIZE = 32;
-      const canvas = document.createElement("canvas");
-      canvas.width = SIZE;
-      canvas.height = SIZE;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0, SIZE, SIZE);
-      const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
-      const margin = Math.round(SIZE * 0.12);
-      let borderSum = 0, borderCount = 0, centerSum = 0, centerCount = 0;
-      for (let y = 0; y < SIZE; y++) {
-        for (let x = 0; x < SIZE; x++) {
-          const i = (y * SIZE + x) * 4;
-          const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          if (x < margin || x >= SIZE - margin || y < margin || y >= SIZE - margin) {
-            borderSum += brightness; borderCount++;
-          } else {
-            centerSum += brightness; centerCount++;
-          }
-        }
-      }
-      const borderAvg = borderSum / borderCount;
-      const centerAvg = centerSum / centerCount;
-      // Near-white border, noticeably brighter than the center → likely a
-      // flat packshot with padding baked in, not a full-frame lifestyle photo.
-      if (borderAvg > 235 && borderAvg - centerAvg > 25) setImgFit("contain");
-    } catch {
-      // Fine to no-op — default "cover" matches most of the catalog.
-    }
-  }
   const addItem = useCartStore((s) => s.addItem);
   const { user, isLoggedIn } = useAuthStore();
 
@@ -171,8 +131,7 @@ export function ProductDetail({ slug }: { slug: string }) {
                 width={480}
                 height={480}
                 priority
-                onLoad={e => detectImageFit(e.currentTarget)}
-                className={`${imgFit === "cover" ? "object-cover" : "object-contain"} sm:object-contain rounded-none sm:rounded-2xl w-full h-full`}
+                className="object-contain rounded-none sm:rounded-2xl w-full h-full"
                 onError={() => setImgError(true)}
               />
               {/* Decorative champagne bottle — bottom-right corner, subtle watermark */}
