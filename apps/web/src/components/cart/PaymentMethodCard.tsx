@@ -162,7 +162,7 @@ export function PaymentMethodCard({ variant, selected, onSelect, disabled, title
       tabIndex={0}
       onClick={() => !disabled && onSelect()}
       onKeyDown={handleKeyDown}
-      className={`relative flex items-center gap-[18px] min-h-[112px] px-5 py-[18px] rounded-[24px] bg-white cursor-pointer
+      className={`relative flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-[18px] min-h-[112px] px-5 py-[18px] rounded-[24px] bg-white cursor-pointer
         border-[1.5px] ${selected ? `border-2 ${v.borderSelected} ${v.bgSelected} ${v.glowSelected}` : `${v.borderDefault} shadow-[0_12px_24px_rgba(20,20,20,0.08)] hover:border-gray-400 hover:shadow-[0_16px_32px_rgba(20,20,20,0.12)]`}
         ${disabled ? "opacity-60 cursor-not-allowed" : "active:scale-[0.98]"}
         transition-all duration-200 ${v.focusRing}`}
@@ -176,18 +176,26 @@ export function PaymentMethodCard({ variant, selected, onSelect, disabled, title
         ✓
       </span>
 
-      <div className={`shrink-0 w-[60px] h-[60px] rounded-[18px] flex items-center justify-center ${v.iconBg}`}>
-        {icon}
+      <div className="flex items-center gap-[14px] sm:gap-[18px]">
+        <div className={`shrink-0 w-[60px] h-[60px] rounded-[18px] flex items-center justify-center ${v.iconBg}`}>
+          {icon}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-[22px] font-bold text-gray-900 leading-[1.2] mb-2">{title}</p>
+          <p className="text-base font-medium text-gray-500 leading-[1.35]">{subtitle}</p>
+        </div>
+
+        {/* Desktop: logos + chevron sit to the right of the text */}
+        <div className="hidden sm:flex items-center gap-3.5 shrink-0">
+          <div className="flex items-center gap-2">{logos}</div>
+          <span className="text-[#3A3A3A] text-xl font-bold leading-none">›</span>
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <p className="text-[22px] font-bold text-gray-900 leading-[1.2] mb-2">{title}</p>
-        <p className="text-base font-medium text-gray-500 leading-[1.35]">{subtitle}</p>
-      </div>
-
-      <div className="hidden sm:flex items-center gap-3.5 shrink-0">
-        <div className="flex items-center gap-2">{logos}</div>
-        <span className="text-[#3A3A3A] text-xl font-bold leading-none">›</span>
+      {/* Mobile: logos wrap onto their own row below the text, indented under it */}
+      <div className="flex sm:hidden items-center gap-2 flex-wrap pl-[74px]">
+        {logos}
       </div>
     </div>
   );
