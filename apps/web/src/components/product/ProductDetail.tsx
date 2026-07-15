@@ -2,8 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
-import { useState, useCallback } from "react";
-import { ShoppingCart, Zap, Star, Gift, Minus, Plus } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { ShoppingCart, Zap, Star, Gift, Minus, Plus, Upload, MessageSquarePlus, ShieldCheck, RefreshCw, Trash2, Check } from "lucide-react";
 import { fetchProductBySlug } from "@/lib/api/products";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
@@ -26,6 +26,52 @@ export function ProductDetail({ slug }: { slug: string }) {
   const [imgError, setImgError] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const { user, isLoggedIn } = useAuthStore();
+
+  // ── Missing Product Image Assistance ──────────────────────────────────────
+  const [refPhotoUrl, setRefPhotoUrl] = useState<string | null>(null);
+  const [refPhotoPreview, setRefPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [verificationNote, setVerificationNote] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setUploadError("Only JPG, PNG, or WEBP files are allowed.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError("File too large. Maximum size is 8 MB.");
+      return;
+    }
+    setUploadError("");
+    setRefPhotoPreview(URL.createObjectURL(file));
+    setUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/upload/verification-photo", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Upload failed. Please try again.");
+      setRefPhotoUrl(data.url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setRefPhotoPreview(null);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  function removeRefPhoto() {
+    setRefPhotoUrl(null);
+    setRefPhotoPreview(null);
+    setUploadError("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ["product", slug],
@@ -226,7 +272,7 @@ export function ProductDetail({ slug }: { slug: string }) {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => { triggerCart(); addItem(effectiveProduct!, qty); }}
+                onClick={() => { triggerCart(); addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined }); }}
                 className={`flex-1 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold px-6 py-3.5 rounded-xl transition-all ${cartPop ? "scale-95 shadow-[0_0_20px_4px_rgba(249,115,22,0.45)]" : "shadow-none"}`}
                 style={{ transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease" }}
               >
@@ -234,7 +280,7 @@ export function ProductDetail({ slug }: { slug: string }) {
                 Add to Cart
               </button>
               <button
-                onClick={() => { triggerBuy(); addItem(effectiveProduct!, qty); window.location.href = "/checkout"; }}
+                onClick={() => { triggerBuy(); addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined }); window.location.href = "/checkout"; }}
                 className={`flex-1 flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-3.5 rounded-xl transition-all ${buyPop ? "scale-95 shadow-[0_0_20px_4px_rgba(255,255,255,0.18)]" : "shadow-none"}`}
                 style={{ transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease" }}
               >
@@ -242,6 +288,112 @@ export function ProductDetail({ slug }: { slug: string }) {
                 Buy Now
               </button>
             </div>
+
+            {/* Missing Product Image Assistance — only for products with no photo */}
+            {(!product.imageUrl || imgError) && (
+              <div className="relative mt-4 rounded-[20px] border-[1.5px] border-brand-200 bg-gradient-to-b from-brand-50 to-white p-5">
+                <div className="flex gap-3 mb-4">
+                  <div className="shrink-0 w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center">
+                    <ShieldCheck size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[15px] font-bold text-gray-900 mb-0.5">Help us get the right product for you</p>
+                    <p className="text-[13px] text-gray-500 leading-snug">
+                      This product doesn&apos;t have a photo yet. Upload a picture or add a note so we can make sure you receive the exact product you want.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3.5">
+                  <span className="hidden sm:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-gray-200 items-center justify-center text-[10px] font-bold text-gray-400">
+                    OR
+                  </span>
+
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center flex flex-col items-center gap-1.5">
+                    <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <Upload size={18} />
+                    </div>
+                    <p className="text-sm font-bold text-gray-800">Upload a Photo</p>
+                    <p className="text-xs text-gray-400 leading-snug">Share a clear photo of the bottle or label.</p>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="mt-1 w-full flex items-center justify-center gap-1.5 border-[1.5px] border-brand-500 text-brand-600 hover:bg-brand-50 rounded-lg py-2 text-xs font-bold transition-colors disabled:opacity-60"
+                    >
+                      <Upload size={13} /> {uploadingPhoto ? "Uploading…" : "Upload Photo"}
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" className="hidden" onChange={handlePhotoSelected} />
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center flex flex-col items-center gap-1.5">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                      <MessageSquarePlus size={18} />
+                    </div>
+                    <p className="text-sm font-bold text-gray-800">Add a Note</p>
+                    <p className="text-xs text-gray-400 leading-snug">Tell us the flavor, size, or packaging.</p>
+                    <button
+                      type="button"
+                      onClick={() => setNoteOpen(true)}
+                      className="mt-1 w-full flex items-center justify-center gap-1.5 border-[1.5px] border-blue-700 text-blue-700 hover:bg-blue-50 rounded-lg py-2 text-xs font-bold transition-colors"
+                    >
+                      <MessageSquarePlus size={13} /> {verificationNote ? "Edit Note" : "Add Note"}
+                    </button>
+                  </div>
+                </div>
+
+                {uploadError && (
+                  <p className="text-xs text-red-600 font-medium mb-3">{uploadError}</p>
+                )}
+
+                {refPhotoPreview && (
+                  <div className="bg-white border border-green-200 rounded-2xl p-3 flex items-center gap-3 mb-3.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={refPhotoPreview} alt="Uploaded reference" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-gray-100" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800 truncate">Reference photo</p>
+                      {uploadingPhoto ? (
+                        <p className="text-[11px] text-gray-400 font-semibold">Uploading…</p>
+                      ) : refPhotoUrl ? (
+                        <p className="text-[11px] text-green-600 font-bold flex items-center gap-1"><Check size={11} /> Photo attached</p>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <button type="button" onClick={() => fileInputRef.current?.click()} title="Replace photo"
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
+                        <RefreshCw size={13} />
+                      </button>
+                      <button type="button" onClick={removeRefPhoto} title="Remove photo"
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {noteOpen && (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-3.5 mb-3.5">
+                    <textarea
+                      value={verificationNote}
+                      onChange={(e) => setVerificationNote(e.target.value.slice(0, 500))}
+                      maxLength={500}
+                      autoFocus
+                      placeholder='e.g. "Green bottle, 750mL, the one with the gold label"'
+                      className="w-full min-h-[64px] text-sm text-gray-800 placeholder:text-gray-400 outline-none resize-none"
+                    />
+                    <div className="flex items-center justify-between mt-1.5 pt-2 border-t border-gray-100">
+                      <span className="text-[11px] text-gray-400 tabular-nums">{verificationNote.length}/500</span>
+                      <button type="button" onClick={() => setNoteOpen(false)} className="text-xs font-bold text-brand-600">Done</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2 text-xs text-gray-500 leading-snug">
+                  <ShieldCheck size={14} className="text-brand-600 shrink-0 mt-0.5" />
+                  We&apos;ll review your photo and note before preparing your order, to make sure you receive the correct product.
+                </div>
+              </div>
+            )}
           </>
         )}
 

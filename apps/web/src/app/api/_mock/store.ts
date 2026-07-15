@@ -23,7 +23,11 @@ export interface MockOrder {
   id: string;
   orderNumber: string;
   status: OrderStatus;
-  items: Array<{ productId: string; name: string; price: number; quantity: number }>;
+  items: Array<{
+    productId: string; name: string; price: number; quantity: number;
+    // Missing Product Image Assistance — customer-supplied when the product has no photo
+    referenceImageUrl?: string; verificationNote?: string;
+  }>;
   subtotal: number;
   bundleDiscount: number;
   couponDiscount: number;

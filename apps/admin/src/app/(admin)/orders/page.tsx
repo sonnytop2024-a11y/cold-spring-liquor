@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, MapPin, User, ChevronRight, Package, X, Edit2, XCircle, RefreshCw, Loader2, Plus, Minus, FlaskConical , Search } from "lucide-react";
+import { Clock, MapPin, User, ChevronRight, Package, X, Edit2, XCircle, RefreshCw, Loader2, Plus, Minus, FlaskConical , Search, Camera, ShieldCheck } from "lucide-react";
 import { API } from "@/lib/api";
 
 // ─── Audio alert (persistent ctx — required by iOS/Safari) ───────────────────
@@ -154,6 +154,41 @@ function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
               ))}
             </div>
           </div>
+
+          {order.items?.some((it: any) => it.referenceImageUrl || it.verificationNote) && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5">
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <ShieldCheck size={13} className="text-orange-600" />
+                <p className="text-xs font-bold text-orange-700 uppercase tracking-wide">Product Verification</p>
+                <span className="text-[10px] font-bold bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded-full ml-auto">Customer Provided</span>
+              </div>
+              <div className="space-y-3">
+                {order.items
+                  .filter((it: any) => it.referenceImageUrl || it.verificationNote)
+                  .map((it: any, i: number) => (
+                    <div key={i} className="flex gap-3">
+                      {it.referenceImageUrl && (
+                        <a href={it.referenceImageUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={it.referenceImageUrl} alt={`Reference for ${it.name}`} className="w-16 h-16 rounded-lg object-cover border border-orange-200" />
+                        </a>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-800">{it.name}</p>
+                        {it.referenceImageUrl && (
+                          <a href={it.referenceImageUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-orange-600 font-semibold flex items-center gap-1 mt-0.5">
+                            <Camera size={11} /> View full-size photo
+                          </a>
+                        )}
+                        {it.verificationNote && (
+                          <p className="text-xs text-gray-600 mt-1 leading-snug">📝 {it.verificationNote}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-gray-50 rounded-xl p-3.5 space-y-1">
             <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{money(order.subtotal)}</span></div>

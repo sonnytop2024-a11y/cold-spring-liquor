@@ -25,6 +25,10 @@ export interface Product {
 export interface CartItem {
   product: Product;
   quantity: number;
+  /** Customer-supplied reference photo URL — only used for products with no catalog image */
+  referenceImageUrl?: string;
+  /** Customer-supplied note — only used for products with no catalog image */
+  verificationNote?: string;
 }
 
 export interface Order {

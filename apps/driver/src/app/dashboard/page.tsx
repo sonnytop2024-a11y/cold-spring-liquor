@@ -316,6 +316,29 @@ function NewOrderAlert({
               📝 <strong>Note: </strong>{order.customerNotes}
             </div>
           )}
+
+          {order.items?.some((it: any) => it.referenceImageUrl || it.verificationNote) && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <ShieldCheck size={12} className="text-orange-600" />
+                <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Product Verification (Customer Provided)</p>
+              </div>
+              <div className="space-y-2">
+                {order.items.filter((it: any) => it.referenceImageUrl || it.verificationNote).map((it: any, i: number) => (
+                  <div key={i} className="flex gap-2">
+                    {it.referenceImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={it.referenceImageUrl} alt={`Reference for ${it.name}`} className="w-11 h-11 rounded-lg object-cover border border-orange-200 shrink-0" />
+                    )}
+                    <div className="min-w-0 text-xs text-orange-900">
+                      <p className="font-bold">{it.name}</p>
+                      {it.verificationNote && <p className="text-orange-800 leading-snug">{it.verificationNote}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -1041,6 +1064,30 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
         {order.customerNotes && (
           <div className="mx-4 mb-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-800">
             📝 <strong>Note: </strong>{order.customerNotes}
+          </div>
+        )}
+
+        {/* Product Verification — customer-supplied photo/note for no-image items */}
+        {order.items?.some((it: any) => it.referenceImageUrl || it.verificationNote) && (
+          <div className="mx-4 mb-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <ShieldCheck size={12} className="text-orange-600" />
+              <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Product Verification (Customer Provided)</p>
+            </div>
+            <div className="space-y-2">
+              {order.items.filter((it: any) => it.referenceImageUrl || it.verificationNote).map((it: any, i: number) => (
+                <div key={i} className="flex gap-2">
+                  {it.referenceImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={it.referenceImageUrl} alt={`Reference for ${it.name}`} className="w-11 h-11 rounded-lg object-cover border border-orange-200 shrink-0" />
+                  )}
+                  <div className="min-w-0 text-xs text-orange-900">
+                    <p className="font-bold">{it.name}</p>
+                    {it.verificationNote && <p className="text-orange-800 leading-snug">{it.verificationNote}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -644,7 +644,10 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     }
 
     const payload = {
-      items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity })),
+      items: items.map(i => ({
+        productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity,
+        referenceImageUrl: i.referenceImageUrl, verificationNote: i.verificationNote,
+      })),
       ...(isPickup
         ? { orderType: "pickup", pickupWindow: pickupSlot, deliveryAddress: null, billingAddress: null, billingAddressSameAsDelivery: false }
         : { orderType: "delivery", deliveryAddress: delivery, billingAddress: delivery, billingAddressSameAsDelivery: true }),
