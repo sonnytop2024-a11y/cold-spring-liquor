@@ -119,10 +119,10 @@ export function ProductDetail({ slug }: { slug: string }) {
     : "Promo codes & rewards available at checkout";
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-10">
       {/* Image */}
       <div className="relative">
-        <div className="bg-gray-50 rounded-2xl overflow-hidden aspect-square flex items-center justify-center relative">
+        <div className="bg-gray-50 rounded-[10px] sm:rounded-2xl overflow-hidden h-[156px] sm:h-auto sm:aspect-square flex items-center justify-center relative">
           {product.imageUrl && !imgError ? (
             <>
               <Image
@@ -131,7 +131,7 @@ export function ProductDetail({ slug }: { slug: string }) {
                 width={480}
                 height={480}
                 priority
-                className="object-cover rounded-2xl w-full h-full"
+                className="object-cover rounded-[10px] sm:rounded-2xl w-full h-full"
                 onError={() => setImgError(true)}
               />
               {/* Decorative champagne bottle — bottom-right corner, subtle watermark */}
@@ -146,19 +146,19 @@ export function ProductDetail({ slug }: { slug: string }) {
               </div>
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-white rounded-2xl">
+            <div className="w-full h-full flex items-center justify-center bg-white rounded-[10px] sm:rounded-2xl">
               {/* Category illustration placeholder — replaced automatically once a real photo is uploaded */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={categoryPlaceholder(product.category)}
                 alt={product.name}
-                className="w-[58%] h-[58%] object-contain"
+                className="w-[26px] h-[26px] sm:w-[58%] sm:h-[58%] object-contain"
               />
             </div>
           )}
         </div>
         {discountPct > 0 && (
-          <span className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1 rounded-full">
+          <span className="absolute top-2 left-2 sm:top-4 sm:left-4 bg-red-500 text-white text-[10px] sm:text-sm font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full">
             -{discountPct}% OFF
           </span>
         )}
@@ -183,213 +183,212 @@ export function ProductDetail({ slug }: { slug: string }) {
           </svg>
         </div>
 
-        <p className="text-sm font-medium text-brand-600 uppercase tracking-wide mb-1">
+        <p className="text-[11px] sm:text-sm font-medium text-brand-600 uppercase tracking-wide mb-0.5 sm:mb-1">
           {product.category} · {product.brand}
         </p>
-        <h1 className="font-product text-3xl font-bold mb-3">{product.name}</h1>
+        <h1 className="font-product text-[17px] leading-[1.3] sm:text-3xl sm:leading-normal font-bold mb-1 sm:mb-3 line-clamp-2 sm:line-clamp-none">{product.name}</h1>
 
         {(product.rating ?? 0) > 0 && (
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
             <div className="flex">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
-                  size={16}
-                  className={
+                  className={`w-3 h-3 sm:w-4 sm:h-4 ${
                     i < Math.round(product.rating ?? 0)
                       ? "fill-amber-400 text-amber-400"
                       : "text-gray-200"
-                  }
+                  }`}
                 />
               ))}
             </div>
-            <span className="text-sm text-gray-600">
+            <span className="text-[11px] sm:text-sm text-gray-600">
               {(product.rating ?? 0).toFixed(1)} ({product.reviewCount ?? 0} reviews)
             </span>
           </div>
         )}
 
-        <div className="flex items-baseline gap-3 mb-2">
-          <span className="font-product text-4xl font-black">
+        <div className="flex items-baseline gap-2 sm:gap-3 mb-2">
+          <span className="font-product text-[17px] sm:text-4xl font-bold sm:font-black">
             {formatCurrency(effectiveProduct!.salePrice ?? effectiveProduct!.price)}
           </span>
           {effectiveProduct!.salePrice && (
-            <span className="font-product text-xl text-gray-400 line-through">
+            <span className="font-product text-xs sm:text-xl text-gray-400 line-through">
               {formatCurrency(effectiveProduct!.price)}
             </span>
           )}
         </div>
 
         {/* Pills: abv only */}
-        <div className="flex flex-wrap gap-3 text-sm text-gray-600 mb-6">
+        <div className="flex flex-wrap gap-1.5 sm:gap-3 text-[10.5px] sm:text-sm text-gray-600 mb-2.5 sm:mb-6">
           {product.abv > 0 && (
-            <span className="bg-gray-100 px-3 py-1 rounded-full">{product.abv}% ABV</span>
+            <span className="bg-gray-50 sm:bg-gray-100 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full">{product.abv}% ABV</span>
           )}
           {!product.inStock && (
-            <span className="px-3 py-1 rounded-full font-medium bg-red-100 text-red-600">
+            <span className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full font-medium bg-red-100 text-red-600">
               Out of Stock
             </span>
           )}
           {product.pickupOnly && (
-            <span className="px-3 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
+            <span className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full font-medium bg-blue-100 text-blue-700">
               🏬 Pickup Only
             </span>
           )}
         </div>
 
         {product.description && (
-          <p className="text-gray-600 leading-relaxed mb-6">{product.description}</p>
+          <p className="text-[12px] sm:text-base text-gray-600 leading-relaxed mb-3 sm:mb-6">{product.description}</p>
         )}
 
         {product.inStock && (
           <>
             {/* Quantity */}
-            <div className="flex items-center gap-4 mb-4">
-              <span className="text-sm font-medium text-gray-700">Quantity</span>
-              <div className="flex items-center border rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between sm:justify-start sm:gap-4 mb-2.5 sm:mb-4">
+              <span className="text-[11.5px] sm:text-sm font-medium text-gray-700">Quantity</span>
+              <div className="flex items-center border-[0.5px] sm:border rounded-[7px] sm:rounded-lg overflow-hidden">
                 <button
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  className="px-3 py-2 hover:bg-gray-50 transition-colors"
+                  className="w-7 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-2 flex items-center justify-center hover:bg-gray-50 transition-colors"
                 >
-                  <Minus size={16} />
+                  <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
-                <span className="px-4 py-2 font-semibold min-w-[3rem] text-center">
+                <span className="w-6 sm:min-w-[3rem] sm:px-4 sm:py-2 text-[12.5px] sm:text-base font-semibold text-center">
                   {qty}
                 </span>
                 <button
                   onClick={() => setQty((q) => Math.min(effectiveProduct!.stockQty, q + 1))}
                   disabled={qty >= effectiveProduct!.stockQty}
-                  className="px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  className="w-7 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-2 flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
-                  <Plus size={16} />
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
               </div>
               {qty >= effectiveProduct!.stockQty && (
-                <span className="text-xs text-amber-600 font-medium">Only {effectiveProduct!.stockQty} left in stock</span>
+                <span className="text-[10px] sm:text-xs text-amber-600 font-medium">Only {effectiveProduct!.stockQty} left in stock</span>
               )}
             </div>
 
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3">
               <button
                 onClick={() => { triggerCart(); addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined }); }}
-                className={`flex-1 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold px-6 py-3.5 rounded-xl transition-all ${cartPop ? "scale-95 shadow-[0_0_20px_4px_rgba(249,115,22,0.45)]" : "shadow-none"}`}
+                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold text-[13px] sm:text-base py-2.5 sm:py-3.5 rounded-[9px] sm:rounded-xl transition-all ${cartPop ? "scale-95 shadow-[0_0_20px_4px_rgba(249,115,22,0.45)]" : "shadow-none"}`}
                 style={{ transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease" }}
               >
-                <ShoppingCart size={18} className={cartPop ? "animate-bounce" : ""} />
+                <ShoppingCart className={`w-[15px] h-[15px] sm:w-[18px] sm:h-[18px] ${cartPop ? "animate-bounce" : ""}`} />
                 Add to Cart
               </button>
               <button
                 onClick={() => { triggerBuy(); addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined }); window.location.href = "/checkout"; }}
-                className={`flex-1 flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-3.5 rounded-xl transition-all ${buyPop ? "scale-95 shadow-[0_0_20px_4px_rgba(255,255,255,0.18)]" : "shadow-none"}`}
+                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold text-[13px] sm:text-base py-2.5 sm:py-3.5 rounded-[9px] sm:rounded-xl transition-all ${buyPop ? "scale-95 shadow-[0_0_20px_4px_rgba(255,255,255,0.18)]" : "shadow-none"}`}
                 style={{ transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease" }}
               >
-                <Zap size={18} className={buyPop ? "animate-pulse" : ""} />
+                <Zap className={`w-[15px] h-[15px] sm:w-[18px] sm:h-[18px] ${buyPop ? "animate-pulse" : ""}`} />
                 Buy Now
               </button>
             </div>
 
             {/* Missing Product Image Assistance — only for products with no photo */}
             {(!product.imageUrl || imgError) && (
-              <div className="relative mt-4 rounded-[20px] border-[1.5px] border-brand-200 bg-gradient-to-b from-brand-50 to-white p-5">
-                <div className="flex gap-3 mb-4">
-                  <div className="shrink-0 w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center">
-                    <ShieldCheck size={18} className="text-white" />
+              <div className="relative mt-2.5 sm:mt-4 rounded-[10px] sm:rounded-[20px] border-[0.5px] sm:border-[1.5px] border-brand-200 bg-gradient-to-b from-brand-50 to-white p-[9px] sm:p-5">
+                <div className="flex items-start gap-1.5 sm:gap-3 mb-2 sm:mb-4">
+                  <div className="shrink-0 w-4 h-4 sm:w-9 sm:h-9 rounded-[5px] sm:rounded-xl bg-brand-500 flex items-center justify-center mt-px sm:mt-0">
+                    <ShieldCheck className="w-[9px] h-[9px] sm:w-[18px] sm:h-[18px] text-white" />
                   </div>
                   <div>
-                    <p className="text-[15px] font-bold text-gray-900 mb-0.5">Help us get the right product for you</p>
-                    <p className="text-[13px] text-gray-500 leading-snug">
+                    <p className="text-[9.5px] leading-[1.3] sm:text-[15px] font-bold text-gray-900 mb-0.5">Help us get the right product for you</p>
+                    <p className="text-[8.5px] leading-[1.35] sm:text-[13px] sm:leading-snug text-gray-500">
                       This product doesn&apos;t have a photo yet. Upload a picture or add a note so we can make sure you receive the exact product you want.
                     </p>
                   </div>
                 </div>
 
-                <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3.5">
+                <div className="relative grid grid-cols-2 gap-1.5 sm:gap-2.5 mb-[7px] sm:mb-3.5">
                   <span className="hidden sm:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-gray-200 items-center justify-center text-[10px] font-bold text-gray-400">
                     OR
                   </span>
 
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center flex flex-col items-center gap-1.5">
-                    <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                      <Upload size={18} />
+                  <div className="bg-white border-[0.5px] sm:border border-gray-200 rounded-[8px] sm:rounded-2xl p-2 sm:p-4 text-center flex flex-col items-center gap-0.5 sm:gap-1.5">
+                    <div className="w-5 h-5 sm:w-10 sm:h-10 rounded-[6px] sm:rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <Upload className="w-[11px] h-[11px] sm:w-[18px] sm:h-[18px]" />
                     </div>
-                    <p className="text-sm font-bold text-gray-800">Upload a Photo</p>
-                    <p className="text-xs text-gray-400 leading-snug">Share a clear photo of the bottle or label.</p>
+                    <p className="text-[9.5px] sm:text-sm font-bold text-gray-800">Upload a Photo</p>
+                    <p className="text-[8px] leading-[1.25] sm:text-xs sm:leading-snug text-gray-400">Share a clear photo of the bottle or label.</p>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingPhoto}
-                      className="mt-1 w-full flex items-center justify-center gap-1.5 border-[1.5px] border-brand-500 text-brand-600 hover:bg-brand-50 rounded-lg py-2 text-xs font-bold transition-colors disabled:opacity-60"
+                      className="mt-0.5 sm:mt-1 w-full flex items-center justify-center gap-1 sm:gap-1.5 border-[0.5px] sm:border-[1.5px] border-brand-500 text-brand-600 hover:bg-brand-50 rounded-[6px] sm:rounded-lg py-1 sm:py-2 text-[8px] sm:text-xs font-bold transition-colors disabled:opacity-60"
                     >
-                      <Upload size={13} /> {uploadingPhoto ? "Uploading…" : "Upload Photo"}
+                      <Upload className="w-[8px] h-[8px] sm:w-[13px] sm:h-[13px]" /> {uploadingPhoto ? "Uploading…" : "Upload Photo"}
                     </button>
                     <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" className="hidden" onChange={handlePhotoSelected} />
                   </div>
 
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center flex flex-col items-center gap-1.5">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
-                      <MessageSquarePlus size={18} />
+                  <div className="bg-white border-[0.5px] sm:border border-gray-200 rounded-[8px] sm:rounded-2xl p-2 sm:p-4 text-center flex flex-col items-center gap-0.5 sm:gap-1.5">
+                    <div className="w-5 h-5 sm:w-10 sm:h-10 rounded-[6px] sm:rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                      <MessageSquarePlus className="w-[11px] h-[11px] sm:w-[18px] sm:h-[18px]" />
                     </div>
-                    <p className="text-sm font-bold text-gray-800">Add a Note</p>
-                    <p className="text-xs text-gray-400 leading-snug">Tell us the flavor, size, or packaging.</p>
+                    <p className="text-[9.5px] sm:text-sm font-bold text-gray-800">Add a Note</p>
+                    <p className="text-[8px] leading-[1.25] sm:text-xs sm:leading-snug text-gray-400">Tell us the flavor, size, or packaging.</p>
                     <button
                       type="button"
                       onClick={() => setNoteOpen(true)}
-                      className="mt-1 w-full flex items-center justify-center gap-1.5 border-[1.5px] border-blue-700 text-blue-700 hover:bg-blue-50 rounded-lg py-2 text-xs font-bold transition-colors"
+                      className="mt-0.5 sm:mt-1 w-full flex items-center justify-center gap-1 sm:gap-1.5 border-[0.5px] sm:border-[1.5px] border-blue-700 text-blue-700 hover:bg-blue-50 rounded-[6px] sm:rounded-lg py-1 sm:py-2 text-[8px] sm:text-xs font-bold transition-colors"
                     >
-                      <MessageSquarePlus size={13} /> {verificationNote ? "Edit Note" : "Add Note"}
+                      <MessageSquarePlus className="w-[8px] h-[8px] sm:w-[13px] sm:h-[13px]" /> {verificationNote ? "Edit Note" : "Add Note"}
                     </button>
                   </div>
                 </div>
 
                 {uploadError && (
-                  <p className="text-xs text-red-600 font-medium mb-3">{uploadError}</p>
+                  <p className="text-[9px] sm:text-xs text-red-600 font-medium mb-2 sm:mb-3">{uploadError}</p>
                 )}
 
                 {refPhotoPreview && (
-                  <div className="bg-white border border-green-200 rounded-2xl p-3 flex items-center gap-3 mb-3.5">
+                  <div className="bg-white border-[0.5px] sm:border border-green-200 rounded-[8px] sm:rounded-2xl p-[7px] sm:p-3 flex items-center gap-2 sm:gap-3 mb-[7px] sm:mb-3.5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={refPhotoPreview} alt="Uploaded reference" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-gray-100" />
+                    <img src={refPhotoPreview} alt="Uploaded reference" className="w-7 h-7 sm:w-14 sm:h-14 rounded-[6px] sm:rounded-lg object-cover shrink-0 bg-gray-100" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-800 truncate">Reference photo</p>
+                      <p className="text-[8.5px] sm:text-xs font-bold text-gray-800 truncate">Reference photo</p>
                       {uploadingPhoto ? (
-                        <p className="text-[11px] text-gray-400 font-semibold">Uploading…</p>
+                        <p className="text-[7.5px] sm:text-[11px] text-gray-400 font-semibold">Uploading…</p>
                       ) : refPhotoUrl ? (
-                        <p className="text-[11px] text-green-600 font-bold flex items-center gap-1"><Check size={11} /> Photo attached</p>
+                        <p className="text-[7.5px] sm:text-[11px] text-green-600 font-bold flex items-center gap-1"><Check className="w-[8px] h-[8px] sm:w-[11px] sm:h-[11px]" /> Photo attached</p>
                       ) : null}
                     </div>
-                    <div className="flex gap-1.5 shrink-0">
+                    <div className="flex gap-1 sm:gap-1.5 shrink-0">
                       <button type="button" onClick={() => fileInputRef.current?.click()} title="Replace photo"
-                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
-                        <RefreshCw size={13} />
+                        className="w-5 h-5 sm:w-8 sm:h-8 rounded-[5px] sm:rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
+                        <RefreshCw className="w-[9px] h-[9px] sm:w-[13px] sm:h-[13px]" />
                       </button>
                       <button type="button" onClick={removeRefPhoto} title="Remove photo"
-                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
-                        <Trash2 size={13} />
+                        className="w-5 h-5 sm:w-8 sm:h-8 rounded-[5px] sm:rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
+                        <Trash2 className="w-[9px] h-[9px] sm:w-[13px] sm:h-[13px]" />
                       </button>
                     </div>
                   </div>
                 )}
 
                 {noteOpen && (
-                  <div className="bg-white border border-gray-200 rounded-2xl p-3.5 mb-3.5">
+                  <div className="bg-white border-[0.5px] sm:border border-gray-200 rounded-[8px] sm:rounded-2xl p-[7px] sm:p-3.5 mb-[7px] sm:mb-3.5">
                     <textarea
                       value={verificationNote}
                       onChange={(e) => setVerificationNote(e.target.value.slice(0, 500))}
                       maxLength={500}
                       autoFocus
                       placeholder='e.g. "Green bottle, 750mL, the one with the gold label"'
-                      className="w-full min-h-[64px] text-sm text-gray-800 placeholder:text-gray-400 outline-none resize-none"
+                      className="w-full min-h-[38px] sm:min-h-[64px] text-[9.5px] sm:text-sm text-gray-800 placeholder:text-gray-400 outline-none resize-none"
                     />
-                    <div className="flex items-center justify-between mt-1.5 pt-2 border-t border-gray-100">
-                      <span className="text-[11px] text-gray-400 tabular-nums">{verificationNote.length}/500</span>
-                      <button type="button" onClick={() => setNoteOpen(false)} className="text-xs font-bold text-brand-600">Done</button>
+                    <div className="flex items-center justify-between mt-1 sm:mt-1.5 pt-1 sm:pt-2 border-t border-gray-100">
+                      <span className="text-[7.5px] sm:text-[11px] text-gray-400 tabular-nums">{verificationNote.length}/500</span>
+                      <button type="button" onClick={() => setNoteOpen(false)} className="text-[8px] sm:text-xs font-bold text-brand-600">Done</button>
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-start gap-2 text-xs text-gray-500 leading-snug">
-                  <ShieldCheck size={14} className="text-brand-600 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-1 sm:gap-2 text-[7.5px] leading-[1.3] sm:text-xs sm:leading-snug text-gray-500">
+                  <ShieldCheck className="w-[9px] h-[9px] sm:w-[14px] sm:h-[14px] text-brand-600 shrink-0 mt-0.5" />
                   We&apos;ll review your photo and note before preparing your order, to make sure you receive the correct product.
                 </div>
               </div>
@@ -398,7 +397,15 @@ export function ProductDetail({ slug }: { slug: string }) {
         )}
 
         {/* Reward / promo badge — replaces old delivery info */}
-        <div className="mt-6 flex items-center gap-3 bg-brand-50 rounded-xl p-4">
+        {/* Mobile: single compact row */}
+        <div className="flex sm:hidden items-center gap-1.5 mt-2.5 bg-gray-50 rounded-[8px] px-2.5 py-2">
+          <Gift className="w-[13px] h-[13px] text-brand-600 shrink-0" />
+          <p className="text-[10px] text-gray-700 font-medium truncate">
+            <span className="font-semibold text-brand-700">10–30 Minute Delivery</span> · <span className="text-brand-600">{rewardLine}</span>
+          </p>
+        </div>
+        {/* Desktop: original two-line card */}
+        <div className="hidden sm:flex items-center gap-3 mt-6 bg-brand-50 rounded-xl p-4">
           <Gift size={20} className="text-brand-600 shrink-0" />
           <div className="text-sm">
             <p className="font-semibold text-brand-700">10–30 Minute Delivery</p>
