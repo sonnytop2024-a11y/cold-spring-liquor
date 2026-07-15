@@ -13,8 +13,8 @@ export default function HomePage() {
   return (
     <>
       <SpinToWin />
-      <HeroSection />
       <HeroBannerCarousel />
+      <HeroSection />
       <ReorderBanner />
       <FlashDeals />
       <FeaturedCategories />
