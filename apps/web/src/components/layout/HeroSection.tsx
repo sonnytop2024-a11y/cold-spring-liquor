@@ -303,11 +303,6 @@ const heroCSS = `
   .hero-bg-day { opacity: 0; transition: opacity 1s ease-in-out; }
   .hero-section[data-hero-theme="day"] .hero-bg-day { opacity: 1; }
 
-  /* Desktop hotspots (clickable areas over the buttons baked into the
-     daylight artwork). Hidden unless day + desktop. */
-  .hero-day-hotspots { display: none; }
-  .hero-day-hotspot  { position: absolute; display: block; border-radius: 14px; }
-
   @media (max-width: 767px) {
     /* Daylight mobile art is 853×1844 — show it uncropped */
     .hero-section[data-hero-theme="day"] { aspect-ratio: 853/1844; }
@@ -361,16 +356,51 @@ const heroCSS = `
   }
 
   @media (min-width: 768px) {
-    /* Daylight desktop art (1870×841) has the headline/CTAs baked in:
-       show it uncropped, hide the HTML text, expose click hotspots. */
+    /* Daylight desktop art (1870×841): the baked-in copy was erased from the
+       image, so the real HTML text (with its neon flicker) renders on the
+       artwork's dark left panel. That panel is narrow (~18% of the width),
+       so day mode compacts the night layout into the mobile-style stack the
+       artwork was designed around — sizes track the viewport so the column
+       always stays on the panel. */
     .hero-section[data-hero-theme="day"] { aspect-ratio: 1870/841; min-height: 0; }
-    .hero-section[data-hero-theme="day"] .hero-card    { display: none; }
-    .hero-section[data-hero-theme="day"] .hero-gradient{ opacity: 0; }
-    .hero-section[data-hero-theme="day"] .hero-day-hotspots {
-      display: block; position: absolute; inset: 0; z-index: 10;
-      pointer-events: none;
+    .hero-section[data-hero-theme="day"] .container-main {
+      max-width: none; margin: 0; padding: 0 0 0 2.1vw;
     }
-    .hero-section[data-hero-theme="day"] .hero-day-hotspot { pointer-events: auto; }
+    .hero-section[data-hero-theme="day"] .hero-top {
+      max-width: clamp(200px, 17.5vw, 330px);
+      padding: 2vw 0 0; gap: 0.8vw;
+    }
+    .hero-section[data-hero-theme="day"] .hero-h1 {
+      font-size: clamp(1.9rem, 2.95vw, 3.4rem);
+    }
+    /* night tagline/body swap back to the USP stack from the artwork */
+    .hero-section[data-hero-theme="day"] p.hero-tagline.neon-kw { display: none; }
+    .hero-section[data-hero-theme="day"] .hero-body { display: none; }
+    .hero-section[data-hero-theme="day"] .hero-usps {
+      display: block; font-size: clamp(0.85rem, 1.3vw, 1.5rem); line-height: 1.45;
+    }
+    .hero-section[data-hero-theme="day"] .hero-delivery {
+      display: block; font-size: clamp(0.75rem, 1.05vw, 1.2rem);
+    }
+    /* the hover-only sweep turns keywords into inline-blocks with
+       overflow:hidden, which clips the glow into visible boxes on the
+       daylight art — run the plain (mobile-style) glow instead */
+    .hero-section[data-hero-theme="day"] .hero-usps .neon-kw,
+    .hero-section[data-hero-theme="day"] .hero-delivery .neon-kw {
+      display: inline; overflow: visible;
+    }
+    .hero-section[data-hero-theme="day"] .hero-usps .neon-kw::after,
+    .hero-section[data-hero-theme="day"] .hero-delivery .neon-kw::after {
+      display: none;
+    }
+    .hero-section[data-hero-theme="day"] .hero-buttons {
+      flex-direction: column; gap: 0.6vw; padding: 0.9vw 0 0;
+      width: clamp(190px, 15.5vw, 300px);
+    }
+    .hero-section[data-hero-theme="day"] .hero-btn-primary,
+    .hero-section[data-hero-theme="day"] .hero-btn-secondary {
+      width: 100%; font-size: clamp(0.7rem, 0.95vw, 0.95rem); padding: 0.8vw 8px;
+    }
   }
 `;
 
@@ -409,16 +439,6 @@ export async function HeroSection() {
           className="hero-bg-img hero-bg-day-img block w-full h-full" />
       </picture>
       <div className="hero-gradient absolute inset-0 pointer-events-none" />
-
-      {/* Day-desktop click hotspots over the CTAs baked into the artwork */}
-      <div className="hero-day-hotspots" aria-hidden="true">
-        <Link href="/categories" tabIndex={-1} aria-label="Shop Now"
-          className="hero-day-hotspot"
-          style={{ left: "1.6%", top: "46.5%", width: "16.2%", height: "11%" }} />
-        <Link href="#delivery-check" tabIndex={-1} aria-label="Check My Area"
-          className="hero-day-hotspot"
-          style={{ left: "1.6%", top: "57.6%", width: "16.2%", height: "10.5%" }} />
-      </div>
       <HeroTruckAnimation />
       {/* Weather overlay: above bg/gradient (z-5), below content (z-10) */}
       <HeroWeatherEffect />
