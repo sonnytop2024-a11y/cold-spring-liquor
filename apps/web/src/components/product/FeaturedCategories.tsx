@@ -1,16 +1,27 @@
+import Image from "next/image";
 import Link from "next/link";
 
-const CATEGORIES = [
-  { name: "Whiskey", slug: "whiskey", emoji: "🥃", gradient: "from-amber-950 to-amber-800", accent: "#f59e0b" },
-  { name: "Wine", slug: "wine", emoji: "🍷", gradient: "from-rose-950 to-rose-800", accent: "#f43f5e" },
-  { name: "Beer", slug: "beer", emoji: "🍺", gradient: "from-yellow-950 to-yellow-800", accent: "#eab308" },
-  { name: "Tequila", slug: "tequila", emoji: "🌵", gradient: "from-lime-950 to-emerald-800", accent: "#22c55e" },
-  { name: "Vodka", slug: "vodka", emoji: "🍸", gradient: "from-sky-950 to-blue-800", accent: "#38bdf8" },
-  { name: "Rum", slug: "rum", emoji: "🍹", gradient: "from-orange-950 to-orange-700", accent: "#fb923c" },
-  { name: "Gin", slug: "gin", emoji: "🌿", gradient: "from-teal-950 to-teal-700", accent: "#2dd4bf" },
-  { name: "Champagne", slug: "champagne", emoji: "🥂", gradient: "from-yellow-900 to-amber-600", accent: "#fbbf24" },
-  { name: "Cognac", slug: "cognac", emoji: "🍶", gradient: "from-red-950 to-red-800", accent: "#ef4444" },
-  { name: "Ready-to-Drink", slug: "rtd", emoji: "🧃", gradient: "from-purple-950 to-purple-700", accent: "#a855f7" },
+// Circular photo tiles — icons live in public/category-icons/*.webp.
+// "citrus" and "new-sips" are curated entries (search / featured filter), not DB categories.
+const CATEGORIES: {
+  name: string;
+  href: string;
+  icon: string;
+  badge?: string;
+  shopNow?: boolean;
+}[] = [
+  { name: "Whiskey", href: "/products?category=whiskey", icon: "whiskey" },
+  { name: "Wine", href: "/products?category=wine", icon: "wine" },
+  { name: "Beer", href: "/products?category=beer", icon: "beer" },
+  { name: "Tequila", href: "/products?category=tequila", icon: "tequila", shopNow: true },
+  { name: "Vodka", href: "/products?category=vodka", icon: "vodka" },
+  { name: "Rum", href: "/products?category=rum", icon: "rum" },
+  { name: "Gin", href: "/products?category=gin", icon: "gin" },
+  { name: "Champagne", href: "/products?category=champagne", icon: "champagne" },
+  { name: "Cognac", href: "/products?category=cognac", icon: "cognac" },
+  { name: "Ready-to-Drink Sips", href: "/products?category=rtd", icon: "rtd" },
+  { name: "Orange & Citrus Curated Picks", href: "/products?q=citrus", icon: "citrus" },
+  { name: "New Sips to Try", href: "/products?featured=true", icon: "newpick", badge: "NEW" },
 ];
 
 export function FeaturedCategories() {
@@ -33,36 +44,47 @@ export function FeaturedCategories() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {CATEGORIES.map((cat) => (
-            <Link
-              key={cat.slug}
-              href={`/products?category=${cat.slug}`}
-              className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cat.gradient} p-5 flex flex-col items-center gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl`}
-              style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
-            >
-              {/* Glow on hover */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-2.5 gap-y-5 lg:gap-x-4 lg:gap-y-6">
+          {CATEGORIES.map((cat, i) => (
+            <Link key={cat.icon} href={cat.href} className="group relative flex flex-col items-center text-center">
               <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 rounded-2xl"
-                style={{ background: cat.accent }}
-              />
-              <span className="text-5xl group-hover:scale-110 transition-transform duration-300 relative z-10" style={{ filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.4))" }}>
-                {cat.emoji}
-              </span>
-              <div className="relative z-10 text-center">
-                <p className="font-bold text-sm text-white">{cat.name}</p>
-                <p
-                  className="text-xs font-semibold mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  style={{ color: cat.accent }}
+                className="relative w-full aspect-square rounded-full overflow-hidden transition-all duration-200 group-hover:-translate-y-0.5"
+                style={{
+                  background: "#0a0a0a",
+                  boxShadow: "0 8px 20px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.08)",
+                }}
+              >
+                <Image
+                  src={`/category-icons/${cat.icon}.webp`}
+                  alt={cat.name}
+                  width={240}
+                  height={240}
+                  priority={i < 3}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {cat.badge && (
+                <div
+                  className="absolute -top-1 right-[2%] z-10 text-white text-[9px] font-extrabold px-2 py-1 rounded-full"
+                  style={{
+                    background: "linear-gradient(135deg,#ff5c5c,#c0392b)",
+                    boxShadow: "0 3px 8px rgba(0,0,0,.45)",
+                  }}
                 >
+                  {cat.badge}
+                </div>
+              )}
+              <p className="text-[13px] font-bold text-white mt-2.5 leading-tight">{cat.name}</p>
+              {cat.shopNow && (
+                <p className="text-[11px] font-bold mt-0.5" style={{ color: "#5fd08a" }}>
                   Shop Now →
                 </p>
-              </div>
+              )}
             </Link>
           ))}
         </div>
 
-        <Link href="/products" className="sm:hidden block text-center mt-5 text-sm font-semibold" style={{ color: "#f97316" }}>
+        <Link href="/products" className="sm:hidden block text-center mt-6 text-sm font-semibold" style={{ color: "#f97316" }}>
           View All Categories →
         </Link>
       </div>
