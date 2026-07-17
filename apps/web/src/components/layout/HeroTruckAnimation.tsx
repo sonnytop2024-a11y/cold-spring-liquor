@@ -19,6 +19,25 @@ const WP: [number, number][] = [
   [0.67, 0.22],
 ];
 
+// Day-mode route tracing hero-bg-mobile-day.jpg (853×1844 daylight artwork)
+const WP_DAY: [number, number][] = [
+  [0.276, 0.740],
+  [0.320, 0.788],
+  [0.385, 0.853],
+  [0.449, 0.883],
+  [0.550, 0.859],
+  [0.610, 0.796],
+  [0.673, 0.734],
+  [0.718, 0.670],
+  [0.712, 0.613],
+  [0.680, 0.550],
+  [0.700, 0.490],
+  [0.770, 0.432],
+  [0.782, 0.350],
+  [0.808, 0.308],
+  [0.846, 0.270],
+];
+
 function toCurve(pts: [number, number][]) {
   return pts.slice(0, -1).map((_, i) => {
     const p0 = pts[Math.max(i - 1, 0)];
@@ -70,6 +89,7 @@ function buildPath(wp: [number, number][], n = 300) {
 
 const N = 300;
 const SAMPLES = buildPath(WP, N);
+const SAMPLES_DAY = buildPath(WP_DAY, N);
 
 const T_IDLE   = 1000;
 const T_DRIVE  = 6500;
@@ -106,6 +126,9 @@ export function HeroTruckAnimation() {
     let prog  = 0;
     let phaseT = performance.now();
     let trail: [number, number][] = [];
+    let lastTheme = '';
+
+    const heroSection = canvas.closest<HTMLElement>('.hero-section');
 
     function frame(now: number) {
       if (!alive) return;
@@ -122,6 +145,16 @@ export function HeroTruckAnimation() {
         rafRef.current = requestAnimationFrame(frame);
         return;
       }
+
+      // Day mode drives the daylight artwork's route; behind the showcase
+      // circle (its route passes under it), above canvas otherwise.
+      const theme = heroSection?.dataset.heroTheme === 'day' ? 'day' : 'night';
+      if (theme !== lastTheme) {
+        lastTheme = theme;
+        trail = [];
+        truck!.style.zIndex = theme === 'day' ? '6' : '20';
+      }
+      const samples = theme === 'day' ? SAMPLES_DAY : SAMPLES;
 
       const el = now - phaseT;
 
@@ -145,7 +178,7 @@ export function HeroTruckAnimation() {
       const fade  = phase === 'arrived' ? Math.max(1 - (arrEl / T_ARRIVE) * 0.80, 0.20) : 1;
 
       const idx  = Math.min(Math.floor(prog * (N - 1)), N - 1);
-      const pt   = SAMPLES[idx];
+      const pt   = samples[idx];
       const tx   = pt[0] * W;
       const ty   = pt[1] * H;
 
@@ -168,7 +201,7 @@ export function HeroTruckAnimation() {
 
       // House glow on arrival
       if (phase === 'arrived') {
-        const hp = SAMPLES[N - 1];
+        const hp = samples[N - 1];
         const hx = hp[0] * W, hy = hp[1] * H;
         const pulse = 0.5 + 0.5 * Math.sin(now / 380);
         const hi    = Math.min(arrEl / 400, 1);

@@ -205,6 +205,12 @@ export interface MockBundleTier {
   sortOrder: number;
 }
 
+/* Hero day/night display — "auto" follows Central Time (day 6:00 AM–5:59 PM),
+   "day"/"night" force one scene for every visitor. Site-wide, admin-controlled. */
+export type HeroDisplayMode = "auto" | "day" | "night";
+export const HERO_DISPLAY_MODES: HeroDisplayMode[] = ["auto", "day", "night"];
+export const DEFAULT_HERO_DISPLAY_MODE: HeroDisplayMode = "auto";
+
 export interface HeroWeatherSettings {
   enabled: boolean;
   rain: { enabled: boolean; intensity: "light" | "medium" | "heavy" };
@@ -316,6 +322,7 @@ export interface StoreSettings {
   pushSubscription?: Record<string, unknown> | null;
   heroWeather?: HeroWeatherSettings;
   heroShowcase?: HeroShowcaseSettings;
+  heroDisplayMode?: HeroDisplayMode;
 }
 
 interface StoreData {
@@ -411,6 +418,7 @@ function getDefaultSettings(): StoreSettings {
     msgArrived: "Your Cold Spring Liquor driver has arrived. Please meet the driver now and show your valid 21+ ID.",
     heroWeather: { ...DEFAULT_HERO_WEATHER, rain: { ...DEFAULT_HERO_WEATHER.rain }, lightning: { ...DEFAULT_HERO_WEATHER.lightning } },
     heroShowcase: JSON.parse(JSON.stringify(DEFAULT_HERO_SHOWCASE)),
+    heroDisplayMode: DEFAULT_HERO_DISPLAY_MODE,
     updatedAt: new Date().toISOString(),
   };
 }

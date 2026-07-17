@@ -2,6 +2,13 @@ import Link from "next/link";
 import { HeroTruckAnimation } from "./HeroTruckAnimation";
 import { HeroWeatherEffect } from "./HeroWeatherEffect";
 import { HeroShowcase } from "./HeroShowcase";
+import { HeroThemeController } from "./HeroThemeController";
+import { dbGetSettings } from "@/lib/db";
+import { resolveHeroTheme } from "@/lib/heroTheme";
+import {
+  DEFAULT_HERO_DISPLAY_MODE,
+  type HeroDisplayMode,
+} from "@/app/api/_mock/store";
 
 /* ─────────────────────────────────────────────────────────────────────
    Hero CSS – module-level const to avoid React SSR hydration mismatch
@@ -286,12 +293,105 @@ const heroCSS = `
     .hero-section { min-height: 600px; }
     .hero-top     { padding-top: 80px; }
   }
+
+  /* ══════════════════════════════════════════════════════════════════
+     DAY MODE — daylight hero artwork, crossfaded over the night hero.
+     Toggled via data-hero-theme on .hero-section (server-rendered from
+     settings + Central Time, kept fresh by HeroThemeController every 60s).
+     Night mode is the untouched default above.
+  ══════════════════════════════════════════════════════════════════ */
+  .hero-bg-day { opacity: 0; transition: opacity 1s ease-in-out; }
+  .hero-section[data-hero-theme="day"] .hero-bg-day { opacity: 1; }
+
+  /* Desktop hotspots (clickable areas over the buttons baked into the
+     daylight artwork). Hidden unless day + desktop. */
+  .hero-day-hotspots { display: none; }
+  .hero-day-hotspot  { position: absolute; display: block; border-radius: 14px; }
+
+  @media (max-width: 767px) {
+    /* Daylight mobile art is 853×1844 — show it uncropped */
+    .hero-section[data-hero-theme="day"] { aspect-ratio: 853/1844; }
+    /* Text stays, glass card background goes (client-approved day look) */
+    .hero-section[data-hero-theme="day"] .hero-card {
+      background: transparent;
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+    }
+    .hero-section[data-hero-theme="day"] .hero-gradient {
+      background: linear-gradient(
+        148deg,
+        rgba(0,0,0,0.22) 0%,
+        rgba(0,0,0,0.10) 18%,
+        rgba(0,0,0,0.03) 35%,
+        transparent 50%
+      );
+    }
+  }
+
+  /* Warm Amber accent for daylight — lime neon washes out on the bright sky.
+     "Liquor" #FFB000, USP keywords + 10–30 min #FFC247. The dark drop shadow
+     is a filter (not text-shadow) so the flicker keyframes can't wipe it. */
+  .hero-section[data-hero-theme="day"] .neon-kw {
+    color: #FFB000;
+    text-shadow:
+      0 0 10px rgba(255,176,0,0.95),
+      0 0 22px rgba(255,176,0,0.60),
+      0 0 42px rgba(255,176,0,0.25);
+    animation-name: neon-flicker-day;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.65));
+  }
+  .hero-section[data-hero-theme="day"] .hero-usps .neon-kw,
+  .hero-section[data-hero-theme="day"] .hero-delivery .neon-kw {
+    color: #FFC247;
+  }
+  @keyframes neon-flicker-day {
+    0%, 84%, 86%, 88%, 90%, 100% {
+      text-shadow:
+        0 0 10px rgba(255,176,0,0.95),
+        0 0 22px rgba(255,176,0,0.60),
+        0 0 42px rgba(255,176,0,0.25);
+      opacity: 1;
+    }
+    85% { text-shadow: 0 0 5px rgba(255,176,0,0.35); opacity: 0.82; }
+    87% { text-shadow:
+            0 0 12px rgba(255,176,0,1),
+            0 0 28px rgba(255,176,0,0.70),
+            0 0 52px rgba(255,176,0,0.35);
+          opacity: 0.96; }
+    89% { text-shadow: 0 0 6px rgba(255,176,0,0.45); opacity: 0.80; }
+  }
+
+  @media (min-width: 768px) {
+    /* Daylight desktop art (1870×841) has the headline/CTAs baked in:
+       show it uncropped, hide the HTML text, expose click hotspots. */
+    .hero-section[data-hero-theme="day"] { aspect-ratio: 1870/841; min-height: 0; }
+    .hero-section[data-hero-theme="day"] .hero-card    { display: none; }
+    .hero-section[data-hero-theme="day"] .hero-gradient{ opacity: 0; }
+    .hero-section[data-hero-theme="day"] .hero-day-hotspots {
+      display: block; position: absolute; inset: 0; z-index: 10;
+      pointer-events: none;
+    }
+    .hero-section[data-hero-theme="day"] .hero-day-hotspot { pointer-events: auto; }
+  }
 `;
 
-export function HeroSection() {
+export async function HeroSection() {
+  // Initial theme server-side (page is ISR-cached ≤60s; the client controller
+  // corrects within a minute of a 6 AM/6 PM boundary or an admin change).
+  let mode: HeroDisplayMode = DEFAULT_HERO_DISPLAY_MODE;
+  try {
+    const s = await dbGetSettings();
+    if (s.heroDisplayMode === "day" || s.heroDisplayMode === "night" || s.heroDisplayMode === "auto") {
+      mode = s.heroDisplayMode;
+    }
+  } catch {
+    // settings failure → Automatic
+  }
+  const initialTheme = resolveHeroTheme(mode);
+
   return (
-    <section className="hero-section">
+    <section className="hero-section" data-hero-theme={initialTheme}>
       <style dangerouslySetInnerHTML={{ __html: heroCSS }} />
+      <HeroThemeController initialMode={mode} />
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <picture className="absolute inset-0 w-full h-full pointer-events-none select-none">
@@ -300,7 +400,25 @@ export function HeroSection() {
         <img src="/hero-bg.jpg" alt="" aria-hidden="true"
           className="hero-bg-img block w-full h-full" />
       </picture>
+      {/* Daylight artwork — crossfades in over the night hero on day mode */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <picture className="hero-bg-day absolute inset-0 w-full h-full pointer-events-none select-none">
+        <source media="(max-width: 767px)" srcSet="/hero-bg-mobile-day.jpg" />
+        <source media="(min-width: 768px)"  srcSet="/hero-bg-day.jpg" />
+        <img src="/hero-bg-day.jpg" alt="" aria-hidden="true"
+          className="hero-bg-img hero-bg-day-img block w-full h-full" />
+      </picture>
       <div className="hero-gradient absolute inset-0 pointer-events-none" />
+
+      {/* Day-desktop click hotspots over the CTAs baked into the artwork */}
+      <div className="hero-day-hotspots" aria-hidden="true">
+        <Link href="/categories" tabIndex={-1} aria-label="Shop Now"
+          className="hero-day-hotspot"
+          style={{ left: "1.6%", top: "46.5%", width: "16.2%", height: "11%" }} />
+        <Link href="#delivery-check" tabIndex={-1} aria-label="Check My Area"
+          className="hero-day-hotspot"
+          style={{ left: "1.6%", top: "57.6%", width: "16.2%", height: "10.5%" }} />
+      </div>
       <HeroTruckAnimation />
       {/* Weather overlay: above bg/gradient (z-5), below content (z-10) */}
       <HeroWeatherEffect />

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Store, Truck, ShoppingCart, Bell, Car, CreditCard, Star, Users, Settings,
   Save, RotateCcw, CheckCircle, AlertCircle, Volume2, VolumeX, ChevronRight,
-  Clock, Globe, Phone, Mail, MapPin, Upload, CloudRain, Sparkles,
+  Clock, Globe, Phone, Mail, MapPin, Upload, CloudRain, Sparkles, Sun,
 } from "lucide-react";
 
 import { API } from "@/lib/api";
@@ -48,6 +48,7 @@ type Settings = {
   telegramBotToken?: string; telegramChatId?: string;
   heroWeather?: HeroWeatherConfig;
   heroShowcase?: HeroShowcaseConfig;
+  heroDisplayMode?: "auto" | "day" | "night";
   updatedAt: string;
 };
 
@@ -507,6 +508,45 @@ export default function SettingsPage() {
 
           {/* ── WEBSITE — Hero Weather Effects + Product Showcase ── */}
           {tab === "website" && (<>
+          {/* ── WEBSITE — Hero Display Mode (day/night hero artwork) ── */}
+          <SectionCard title="Hero Display Mode" icon={Sun}>
+            <p className="text-sm text-gray-600 pb-3">
+              Controls whether the homepage hero shows the daylight or night scene.
+              Site-wide — applies to every customer on every device, no deploy needed.
+            </p>
+            <div className="space-y-2 pb-1">
+              {([
+                { val: "auto",  label: "Automatic Day/Night",
+                  desc: "Day 6:00 AM – 5:59 PM · Night 6:00 PM – 5:59 AM (Central Time)", badge: "DEFAULT" },
+                { val: "day",   label: "Always Day",
+                  desc: "Forces the daylight hero at all times.", badge: "" },
+                { val: "night", label: "Always Night",
+                  desc: "Forces the current night hero at all times.", badge: "" },
+              ] as { val: "auto" | "day" | "night"; label: string; desc: string; badge: string }[]).map(o => {
+                const cur = form.heroDisplayMode ?? "auto";
+                return (
+                  <button key={o.val} type="button" onClick={() => set("heroDisplayMode", o.val)}
+                    className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                      cur === o.val ? "border-brand-500 bg-orange-50" : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}>
+                    <span className={`w-4 h-4 rounded-full flex-none ${
+                      cur === o.val ? "border-[5px] border-brand-500" : "border-2 border-gray-300"
+                    }`} />
+                    <span className="flex-1">
+                      <span className="block text-sm font-semibold text-gray-800">{o.label}</span>
+                      <span className="block text-xs text-gray-500 mt-0.5">{o.desc}</span>
+                    </span>
+                    {o.badge && (
+                      <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                        {o.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </SectionCard>
+
           {(() => {
             const hw = form.heroWeather ?? DEFAULT_HERO_WEATHER;
             const setHW = (patch: Partial<HeroWeatherConfig>) =>
