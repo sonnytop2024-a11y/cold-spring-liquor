@@ -285,7 +285,7 @@ export function HeroShowcase() {
         swapTo((currentRef.current + 1) % products.length);
       });
       schedule();
-    }, 7000);
+    }, 5000);
   }, [products.length, firePulse, arrivalFX, swapTo]);
 
   const manualGoTo = useCallback((i: number) => {
