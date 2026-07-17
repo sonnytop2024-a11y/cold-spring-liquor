@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HeroTruckAnimation } from "./HeroTruckAnimation";
 import { HeroWeatherEffect } from "./HeroWeatherEffect";
+import { HeroShowcase } from "./HeroShowcase";
 
 /* ─────────────────────────────────────────────────────────────────────
    Hero CSS – module-level const to avoid React SSR hydration mismatch
@@ -303,6 +304,8 @@ export function HeroSection() {
       <HeroTruckAnimation />
       {/* Weather overlay: above bg/gradient (z-5), below content (z-10) */}
       <HeroWeatherEffect />
+      {/* Circular product showcase in the dark corner — admin-controlled */}
+      <HeroShowcase />
 
 
       <div className="container-main relative z-10">

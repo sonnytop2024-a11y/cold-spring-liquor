@@ -220,6 +220,41 @@ export const DEFAULT_HERO_WEATHER: HeroWeatherSettings = {
   opacity: 35,
 };
 
+export interface HeroShowcaseProduct {
+  id: string;
+  kicker: string;        // headline inside the circle, e.g. "NEW ARRIVAL"
+  subtitle: string;      // e.g. "Just In · Limited Stock"
+  badge: string;         // sticker text, lines separated by "\n"
+  price: number;
+  regularPrice: number | null;
+  imageUrl: string | null; // transparent PNG/WebP, auto-trimmed at upload
+  url: string;           // link opened on tap, e.g. /products/slug
+  active: boolean;
+  order: number;
+}
+
+export interface HeroShowcaseSettings {
+  enabled: boolean;
+  // Per-device visibility: the mobile hero has a clean dark corner for the
+  // showcase; the desktop artwork is busier (bottle basket, truck, route),
+  // so desktop defaults OFF — admins can enable it anytime.
+  showOnMobile: boolean;
+  showOnDesktop: boolean;
+  products: HeroShowcaseProduct[]; // max 5 active
+  // Admin-tunable placement per breakpoint (approved via design preview)
+  mobile: { size: number; right: number; bottom: number };  // px, %, %
+  desktop: { size: number; left: number; bottom: number };  // px, %, %
+}
+
+export const DEFAULT_HERO_SHOWCASE: HeroShowcaseSettings = {
+  enabled: true, // with zero products the showcase auto-hides, so ON is safe
+  showOnMobile: true,
+  showOnDesktop: false,
+  products: [],
+  mobile: { size: 150, right: 4, bottom: 4 },
+  desktop: { size: 160, left: 46, bottom: 4.5 },
+};
+
 export interface StoreSettings {
   storeName: string;
   storeAddress: string;
@@ -280,6 +315,7 @@ export interface StoreSettings {
   telegramChatId?: string;
   pushSubscription?: Record<string, unknown> | null;
   heroWeather?: HeroWeatherSettings;
+  heroShowcase?: HeroShowcaseSettings;
 }
 
 interface StoreData {
@@ -374,6 +410,7 @@ function getDefaultSettings(): StoreSettings {
     msgArrivingSoon: "Your Cold Spring Liquor driver is arriving soon. Please come outside or be ready at the door with your valid 21+ ID.",
     msgArrived: "Your Cold Spring Liquor driver has arrived. Please meet the driver now and show your valid 21+ ID.",
     heroWeather: { ...DEFAULT_HERO_WEATHER, rain: { ...DEFAULT_HERO_WEATHER.rain }, lightning: { ...DEFAULT_HERO_WEATHER.lightning } },
+    heroShowcase: JSON.parse(JSON.stringify(DEFAULT_HERO_SHOWCASE)),
     updatedAt: new Date().toISOString(),
   };
 }

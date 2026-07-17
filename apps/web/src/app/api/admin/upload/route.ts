@@ -26,6 +26,20 @@ async function processBannerImage(buffer: ArrayBuffer): Promise<Buffer> {
     .toBuffer();
 }
 
+// Hero showcase bottle images: auto-crop the empty border around the bottle
+// (transparent or white, whichever the source uses), fit inside 400×400 with
+// no forced crop, and keep the alpha channel so the bottle floats on the
+// glowing circle. This is what lets admins upload any-size images without
+// ever adjusting them manually.
+async function processShowcaseImage(buffer: ArrayBuffer): Promise<Buffer> {
+  const input = Buffer.from(buffer);
+  return sharp(input)
+    .trim({ threshold: 12 })
+    .resize(400, 400, { fit: "inside", withoutEnlargement: true })
+    .toFormat("webp", { quality: 88, effort: 4 })
+    .toBuffer();
+}
+
 export async function POST(req: NextRequest) {
 try {
     const formData = await req.formData();
@@ -55,7 +69,9 @@ try {
     const rawBytes = await f.arrayBuffer();
     const processed = folder === "banners"
       ? await processBannerImage(rawBytes)
-      : await processProductImage(rawBytes);
+      : folder === "showcase"
+        ? await processShowcaseImage(rawBytes)
+        : await processProductImage(rawBytes);
 
     const safeName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
 

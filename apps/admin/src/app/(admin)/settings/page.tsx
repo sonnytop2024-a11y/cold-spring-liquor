@@ -5,13 +5,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Store, Truck, ShoppingCart, Bell, Car, CreditCard, Star, Users, Settings,
   Save, RotateCcw, CheckCircle, AlertCircle, Volume2, VolumeX, ChevronRight,
-  Clock, Globe, Phone, Mail, MapPin, Upload, CloudRain,
+  Clock, Globe, Phone, Mail, MapPin, Upload, CloudRain, Sparkles,
 } from "lucide-react";
 
 import { API } from "@/lib/api";
 import { formatPhoneUS } from "@/lib/phoneUtils";
 import { enablePushNotifications, disablePushNotifications } from "@/components/PushRegistrar";
 import { HeroWeatherPreview, type HeroWeatherConfig } from "@/components/HeroWeatherPreview";
+import { HeroShowcaseEditor, type HeroShowcaseConfig } from "@/components/HeroShowcaseEditor";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const DEFAULT_HERO_WEATHER: HeroWeatherConfig = {
@@ -46,6 +47,7 @@ type Settings = {
   msgOnTheWay: string; msgArrivingSoon: string; msgArrived: string;
   telegramBotToken?: string; telegramChatId?: string;
   heroWeather?: HeroWeatherConfig;
+  heroShowcase?: HeroShowcaseConfig;
   updatedAt: string;
 };
 
@@ -503,8 +505,9 @@ export default function SettingsPage() {
             </>
           )}
 
-          {/* ── WEBSITE — Hero Weather Effects ─────────────────── */}
-          {tab === "website" && (() => {
+          {/* ── WEBSITE — Hero Weather Effects + Product Showcase ── */}
+          {tab === "website" && (<>
+          {(() => {
             const hw = form.heroWeather ?? DEFAULT_HERO_WEATHER;
             const setHW = (patch: Partial<HeroWeatherConfig>) =>
               set("heroWeather", { ...hw, ...patch });
@@ -569,6 +572,14 @@ export default function SettingsPage() {
               </SectionCard>
             );
           })()}
+          <SectionCard title="Hero Product Showcase" icon={Sparkles}>
+            <HeroShowcaseEditor
+              value={form.heroShowcase}
+              onChange={v => set("heroShowcase", v)}
+              api={API}
+            />
+          </SectionCard>
+          </>)}
 
           {/* ── DELIVERY ───────────────────────────────────────── */}
           {tab === "delivery" && (
