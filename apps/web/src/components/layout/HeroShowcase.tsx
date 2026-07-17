@@ -47,7 +47,15 @@ export interface HeroShowcaseConfig {
 const ANCHOR = {
   mobile: { x: 0.20, y: 0.667, bowX: 30, bowY: 60 },
   desktop: { x: 0.107, y: 0.737, bowX: 40, bowY: 95 },
+  /* daylight desktop artwork (hero-bg-day.jpg): pin sits on the store roof */
+  desktopDay: { x: 0.304, y: 0.573, bowX: 20, bowY: 110 },
 };
+
+/* Daylight desktop artwork has a dark corner reserved for the showcase
+   (the baked-in mock circle was erased from the image). Center of that
+   zone as fractions of the hero box — placement is locked here so the
+   circle always sits on the dark zone regardless of admin left/bottom. */
+const DAY_DESKTOP_CENTER = { x: 0.8797, y: 0.7729 };
 
 const showcaseCSS = `
   .hsc-outer{position:absolute;z-index:8;aspect-ratio:1/1;}
@@ -167,6 +175,7 @@ export function HeroShowcase() {
   const [leaving, setLeaving] = useState(false);
   const [entering, setEntering] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isDay, setIsDay] = useState(false);
   const router = useRouter();
 
   const outerRef = useRef<HTMLDivElement>(null);
@@ -210,6 +219,18 @@ export function HeroShowcase() {
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  /* Day/night theme — HeroThemeController owns data-hero-theme on the section;
+     desktop day relocates the circle onto the daylight artwork's dark corner. */
+  useEffect(() => {
+    const hero = document.querySelector<HTMLElement>(".hero-section");
+    if (!hero) return;
+    const apply = () => setIsDay(hero.dataset.heroTheme === "day");
+    apply();
+    const mo = new MutationObserver(apply);
+    mo.observe(hero, { attributes: true, attributeFilter: ["data-hero-theme"] });
+    return () => mo.disconnect();
   }, []);
 
   /* spark field, spur path, cycle scheduling */
@@ -331,15 +352,21 @@ export function HeroShowcase() {
 
     const layoutSpur = () => {
       const rect = hero.getBoundingClientRect();
-      const a = isMobile ? ANCHOR.mobile : ANCHOR.desktop;
+      const dayDesktop = !isMobile && isDay;
+      const a = isMobile ? ANCHOR.mobile : dayDesktop ? ANCHOR.desktopDay : ANCHOR.desktop;
       const pos = isMobile ? config.mobile : config.desktop;
       const ax = rect.width * a.x, ay = rect.height * a.y;
       // mirror the CSS min(sizePx, 56vw) cap so the pulse lands dead-center
       const effSize = Math.min(pos.size, window.innerWidth * 0.56);
-      let cxPx: number;
-      if (isMobile) cxPx = rect.width - rect.width * (config.mobile.right / 100) - effSize / 2;
-      else cxPx = rect.width * (config.desktop.left / 100) + effSize / 2;
-      const cyPx = rect.height - rect.height * (pos.bottom / 100) - effSize / 2;
+      let cxPx: number, cyPx: number;
+      if (dayDesktop) {
+        cxPx = rect.width * DAY_DESKTOP_CENTER.x;
+        cyPx = rect.height * DAY_DESKTOP_CENTER.y;
+      } else {
+        if (isMobile) cxPx = rect.width - rect.width * (config.mobile.right / 100) - effSize / 2;
+        else cxPx = rect.width * (config.desktop.left / 100) + effSize / 2;
+        cyPx = rect.height - rect.height * (pos.bottom / 100) - effSize / 2;
+      }
       const mx = (ax + cxPx) / 2 + a.bowX, my = (ay + cyPx) / 2 + a.bowY;
       const d = `M ${ax.toFixed(1)} ${ay.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${cxPx.toFixed(1)} ${cyPx.toFixed(1)}`;
       spurPathRef.current?.setAttribute("d", d);
@@ -378,7 +405,7 @@ export function HeroShowcase() {
       if (cycleRef.current) clearTimeout(cycleRef.current);
       if (resumeRef.current) clearTimeout(resumeRef.current);
     };
-  }, [config, isMobile, scheduleCycle]);
+  }, [config, isMobile, isDay, scheduleCycle]);
 
   if (!config) return null;
   // per-device visibility, admin-controlled (desktop defaults OFF — its hero
@@ -393,6 +420,12 @@ export function HeroShowcase() {
   // hero on small screens (e.g. 320px-wide phones). No effect at defaults.
   const outerStyle: React.CSSProperties = isMobile
     ? { width: `min(${config.mobile.size}px, 56vw)`, right: `${config.mobile.right}%`, bottom: `${config.mobile.bottom}%` }
+    : isDay
+    ? { // daylight artwork: circle center locked onto the dark corner zone
+        width: `min(${config.desktop.size}px, 56vw)`,
+        left: `calc(${(DAY_DESKTOP_CENTER.x * 100).toFixed(2)}% - min(${config.desktop.size / 2}px, 28vw))`,
+        bottom: `calc(${((1 - DAY_DESKTOP_CENTER.y) * 100).toFixed(2)}% - min(${config.desktop.size / 2}px, 28vw))`,
+      }
     : { width: `min(${config.desktop.size}px, 56vw)`, left: `${config.desktop.left}%`, bottom: `${config.desktop.bottom}%` };
 
   function handleSlideClick() {
