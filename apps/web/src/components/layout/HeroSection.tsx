@@ -363,6 +363,16 @@ const heroCSS = `
        artwork was designed around — sizes track the viewport so the column
        always stays on the panel. */
     .hero-section[data-hero-theme="day"] { aspect-ratio: 1870/841; min-height: 0; }
+    /* the artwork already has its own dark left panel — the heavy night
+       gradient on top of it was drowning the store, so day keeps only a
+       slim fade behind the text column */
+    .hero-section[data-hero-theme="day"] .hero-gradient {
+      background: linear-gradient(
+        to right,
+        rgba(10,6,2,0.50) 0%, rgba(10,6,2,0.26) 12%,
+        rgba(10,6,2,0.08) 20%, transparent 30%
+      );
+    }
     .hero-section[data-hero-theme="day"] .container-main {
       max-width: none; margin: 0; padding: 0 0 0 2.1vw;
     }
