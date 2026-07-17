@@ -28,16 +28,19 @@ function resolveLink(banner: Banner): string {
   }
 }
 
-export function HeroBannerCarousel() {
-  const [banners, setBanners] = useState<Banner[]>([]);
+export function HeroBannerCarousel({ initialBanners }: { initialBanners?: Banner[] }) {
+  const [banners, setBanners] = useState<Banner[]>(initialBanners ?? []);
   const [current, setCurrent] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState((initialBanners?.length ?? 0) > 0);
   const [transitioning, setTransitioning] = useState(false);
   const router = useRouter();
   const touchStartX = useRef<number | null>(null);
   const autoRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Server-provided banners render in the initial HTML; the client fetch is
+  // only a fallback for callers that don't pass them.
   useEffect(() => {
+    if (initialBanners && initialBanners.length > 0) return;
     fetch("/api/banners")
       .then(r => r.json())
       .then(data => {
@@ -47,6 +50,7 @@ export function HeroBannerCarousel() {
         }
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const goTo = useCallback((idx: number) => {
