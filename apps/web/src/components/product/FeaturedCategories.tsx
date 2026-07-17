@@ -19,7 +19,9 @@ const CATEGORIES: {
   { name: "Gin", href: "/products?category=gin", icon: "gin" },
   { name: "Champagne", href: "/products?category=champagne", icon: "champagne" },
   { name: "Cognac", href: "/products?category=cognac", icon: "cognac" },
+  { name: "Sake & Soju", href: "/products?category=sake_soju", icon: "soju" },
   { name: "Ready-to-Drink Sips", href: "/products?category=rtd", icon: "rtd" },
+  { name: "Vape & Cigarettes", href: "/products?category=vape_cigarettes", icon: "vape" },
   { name: "Orange & Citrus Curated Picks", href: "/products?q=citrus", icon: "citrus" },
   { name: "New Sips to Try", href: "/products?featured=true", icon: "newpick", badge: "NEW" },
 ];
