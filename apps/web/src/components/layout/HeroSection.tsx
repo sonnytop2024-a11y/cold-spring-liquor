@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HeroTruckAnimation } from "./HeroTruckAnimation";
+import { HeroWeatherEffect } from "./HeroWeatherEffect";
 
 /* ─────────────────────────────────────────────────────────────────────
    Hero CSS – module-level const to avoid React SSR hydration mismatch
@@ -300,6 +301,8 @@ export function HeroSection() {
       </picture>
       <div className="hero-gradient absolute inset-0 pointer-events-none" />
       <HeroTruckAnimation />
+      {/* Weather overlay: above bg/gradient (z-5), below content (z-10) */}
+      <HeroWeatherEffect />
 
 
       <div className="container-main relative z-10">

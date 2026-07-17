@@ -5,13 +5,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Store, Truck, ShoppingCart, Bell, Car, CreditCard, Star, Users, Settings,
   Save, RotateCcw, CheckCircle, AlertCircle, Volume2, VolumeX, ChevronRight,
-  Clock, Globe, Phone, Mail, MapPin, Upload,
+  Clock, Globe, Phone, Mail, MapPin, Upload, CloudRain,
 } from "lucide-react";
 
 import { API } from "@/lib/api";
 import { formatPhoneUS } from "@/lib/phoneUtils";
 import { enablePushNotifications, disablePushNotifications } from "@/components/PushRegistrar";
+import { HeroWeatherPreview, type HeroWeatherConfig } from "@/components/HeroWeatherPreview";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const DEFAULT_HERO_WEATHER: HeroWeatherConfig = {
+  enabled: true,
+  rain: { enabled: true, intensity: "light" },
+  lightning: { enabled: false, frequency: "low" },
+  opacity: 35,
+};
 
 type Settings = {
   storeName: string; storeAddress: string; storePhone: string; storeTextPhone?: string; storeEmail: string;
@@ -37,13 +45,15 @@ type Settings = {
   waitTimerMinutes: number;
   msgOnTheWay: string; msgArrivingSoon: string; msgArrived: string;
   telegramBotToken?: string; telegramChatId?: string;
+  heroWeather?: HeroWeatherConfig;
   updatedAt: string;
 };
 
-type Tab = "store" | "delivery" | "checkout" | "notifications" | "driver" | "payment" | "rewards" | "account" | "system";
+type Tab = "store" | "website" | "delivery" | "checkout" | "notifications" | "driver" | "payment" | "rewards" | "account" | "system";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "store",         label: "Store Info",     icon: Store },
+  { id: "website",       label: "Website",         icon: Globe },
   { id: "delivery",      label: "Delivery",        icon: Truck },
   { id: "checkout",      label: "Checkout",        icon: ShoppingCart },
   { id: "notifications", label: "Notifications",   icon: Bell },
@@ -492,6 +502,73 @@ export default function SettingsPage() {
               </SectionCard>
             </>
           )}
+
+          {/* ── WEBSITE — Hero Weather Effects ─────────────────── */}
+          {tab === "website" && (() => {
+            const hw = form.heroWeather ?? DEFAULT_HERO_WEATHER;
+            const setHW = (patch: Partial<HeroWeatherConfig>) =>
+              set("heroWeather", { ...hw, ...patch });
+            const pills = (
+              options: { val: string; label: string }[],
+              current: string,
+              onPick: (val: string) => void,
+              dimmed: boolean,
+            ) => (
+              <div className={`flex flex-wrap gap-2 pb-3 ${dimmed ? "opacity-40 pointer-events-none" : ""}`}>
+                {options.map(o => (
+                  <button key={o.val} type="button" onClick={() => onPick(o.val)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                      current === o.val ? "bg-brand-500 border-brand-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            );
+            return (
+              <SectionCard title="Hero Weather Effects" icon={CloudRain}>
+                <Toggle checked={hw.enabled} onChange={v => setHW({ enabled: v })}
+                  label="Enable Weather Effect"
+                  description="Master switch. When OFF, no rain or lightning is shown anywhere on the site." />
+
+                <div className={hw.enabled ? "" : "opacity-40 pointer-events-none"}>
+                  <Toggle checked={hw.rain.enabled} onChange={v => setHW({ rain: { ...hw.rain, enabled: v } })}
+                    label="Rain Effect" description="Default: Light" />
+                  {pills(
+                    [{ val: "light", label: "Light" }, { val: "medium", label: "Medium" }, { val: "heavy", label: "Heavy" }],
+                    hw.rain.intensity,
+                    v => setHW({ rain: { ...hw.rain, intensity: v as HeroWeatherConfig["rain"]["intensity"] } }),
+                    !hw.rain.enabled,
+                  )}
+
+                  <Toggle checked={hw.lightning.enabled} onChange={v => setHW({ lightning: { ...hw.lightning, enabled: v } })}
+                    label="Lightning Effect" description="Default: OFF — turn on for special promotions/campaigns." />
+                  {pills(
+                    [{ val: "low", label: "Low (20–30s)" }, { val: "medium", label: "Medium (10–20s)" }, { val: "high", label: "High (5–10s)" }],
+                    hw.lightning.frequency,
+                    v => setHW({ lightning: { ...hw.lightning, frequency: v as HeroWeatherConfig["lightning"]["frequency"] } }),
+                    !hw.lightning.enabled,
+                  )}
+
+                  <div className="py-3 border-b">
+                    <p className="text-sm font-medium text-gray-800 mb-2">Effect Opacity</p>
+                    <input type="range" min={10} max={100} value={hw.opacity}
+                      onChange={e => setHW({ opacity: parseInt(e.target.value, 10) })}
+                      className="w-full accent-brand-500" />
+                    <p className="text-xs text-gray-500 mt-1">{hw.opacity}%</p>
+                  </div>
+                </div>
+
+                <div className="py-4">
+                  <p className="text-sm font-medium text-gray-800 mb-2">Live Preview</p>
+                  <HeroWeatherPreview config={hw} />
+                  <p className="text-xs text-gray-500 mt-2">
+                    The public website updates only after you click Save Settings — no code deploy needed.
+                  </p>
+                </div>
+              </SectionCard>
+            );
+          })()}
 
           {/* ── DELIVERY ───────────────────────────────────────── */}
           {tab === "delivery" && (

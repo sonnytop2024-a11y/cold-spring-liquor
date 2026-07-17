@@ -205,6 +205,21 @@ export interface MockBundleTier {
   sortOrder: number;
 }
 
+export interface HeroWeatherSettings {
+  enabled: boolean;
+  rain: { enabled: boolean; intensity: "light" | "medium" | "heavy" };
+  lightning: { enabled: boolean; frequency: "low" | "medium" | "high" };
+  opacity: number; // 10–100
+}
+
+export const DEFAULT_HERO_WEATHER: HeroWeatherSettings = {
+  enabled: true,
+  rain: { enabled: true, intensity: "light" },
+  // Lightning defaults OFF — admins turn it on for special campaigns only
+  lightning: { enabled: false, frequency: "low" },
+  opacity: 35,
+};
+
 export interface StoreSettings {
   storeName: string;
   storeAddress: string;
@@ -264,6 +279,7 @@ export interface StoreSettings {
   telegramBotToken?: string;
   telegramChatId?: string;
   pushSubscription?: Record<string, unknown> | null;
+  heroWeather?: HeroWeatherSettings;
 }
 
 interface StoreData {
@@ -357,6 +373,7 @@ function getDefaultSettings(): StoreSettings {
     msgOnTheWay: "Your Cold Spring Liquor driver is on the way. Please be ready to meet the driver and show your valid 21+ ID at delivery.",
     msgArrivingSoon: "Your Cold Spring Liquor driver is arriving soon. Please come outside or be ready at the door with your valid 21+ ID.",
     msgArrived: "Your Cold Spring Liquor driver has arrived. Please meet the driver now and show your valid 21+ ID.",
+    heroWeather: { ...DEFAULT_HERO_WEATHER, rain: { ...DEFAULT_HERO_WEATHER.rain }, lightning: { ...DEFAULT_HERO_WEATHER.lightning } },
     updatedAt: new Date().toISOString(),
   };
 }
