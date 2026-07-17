@@ -7,12 +7,15 @@ export function AgeGateModal() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("age_verified");
+    // localStorage (not sessionStorage) so the confirmation survives new tabs
+    // and return visits; also migrate the flag from older sessions.
+    const verified = localStorage.getItem("age_verified") || sessionStorage.getItem("age_verified");
     if (!verified) setShow(true);
+    else localStorage.setItem("age_verified", "true");
   }, []);
 
   function confirm() {
-    sessionStorage.setItem("age_verified", "true");
+    localStorage.setItem("age_verified", "true");
     setShow(false);
   }
 

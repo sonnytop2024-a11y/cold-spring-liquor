@@ -397,8 +397,22 @@ export function HeroShowcase() {
 
   function handleSlideClick() {
     if (swipedRef.current || !p.url) return;
-    if (p.url.startsWith("/")) router.push(p.url);
-    else window.open(p.url, "_blank", "noopener");
+    if (p.url.startsWith("/")) {
+      router.push(p.url);
+      return;
+    }
+    // Absolute URLs pointing at our own site navigate in-app; a new tab has
+    // its own sessionStorage, which would re-trigger the age gate.
+    try {
+      const target = new URL(p.url);
+      if (target.hostname.replace(/^www\./, "") === window.location.hostname.replace(/^www\./, "")) {
+        router.push(target.pathname + target.search + target.hash);
+        return;
+      }
+    } catch {
+      return;
+    }
+    window.open(p.url, "_blank", "noopener");
   }
 
   return (
