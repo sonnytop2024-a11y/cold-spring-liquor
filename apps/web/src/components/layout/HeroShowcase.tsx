@@ -72,7 +72,10 @@ const showcaseCSS = `
     55%{box-shadow:0 0 34px 16px rgba(255,140,40,.38);}
     100%{box-shadow:0 0 0 0 rgba(255,140,40,0);}
   }
-  .hsc-sparks{position:absolute;inset:-42%;pointer-events:none;z-index:1;transition:opacity .4s ease;}
+  /* explicit size, not inset shorthand: Safari keeps an absolutely-positioned
+     SVG at its intrinsic size instead of stretching it to the inset box,
+     which shifted the whole spark field up-left on iPhone */
+  .hsc-sparks{position:absolute;left:-42%;top:-42%;width:184%;height:184%;pointer-events:none;z-index:1;transition:opacity .4s ease;}
   .hsc-sparks.reduced{opacity:.35;}
   .hsc-spark{animation:hscTwinkle var(--dur,2.4s) ease-in-out infinite;animation-delay:var(--delay,0s);transform-origin:center;}
   @keyframes hscTwinkle{0%,100%{opacity:var(--min,.15);}50%{opacity:var(--max,.85);}}
@@ -331,10 +334,12 @@ export function HeroShowcase() {
       const a = isMobile ? ANCHOR.mobile : ANCHOR.desktop;
       const pos = isMobile ? config.mobile : config.desktop;
       const ax = rect.width * a.x, ay = rect.height * a.y;
+      // mirror the CSS min(sizePx, 56vw) cap so the pulse lands dead-center
+      const effSize = Math.min(pos.size, window.innerWidth * 0.56);
       let cxPx: number;
-      if (isMobile) cxPx = rect.width - rect.width * (config.mobile.right / 100) - pos.size / 2;
-      else cxPx = rect.width * (config.desktop.left / 100) + pos.size / 2;
-      const cyPx = rect.height - rect.height * (pos.bottom / 100) - pos.size / 2;
+      if (isMobile) cxPx = rect.width - rect.width * (config.mobile.right / 100) - effSize / 2;
+      else cxPx = rect.width * (config.desktop.left / 100) + effSize / 2;
+      const cyPx = rect.height - rect.height * (pos.bottom / 100) - effSize / 2;
       const mx = (ax + cxPx) / 2 + a.bowX, my = (ay + cyPx) / 2 + a.bowY;
       const d = `M ${ax.toFixed(1)} ${ay.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${cxPx.toFixed(1)} ${cyPx.toFixed(1)}`;
       spurPathRef.current?.setAttribute("d", d);
@@ -383,9 +388,12 @@ export function HeroShowcase() {
   const p = products[current];
   if (!p) return null;
 
+  // Safety cap: never let the circle exceed 56% of the viewport width, so an
+  // oversized admin slider value can't push it into the truck zone or off the
+  // hero on small screens (e.g. 320px-wide phones). No effect at defaults.
   const outerStyle: React.CSSProperties = isMobile
-    ? { width: config.mobile.size, right: `${config.mobile.right}%`, bottom: `${config.mobile.bottom}%` }
-    : { width: config.desktop.size, left: `${config.desktop.left}%`, bottom: `${config.desktop.bottom}%` };
+    ? { width: `min(${config.mobile.size}px, 56vw)`, right: `${config.mobile.right}%`, bottom: `${config.mobile.bottom}%` }
+    : { width: `min(${config.desktop.size}px, 56vw)`, left: `${config.desktop.left}%`, bottom: `${config.desktop.bottom}%` };
 
   function handleSlideClick() {
     if (swipedRef.current || !p.url) return;
