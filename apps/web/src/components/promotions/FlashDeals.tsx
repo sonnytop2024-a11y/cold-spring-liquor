@@ -288,6 +288,22 @@ const flashCSS = `
     .fd-cd .digit-lbl{font-size:6.5px;}
     .fd-cd-name{margin-top:4px;padding-top:4px;font-size:9.5px;max-width:164px;}
   }
+
+  /* Very narrow screens (Galaxy Fold cover ~344px, small phones ≤420px):
+     title + clock can't share one row — stack them full-width so nothing
+     wraps or squeezes, and center the benefit tiles. */
+  @media (max-width:420px){
+    .fd-panel{flex-direction:column;align-items:stretch;gap:10px;}
+    .fd-panel h3{font-size:24px;text-align:left;}
+    .fd-cd{max-width:100%;width:100%;padding:9px 12px 10px;}
+    .fd-cd .digit{font-size:19px;}
+    .fd-cd .colon{font-size:16px;}
+    .fd-cd-name{max-width:100%;font-size:10.5px;}
+    .fd-strip-item{flex-direction:column;text-align:center;gap:7px;}
+    .fd-strip-item .fd-strip-icon{width:34px;height:34px;font-size:14px;}
+    .fd-strip-item .fd-strip-title{font-size:12px;}
+    .fd-strip-item .fd-strip-sub{font-size:10px;margin-top:1px;}
+  }
 `;
 
 type DealState = "active" | "urgent" | "critical" | "expired" | "soldout";
@@ -589,13 +605,13 @@ export function FlashDeals() {
         {/* Benefit strip */}
         <div className="mt-5 bg-[#0B0B0B] border border-[#222] rounded-[20px] p-5 flex max-[700px]:flex-wrap max-[700px]:gap-4">
           {BENEFITS.map((b, i) => (
-            <div key={b.title} className={`flex-1 max-[700px]:flex-none max-[700px]:w-[calc(50%-8px)] flex items-center gap-3 px-4 max-[700px]:px-0 relative ${i > 0 ? "min-[701px]:before:content-[''] min-[701px]:before:absolute min-[701px]:before:left-0 min-[701px]:before:top-[10%] min-[701px]:before:bottom-[10%] min-[701px]:before:w-px min-[701px]:before:bg-[#222]" : ""}`}>
-              <div className="w-[42px] h-[42px] rounded-full border-[1.5px] border-[#F6B94A] flex items-center justify-center flex-none text-[#F6B94A] text-lg">
+            <div key={b.title} className={`fd-strip-item flex-1 max-[700px]:flex-none max-[700px]:w-[calc(50%-8px)] flex items-center gap-3 px-4 max-[700px]:px-0 relative ${i > 0 ? "min-[701px]:before:content-[''] min-[701px]:before:absolute min-[701px]:before:left-0 min-[701px]:before:top-[10%] min-[701px]:before:bottom-[10%] min-[701px]:before:w-px min-[701px]:before:bg-[#222]" : ""}`}>
+              <div className="fd-strip-icon w-[42px] h-[42px] rounded-full border-[1.5px] border-[#F6B94A] flex items-center justify-center flex-none text-[#F6B94A] text-lg">
                 {b.icon}
               </div>
               <div>
-                <div className="text-[13px] font-extrabold text-white">{b.title}</div>
-                <div className="text-[11px] text-[#A4A4A4] mt-px">{b.sub}</div>
+                <div className="fd-strip-title text-[13px] font-extrabold text-white">{b.title}</div>
+                <div className="fd-strip-sub text-[11px] text-[#A4A4A4] mt-px">{b.sub}</div>
               </div>
             </div>
           ))}
