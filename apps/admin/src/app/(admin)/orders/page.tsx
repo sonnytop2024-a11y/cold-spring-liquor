@@ -45,7 +45,7 @@ async function playAdminAlertSound() {
 const STATUS_COLORS: Record<string, string> = {
   pending:           "bg-yellow-100 text-yellow-700",
   confirmed:         "bg-blue-100 text-blue-700",
-  preparing:         "bg-purple-100 text-purple-700",
+  preparing:         "bg-orange-100 text-orange-700",
   driver_assigned:   "bg-indigo-100 text-indigo-700",
   driver_at_store:   "bg-orange-100 text-orange-700",
   out_for_delivery:  "bg-orange-100 text-orange-700",
@@ -55,7 +55,7 @@ const STATUS_COLORS: Record<string, string> = {
   failed_delivery:   "bg-red-100 text-red-700",
   cancelled:         "bg-red-100 text-red-700",
   refunded:          "bg-gray-100 text-gray-700",
-  ready_for_pickup:  "bg-amber-100 text-amber-800",
+  ready_for_pickup:  "bg-green-100 text-green-700",
   picked_up:         "bg-green-100 text-green-700",
 };
 
@@ -80,6 +80,71 @@ const PICKUP_NEXT_STATUS: Record<string, string> = {
   ready_for_pickup: "picked_up",
 };
 const PICKUP_STATUSES = ["pending","preparing","ready_for_pickup","picked_up","cancelled"];
+
+// ── Pickup status update — confirmation modal ────────────────────────────────
+const PICKUP_STATUS_META: Record<string, { label: string; note: string; confirmClass: string }> = {
+  preparing: {
+    label: "PREPARING",
+    note: "The order moves to the preparation queue.",
+    confirmClass: "bg-orange-500 hover:bg-orange-600",
+  },
+  ready_for_pickup: {
+    label: "READY FOR PICKUP",
+    note: "The customer is notified automatically — ready-for-pickup email + in-app notification are sent the moment you confirm.",
+    confirmClass: "bg-green-600 hover:bg-green-700",
+  },
+  picked_up: {
+    label: "PICKED UP",
+    note: "Confirm the customer collected the order and their 21+ photo ID was checked.",
+    confirmClass: "bg-green-600 hover:bg-green-700",
+  },
+};
+
+function pickupStatusLabel(s: string): string {
+  return PICKUP_STATUS_META[s]?.label ?? s.replace(/_/g, " ").toUpperCase();
+}
+
+function PickupStatusModal({ order, next, updating, onConfirm, onClose }: {
+  order: any; next: string; updating: boolean; onConfirm: () => void; onClose: () => void;
+}) {
+  const meta = PICKUP_STATUS_META[next];
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <h3 className="font-black text-lg text-gray-900 mb-1">Update Pickup Status</h3>
+        <p className="text-sm text-gray-500 mb-5">Order <span className="font-bold text-gray-700">{order.orderNumber}</span> · {order.customerName}</p>
+
+        {/* Current → Next */}
+        <div className="flex items-center justify-center gap-3 mb-5">
+          <span className={`text-xs font-black px-3.5 py-2 rounded-full uppercase tracking-wide ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-600"}`}>
+            {pickupStatusLabel(order.status)}
+          </span>
+          <span className="text-gray-400 text-lg font-bold">→</span>
+          <span className={`text-xs font-black px-3.5 py-2 rounded-full uppercase tracking-wide ring-2 ring-offset-1 ${STATUS_COLORS[next] ?? "bg-gray-100 text-gray-600"} ${next === "ready_for_pickup" || next === "picked_up" ? "ring-green-300" : "ring-orange-300"}`}>
+            {pickupStatusLabel(next)}
+          </span>
+        </div>
+
+        {meta?.note && (
+          <div className={`rounded-xl px-4 py-3 text-sm mb-5 border ${next === "ready_for_pickup" ? "bg-green-50 border-green-200 text-green-800" : "bg-gray-50 border-gray-200 text-gray-600"}`}>
+            {next === "ready_for_pickup" ? "📣 " : ""}{meta.note}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button onClick={onClose} disabled={updating}
+            className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={updating}
+            className={`flex-1 text-white font-black py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60 ${meta?.confirmClass ?? "bg-brand-500 hover:bg-brand-600"}`}>
+            {updating ? "Updating…" : `Confirm → ${pickupStatusLabel(next)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 async function patchOrderStatus(orderId: string, status: string) {
   await fetch(`${API}/orders/${orderId}/status`, {
@@ -398,6 +463,7 @@ export default function OrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [cancelOrder, setCancelOrder] = useState<any>(null);
   const [detailOrder, setDetailOrder] = useState<any>(null);
+  const [statusConfirm, setStatusConfirm] = useState<{ order: any; next: string } | null>(null);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [creatingTest, setCreatingTest] = useState(false);
   const [showTestOrders, setShowTestOrders] = useState(false);
@@ -682,10 +748,23 @@ export default function OrdersPage() {
                 👁
               </button>
               {nextStatus && !isDone && (
-                <button onClick={() => updateMutation.mutate({ id: order.id, status: nextStatus })}
-                  className="text-[11px] bg-brand-500 hover:bg-brand-600 text-white px-2 py-1 rounded-lg font-semibold transition-colors whitespace-nowrap">
-                  {STATUS_LABELS[nextStatus] ?? nextStatus} →
-                </button>
+                isPickupOrder ? (
+                  // Pickup status changes go through a confirmation modal —
+                  // moving to Ready for Pickup notifies the customer.
+                  <button onClick={() => setStatusConfirm({ order, next: nextStatus })}
+                    className={`text-[11px] text-white px-2.5 py-1 rounded-lg font-bold transition-colors whitespace-nowrap ${
+                      nextStatus === "ready_for_pickup" || nextStatus === "picked_up"
+                        ? "bg-green-600 hover:bg-green-700"
+                        : "bg-orange-500 hover:bg-orange-600"
+                    }`}>
+                    Update Status →
+                  </button>
+                ) : (
+                  <button onClick={() => updateMutation.mutate({ id: order.id, status: nextStatus })}
+                    className="text-[11px] bg-brand-500 hover:bg-brand-600 text-white px-2 py-1 rounded-lg font-semibold transition-colors whitespace-nowrap">
+                    {STATUS_LABELS[nextStatus] ?? nextStatus} →
+                  </button>
+                )
               )}
               {!isDone && (
                 <button onClick={() => setCancelOrder(order)}
@@ -965,6 +1044,18 @@ export default function OrdersPage() {
   return (
     <div>
       {detailOrder && <DetailModal order={detailOrder} onClose={() => setDetailOrder(null)} />}
+      {statusConfirm && (
+        <PickupStatusModal
+          order={statusConfirm.order}
+          next={statusConfirm.next}
+          updating={updateMutation.isPending}
+          onConfirm={() => updateMutation.mutate(
+            { id: statusConfirm.order.id, status: statusConfirm.next },
+            { onSuccess: () => setStatusConfirm(null) },
+          )}
+          onClose={() => setStatusConfirm(null)}
+        />
+      )}
       {cancelOrder && (
         <CancelModal order={cancelOrder} onClose={() => setCancelOrder(null)}
           onConfirm={data => adminUpdateMutation.mutateAsync({ id: cancelOrder.id, data })} />

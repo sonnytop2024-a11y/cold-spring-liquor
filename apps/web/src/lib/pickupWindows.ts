@@ -16,6 +16,25 @@ const OPEN_HOUR = 10;
 const CLOSE_HOUR = 21;
 export const MAX_PICKUP_DAYS_AHEAD = 7;
 
+// Per-day store hours for display (review, thank-you popup, emails, order
+// pages). Derived from the same OPEN/CLOSE constants that drive the pickup
+// windows so the two can never disagree.
+function hourLabel(h: number): string {
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:00 ${ampm}`;
+}
+export const STORE_HOURS_LABEL = `${hourLabel(OPEN_HOUR)} – ${hourLabel(CLOSE_HOUR)}`;
+export const STORE_HOURS: { day: string; hours: string; closed?: boolean }[] = [
+  { day: "Monday",    hours: STORE_HOURS_LABEL },
+  { day: "Tuesday",   hours: STORE_HOURS_LABEL },
+  { day: "Wednesday", hours: STORE_HOURS_LABEL },
+  { day: "Thursday",  hours: STORE_HOURS_LABEL },
+  { day: "Friday",    hours: STORE_HOURS_LABEL },
+  { day: "Saturday",  hours: STORE_HOURS_LABEL },
+  { day: "Sunday",    hours: "Closed", closed: true },
+];
+
 // Automatic discount for Pick Up In Store orders — single source of truth.
 // Displayed labels use PICKUP_DISCOUNT_LABEL so a rate change is a one-line edit.
 export const PICKUP_DISCOUNT_RATE = 0.05;

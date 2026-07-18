@@ -2,10 +2,13 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Package, Loader2, RefreshCw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
+import { ReorderModal, type ReorderDraft } from "@/components/account/AccountDashboard";
+import { STORE_HOURS } from "@/lib/pickupWindows";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Order Received",
@@ -26,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
   confirmed: "bg-blue-100 text-blue-700",
-  preparing: "bg-blue-100 text-blue-700",
+  preparing: "bg-orange-100 text-orange-700 uppercase font-black tracking-wide",
   driver_assigned: "bg-purple-100 text-purple-700",
   driver_at_store: "bg-orange-100 text-orange-700",
   out_for_delivery: "bg-orange-100 text-orange-700",
@@ -35,7 +38,7 @@ const STATUS_COLOR: Record<string, string> = {
   delivered: "bg-green-100 text-green-700",
   failed_delivery: "bg-red-100 text-red-700",
   cancelled: "bg-red-100 text-red-700",
-  ready_for_pickup: "bg-amber-100 text-amber-700",
+  ready_for_pickup: "bg-green-100 text-green-700 uppercase font-black tracking-wide",
   picked_up: "bg-green-100 text-green-700",
 };
 
@@ -52,6 +55,8 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const addToCart = useCartStore((s) => s.addItem);
   const clearCart = useCartStore((s) => s.clearCart);
+  const [reorderDraft, setReorderDraft] = useState<ReorderDraft | null>(null);
+  const [reorderLoading, setReorderLoading] = useState(false);
 
   const { data: order, isLoading, error } = useQuery({
     queryKey: ["order-detail", id],
@@ -59,25 +64,38 @@ export default function OrderDetailPage() {
     retry: 1,
   });
 
-  function handleReorder() {
-    if (!order?.items?.length) return;
+  // Reorder goes through the server so availability/stock/current prices are
+  // validated — old promo codes and sale prices are never carried over.
+  async function handleReorder() {
+    setReorderLoading(true);
+    try {
+      const res = await fetch(`/api/orders/reorder/${id}`, { method: "POST" });
+      if (!res.ok) { alert("Could not load this order for reorder. Please try again."); return; }
+      setReorderDraft(await res.json());
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setReorderLoading(false);
+    }
+  }
+
+  function confirmReorder() {
+    if (!reorderDraft) return;
     clearCart();
-    order.items.forEach((item: any) => {
-      addToCart({
-        id: item.productId ?? item.id ?? item.name,
-        slug: item.slug ?? item.productId ?? item.name,
-        name: item.name,
-        brand: item.brand ?? "",
-        category: item.category ?? "",
-        price: item.price,
-        volume: item.volume ?? "",
-        abv: item.abv ?? 0,
-        imageUrl: item.imageUrl ?? undefined,
-        inStock: true,
-        stockQty: 99,
-      }, item.quantity);
-    });
-    router.push("/cart");
+    for (const { product, quantity } of reorderDraft.validItems) {
+      addToCart(product, quantity);
+    }
+    localStorage.setItem("csl-reorder-prefill", JSON.stringify({
+      customerName: reorderDraft.customerName,
+      customerEmail: reorderDraft.customerEmail,
+      customerPhone: reorderDraft.customerPhone,
+      deliveryAddress: reorderDraft.deliveryAddress,
+      billingAddress: reorderDraft.billingAddress,
+      billingAddressSameAsDelivery: reorderDraft.billingAddressSameAsDelivery,
+      fromOrderNumber: reorderDraft.originalOrderNumber,
+    }));
+    setReorderDraft(null);
+    router.push(reorderDraft.orderType === "pickup" ? "/checkout/pickup" : "/checkout");
   }
 
   if (isLoading) {
@@ -172,6 +190,14 @@ export default function OrderDetailPage() {
           <p className="font-bold text-gray-900 text-xs uppercase tracking-wide mb-1">🏬 Pick Up In Store</p>
           <p>🕐 {order.pickupWindow.dateLabel} · {order.pickupWindow.label}</p>
           <p className="text-gray-500 text-xs mt-0.5">15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641 · Bring a valid 21+ photo ID</p>
+          <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+            {STORE_HOURS.map(h => (
+              <div key={h.day} className="flex justify-between gap-2">
+                <span className="text-gray-500">{h.day}</span>
+                <span className={h.closed ? "text-red-500 font-semibold" : "text-gray-700 font-medium"}>{h.hours}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -249,10 +275,12 @@ export default function OrderDetailPage() {
             <span>-{formatCurrency(order.rewardDiscount)}</span>
           </div>
         )}
-        <div className="flex justify-between text-sm text-green-600">
-          <span>Delivery Fee</span>
-          <span>FREE</span>
-        </div>
+        {!isPickupOrder && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span>Delivery Fee</span>
+            <span>FREE</span>
+          </div>
+        )}
         <div className="flex justify-between text-sm text-gray-600">
           <span>Tax (8.25%)</span>
           <span>{formatCurrency(order.tax)}</span>
@@ -294,7 +322,9 @@ export default function OrderDetailPage() {
       {/* Delivery status summary */}
       {isDelivered && (
         <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4 mb-4">
-          <p className="font-semibold text-sm text-green-700 mb-1">✓ Delivered Successfully</p>
+          <p className="font-semibold text-sm text-green-700 mb-1">
+            {order.status === "picked_up" ? "✓ Picked Up Successfully" : "✓ Delivered Successfully"}
+          </p>
           {order.statusTimestamps?.delivered && (
             <p className="text-xs text-green-600">
               Delivered at{" "}
@@ -319,10 +349,17 @@ export default function OrderDetailPage() {
       {isDelivered && order.items?.length > 0 && (
         <button
           onClick={handleReorder}
-          className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl text-sm transition-colors mb-3"
+          disabled={reorderLoading}
+          className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-xl text-sm transition-colors mb-3"
         >
-          <RefreshCw size={16} /> Reorder These Items
+          {reorderLoading
+            ? <><Loader2 size={16} className="animate-spin" /> Checking availability…</>
+            : <><RefreshCw size={16} /> REORDER</>}
         </button>
+      )}
+
+      {reorderDraft && (
+        <ReorderModal draft={reorderDraft} onConfirm={confirmReorder} onClose={() => setReorderDraft(null)} />
       )}
 
       <Link

@@ -8,32 +8,55 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useCartStore } from "@/store/cartStore";
 import { formatCurrency } from "@/lib/utils";
+import { ItemThumb } from "@/components/shared/orderDisplay";
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
   confirmed: "bg-blue-100 text-blue-700",
-  preparing: "bg-blue-100 text-blue-700",
+  preparing: "bg-orange-100 text-orange-700",
   driver_assigned: "bg-purple-100 text-purple-700",
   driver_at_store: "bg-orange-100 text-orange-700",
   out_for_delivery: "bg-orange-100 text-orange-700",
   driver_arriving: "bg-yellow-100 text-yellow-800",
+  driver_arrived: "bg-amber-100 text-amber-700",
   delivered: "bg-green-100 text-green-700",
   cancelled: "bg-red-100 text-red-700",
   failed_delivery: "bg-red-100 text-red-700",
+  ready_for_pickup: "bg-green-100 text-green-700",
+  picked_up: "bg-green-100 text-green-700",
 };
 
-const ACTIVE_STATUSES = ["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving"];
+// Everything the customer is still waiting on stays in Active — only
+// completed (delivered / picked up), cancelled or refunded orders go to History.
+const ACTIVE_STATUSES = ["pending","confirmed","preparing","ready_for_pickup","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"];
+
+// Live-order badges: the pickup flow statuses read as bold uppercase pills
+const EMPHASIZED_STATUSES = ["preparing", "ready_for_pickup"];
+export function statusBadgeClass(status: string): string {
+  const base = STATUS_COLOR[status] ?? "bg-gray-100 text-gray-600";
+  return EMPHASIZED_STATUSES.includes(status)
+    ? `${base} uppercase font-black tracking-wide`
+    : `${base} capitalize font-medium`;
+}
 
 const TRACKING_STEPS = [
   { statuses: ["pending","confirmed"], label: "Order Received" },
   { statuses: ["preparing"], label: "Preparing" },
   { statuses: ["driver_assigned","driver_at_store"], label: "Driver Assigned" },
-  { statuses: ["out_for_delivery","driver_arriving"], label: "Out for Delivery" },
+  { statuses: ["out_for_delivery","driver_arriving","driver_arrived"], label: "Out for Delivery" },
   { statuses: ["delivered"], label: "Delivered" },
 ];
 
-function getStepIdx(status: string) {
-  return TRACKING_STEPS.findIndex(s => s.statuses.includes(status));
+// Pick Up In Store orders track through their own steps
+const PICKUP_TRACKING_STEPS = [
+  { statuses: ["pending","confirmed"], label: "Order Received" },
+  { statuses: ["preparing"], label: "Preparing" },
+  { statuses: ["ready_for_pickup"], label: "Ready for Pickup" },
+  { statuses: ["picked_up"], label: "Picked Up" },
+];
+
+function getStepIdx(steps: typeof TRACKING_STEPS, status: string) {
+  return steps.findIndex(s => s.statuses.includes(status));
 }
 
 function LiveTracker({ order }: { order: any }) {
@@ -43,26 +66,29 @@ function LiveTracker({ order }: { order: any }) {
     refetchInterval: 15_000,
     initialData: order,
   });
-  const currentIdx = getStepIdx(live?.status ?? order.status);
+  const status = live?.status ?? order.status;
+  const isPickupOrder = (live?.orderType ?? order.orderType) === "pickup";
+  const steps = isPickupOrder ? PICKUP_TRACKING_STEPS : TRACKING_STEPS;
+  const currentIdx = getStepIdx(steps, status);
 
   return (
     <div className="bg-gradient-to-br from-brand-50 to-orange-50 border border-brand-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="font-bold text-sm">#{live?.orderNumber ?? order.orderNumber}</p>
-          <p className="text-xs text-gray-500">Live tracking · updates every 15s</p>
+          <p className="text-xs text-gray-500">{isPickupOrder ? "🏬 Pick Up In Store · updates every 15s" : "Live tracking · updates every 15s"}</p>
         </div>
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_COLOR[live?.status ?? order.status] ?? ""}`}>
-          {(live?.status ?? order.status).replace(/_/g, " ")}
+        <span className={`text-xs px-2.5 py-1 rounded-full ${statusBadgeClass(status)}`}>
+          {status.replace(/_/g, " ")}
         </span>
       </div>
       <div className="flex items-center gap-1 mb-3">
-        {TRACKING_STEPS.map((step, i) => (
+        {steps.map((step, i) => (
           <div key={step.label} className="flex-1 h-1.5 rounded-full transition-colors" style={{ background: i <= currentIdx ? "var(--color-brand-500, #f97316)" : "#e5e7eb" }} />
         ))}
       </div>
       <div className="space-y-1.5">
-        {TRACKING_STEPS.map((step, i) => {
+        {steps.map((step, i) => {
           const done = i <= currentIdx;
           const active = i === currentIdx;
           return (
@@ -92,7 +118,7 @@ function LiveTracker({ order }: { order: any }) {
 }
 
 // ─── Reorder Modal ────────────────────────────────────────────────────────────
-interface ReorderDraft {
+export interface ReorderDraft {
   validItems: {
     product: any;
     quantity: number;
@@ -108,10 +134,11 @@ interface ReorderDraft {
   customerEmail: string | null;
   customerPhone: string | null;
   originalOrderNumber: string;
+  orderType?: "delivery" | "pickup";
   hasWarnings: boolean;
 }
 
-function ReorderModal({ draft, onConfirm, onClose }: {
+export function ReorderModal({ draft, onConfirm, onClose }: {
   draft: ReorderDraft;
   onConfirm: () => void;
   onClose: () => void;
@@ -154,7 +181,8 @@ function ReorderModal({ draft, onConfirm, onClose }: {
               <div className="space-y-2">
                 {draft.validItems.map((item, i) => (
                   <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5">
-                    <div className="flex-1 min-w-0">
+                    <ItemThumb imageUrl={item.product.imageUrl} category={item.product.category} name={item.product.name} size={38} />
+                    <div className="flex-1 min-w-0 ml-3">
                       <p className="text-sm font-medium truncate">{item.product.name}</p>
                       <p className="text-xs text-gray-400">×{item.quantity} · {item.product.volume}</p>
                     </div>
@@ -216,7 +244,10 @@ function ReorderModal({ draft, onConfirm, onClose }: {
                 <span>New subtotal</span>
                 <span>{formatCurrency(newSubtotal)}</span>
               </div>
-              <p className="text-xs text-green-600 font-medium">🚚 Delivery FREE · No Tip</p>
+              <p className="text-xs text-green-600 font-medium">
+                {draft.orderType === "pickup" ? "🏬 Pick Up In Store · 5% discount applies at checkout" : "🚚 Delivery FREE · No Tip"}
+              </p>
+              <p className="text-[11px] text-gray-400">Current prices apply — previous promo codes and sale prices are not carried over.</p>
             </div>
           )}
         </div>
@@ -279,7 +310,8 @@ function OrderHistoryCard({ order }: { order: any }) {
       fromOrderNumber: draft.originalOrderNumber,
     }));
     setDraft(null);
-    router.push("/checkout");
+    // Pickup orders reorder straight into the pickup checkout
+    router.push(draft.orderType === "pickup" ? "/checkout/pickup" : "/checkout");
   }
 
   return (
@@ -296,7 +328,7 @@ function OrderHistoryCard({ order }: { order: any }) {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${STATUS_COLOR[order.status] ?? "bg-gray-100 text-gray-600"}`}>
+              <span className={`text-xs px-2 py-1 rounded-full ${statusBadgeClass(order.status)}`}>
                 {order.status.replace(/_/g, " ")}
               </span>
               <p className="font-bold text-sm">{formatCurrency(Number(order.total))}</p>
@@ -305,11 +337,13 @@ function OrderHistoryCard({ order }: { order: any }) {
 
           <p className="text-xs text-gray-500 mb-3">
             {order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0} items ·{" "}
-            {order.deliveryAddress?.city}, {order.deliveryAddress?.state}
+            {order.orderType === "pickup"
+              ? "🏬 Pick Up In Store"
+              : `${order.deliveryAddress?.city ?? ""}, ${order.deliveryAddress?.state ?? ""}`}
           </p>
 
           <div className="flex items-center gap-2">
-            {order.status === "delivered" && (
+            {(order.status === "delivered" || order.status === "picked_up") && (
               <button
                 onClick={openReorderModal}
                 disabled={loading}
@@ -332,9 +366,10 @@ function OrderHistoryCard({ order }: { order: any }) {
           <div className="border-t px-4 py-3 bg-gray-50 space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase">Items</p>
             {(order.items ?? []).map((item: any, i: number) => (
-              <div key={i} className="flex justify-between text-sm">
-                <span className="text-gray-700">{item.name} ×{item.quantity}</span>
-                <span className="text-gray-500">{formatCurrency(item.price * item.quantity)}</span>
+              <div key={i} className="flex items-center gap-2.5 text-sm">
+                <ItemThumb imageUrl={item.imageUrl} category={item.category} name={item.name} size={34} />
+                <span className="text-gray-700 flex-1">{item.name} ×{item.quantity}</span>
+                <span className="text-gray-500 shrink-0">{formatCurrency(item.price * item.quantity)}</span>
               </div>
             ))}
             <div className="flex justify-between text-sm font-bold border-t pt-2 mt-1">
@@ -416,7 +451,8 @@ export function AccountDashboard() {
   const { data: orders = [] } = useQuery({
     queryKey: ["my-orders"],
     queryFn: async () => { try { const r = await fetch("/api/orders/my"); return r.ok ? r.json() : []; } catch { return []; } },
-    refetchInterval: 30_000,
+    // Near real-time: the Active tab count and statuses refresh every 15s
+    refetchInterval: 15_000,
   });
 
   const { data: availableCoupons = [] } = useQuery<{ code: string; type: string; value: number; label: string; minOrder: number | null }[]>({

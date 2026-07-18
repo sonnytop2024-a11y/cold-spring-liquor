@@ -47,6 +47,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     customerEmail: order.customerEmail ?? null,
     customerPhone: order.customerPhone ?? null,
     originalOrderNumber: order.orderNumber,
+    orderType: order.orderType === "pickup" ? "pickup" : "delivery",
     hasWarnings: removedItems.length > 0 || validItems.some(i => i.priceChanged),
   });
 }

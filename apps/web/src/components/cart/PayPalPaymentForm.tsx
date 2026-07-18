@@ -3,6 +3,7 @@
 import { AlertTriangle, Loader2, MapPin, Mail, Phone, CreditCard, ChevronLeft } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { formatCurrency } from "@/lib/utils";
+import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
 
 interface ReviewData {
   customerName: string;
@@ -11,7 +12,7 @@ interface ReviewData {
   deliveryAddress: { street: string; city: string; state: string; zip: string };
   billingAddress: { street: string; city: string; state: string; zip: string };
   sameBilling: boolean;
-  items: { product: { id: string; name: string; price: number; salePrice?: number | null }; quantity: number }[];
+  items: { product: { id: string; name: string; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null }; quantity: number }[];
   subtotal: number;
   flashSavings: number;
   bundleDiscount: number;
@@ -163,9 +164,10 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
           <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">🛒 Items</h3>
           <div className="space-y-2">
             {rd.items.map(({ product: p, quantity }) => (
-              <div key={p.id} className="flex justify-between text-sm">
-                <span className="text-gray-700 flex-1 pr-4">{p.name} <span className="text-gray-400">×{quantity}</span></span>
-                <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency((p.salePrice ?? p.price) * quantity)}</span>
+              <div key={p.id} className="flex items-center gap-3 text-sm">
+                <ItemThumb imageUrl={p.imageUrl} category={p.category} name={p.name} size={40} />
+                <span className="text-gray-700 flex-1 pr-2 leading-snug">{p.name} <span className="text-gray-400">×{quantity}</span></span>
+                <span className="font-medium text-gray-900 whitespace-nowrap shrink-0">{formatCurrency((p.salePrice ?? p.price) * quantity)}</span>
               </div>
             ))}
           </div>
@@ -185,7 +187,10 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">{isPickup ? "🏬 Pick Up In Store" : "📍 Delivery"}</h3>
           {isPickup ? (
-            <p className="text-sm text-gray-700 flex items-start gap-2"><MapPin size={13} className="mt-0.5 shrink-0 text-gray-400" /><span><strong>{rd.pickup!.dateLabel} · {rd.pickup!.label}</strong><br />15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641</span></p>
+            <div>
+              <p className="text-sm text-gray-700 flex items-start gap-2"><MapPin size={13} className="mt-0.5 shrink-0 text-gray-400" /><span><strong>{rd.pickup!.dateLabel} · {rd.pickup!.label}</strong><br />15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641</span></p>
+              <div className="pl-6"><StoreHoursList /></div>
+            </div>
           ) : (
             <p className="text-sm text-gray-700 flex items-start gap-2"><MapPin size={13} className="mt-0.5 shrink-0 text-gray-400" />{addrStr(rd.deliveryAddress)}</p>
           )}

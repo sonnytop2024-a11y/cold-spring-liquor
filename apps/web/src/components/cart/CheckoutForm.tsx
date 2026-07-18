@@ -12,6 +12,7 @@ import { formatCurrency, MIN_ORDER, calcPointsValue } from "@/lib/utils";
 import { formatPhoneUS } from "@/lib/phoneUtils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, calcPickupDiscount, PICKUP_DISCOUNT_LABEL, type PickupSlot } from "@/lib/pickupWindows";
+import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -37,6 +38,7 @@ export const STORE_INFO = {
   zip: "78641",
   hours: "Mon–Sat 10 AM – 9 PM",
 };
+
 
 function CheckoutSteps({ current }: { current: 1 | 2 | 3 | 4 }) {
   return (
@@ -204,12 +206,14 @@ function ThankYouPopup({
   customerName,
   onTrack,
   pickup,
+  items = [],
 }: {
   orderNumber: string;
   total: number;
   customerName: string;
   onTrack: () => void;
   pickup?: { dateLabel: string; label: string } | null;
+  items?: { name: string; quantity: number; imageUrl?: string | null; category?: string | null }[];
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -254,6 +258,24 @@ function ThankYouPopup({
 
         {/* White body */}
         <div className="px-8 py-7 space-y-5">
+          {/* Ordered items preview */}
+          {items.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {items.slice(0, 6).map((it, i) => (
+                <div key={i} className="relative shrink-0">
+                  <ItemThumb imageUrl={it.imageUrl} category={it.category} name={it.name} size={48} />
+                  {it.quantity > 1 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                      {it.quantity}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {items.length > 6 && (
+                <span className="text-xs text-gray-400 font-semibold shrink-0">+{items.length - 6} more</span>
+              )}
+            </div>
+          )}
           {pickup ? (
             <>
               {/* Pickup details */}
@@ -261,6 +283,7 @@ function ThankYouPopup({
                 <p>🕐 <strong className="text-gray-900">Pick up:</strong> {pickup.dateLabel} · {pickup.label}</p>
                 <p>📍 <strong className="text-gray-900">{STORE_INFO.name}</strong></p>
                 <p className="text-gray-500 text-xs pl-5">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
+                <div className="pl-5"><StoreHoursList compact /></div>
               </div>
               <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
                 🪪 <strong>Bring a valid photo ID</strong> — the person picking up must be 21+, and the name on the ID should match the order.
@@ -443,7 +466,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
   const [paymentStep, setPaymentStep] = useState<null | "select" | "paypal" | "review-free">(null);
   const [selectedMethod, setSelectedMethod] = useState<null | "stripe" | "paypal">(null);
-  const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null } | null>(null);
+  const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null; items?: { name: string; quantity: number; imageUrl?: string | null; category?: string | null }[] } | null>(null);
   const [rewardsDismissed, setRewardsDismissed] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -479,7 +502,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         if (res.ok) {
           const order = await res.json();
           clearCart();
-          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
+          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null, items: (order as any).items ?? [] });
         }
       }
     });
@@ -694,6 +717,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         total={thankYouOrder.total}
         customerName={name}
         pickup={thankYouOrder.pickupWindow ?? (isPickup ? pickupSlot : null)}
+        items={thankYouOrder.items ?? []}
         onTrack={() => router.push(`/track/${thankYouOrder.orderId}`)}
       />
     );
@@ -721,7 +745,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         const order = await res.json();
         if (!res.ok) throw new Error(order.error ?? "Failed to place order");
         clearCart();
-        setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
+        setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null, items: (order as any).items ?? [] });
       } catch (err: any) {
         setConfirmError(err.message ?? "Something went wrong. Please try again.");
         setConfirming(false);
@@ -746,11 +770,12 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-3">🛒 Items</h3>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {rd.items.map(({ product: p, quantity }) => (
-              <div key={p.id} className="flex justify-between text-sm">
-                <span className="text-gray-700 flex-1 pr-4">{p.name} <span className="text-gray-400">×{quantity}</span></span>
-                <span className="font-medium text-gray-900">{formatCurrency((p.salePrice ?? p.price) * quantity)}</span>
+              <div key={p.id} className="flex items-center gap-3 text-sm">
+                <ItemThumb imageUrl={(p as any).imageUrl} category={(p as any).category} name={p.name} size={40} />
+                <span className="text-gray-700 flex-1 pr-2 leading-snug">{p.name} <span className="text-gray-400">×{quantity}</span></span>
+                <span className="font-medium text-gray-900 shrink-0">{formatCurrency((p.salePrice ?? p.price) * quantity)}</span>
               </div>
             ))}
           </div>
@@ -768,6 +793,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
                 <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">🏬 Pick Up In Store</h3>
                 <p className="text-sm text-gray-800 font-medium">{pickupSlot ? `${pickupSlot.dateLabel} · ${pickupSlot.label}` : ""}</p>
                 <p className="text-sm text-gray-500">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
+                <StoreHoursList />
               </>
             ) : (
               <>
@@ -891,7 +917,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         }}
         onSuccess={(order) => {
           clearCart();
-          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
+          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null, items: (order as any).items ?? [] });
         }}
         onCancel={() => setPaymentStep("select")}
       />
@@ -955,6 +981,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
               orderNumber: order.orderNumber,
               total: order.total,
               pickupWindow: order.pickupWindow ?? null,
+              items: (order as any).items ?? [],
             });
           }}
           onCancel={() => { setClientSecret(null); setPaymentStep("select"); setSubmitting(false); }}
@@ -1384,7 +1411,7 @@ interface ReviewData {
   deliveryAddress: { street: string; city: string; state: string; zip: string };
   billingAddress: { street: string; city: string; state: string; zip: string };
   sameBilling: boolean;
-  items: { product: { id: string; name: string; price: number; salePrice?: number | null }; quantity: number }[];
+  items: { product: { id: string; name: string; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null }; quantity: number }[];
   subtotal: number;
   flashSavings: number;
   bundleDiscount: number;
@@ -1542,7 +1569,10 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
                 const price = product.salePrice ?? product.price;
                 return (
                   <div key={product.id} className="flex items-center gap-3">
-                    <span className="w-6 h-6 bg-brand-500 rounded-full text-white text-[10px] font-black flex items-center justify-center shrink-0">{quantity}</span>
+                    <div className="relative shrink-0">
+                      <ItemThumb imageUrl={(product as any).imageUrl} category={(product as any).category} name={product.name} size={44} />
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-500 rounded-full text-white text-[10px] font-black flex items-center justify-center border-2 border-white">{quantity}</span>
+                    </div>
                     <span className="flex-1 text-sm text-gray-700 leading-snug">{product.name}</span>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-semibold text-gray-900">{formatCurrency(price * quantity)}</p>
@@ -1568,6 +1598,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
                   <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-2">🏬 Pick Up In Store</h3>
                   <p className="text-sm text-gray-800 font-medium">{rd.pickup!.dateLabel} · {rd.pickup!.label}</p>
                   <p className="text-sm text-gray-500">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
+                  <StoreHoursList />
                 </>
               ) : (
                 <>

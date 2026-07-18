@@ -13,7 +13,7 @@ async function fetchMyOrders() {
 const STATUS_LABEL: Record<string, string> = {
   pending: "Order Received",
   confirmed: "Confirmed",
-  preparing: "Preparing",
+  preparing: "PREPARING",
   driver_assigned: "Driver Assigned",
   driver_at_store: "Driver at Store",
   out_for_delivery: "Out for Delivery",
@@ -22,12 +22,14 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: "Delivered",
   failed_delivery: "Delivery Failed",
   cancelled: "Cancelled",
+  ready_for_pickup: "READY FOR PICKUP",
+  picked_up: "Picked Up",
 };
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
   confirmed: "bg-blue-100 text-blue-700",
-  preparing: "bg-blue-100 text-blue-700",
+  preparing: "bg-orange-100 text-orange-700 font-black uppercase tracking-wide",
   driver_assigned: "bg-purple-100 text-purple-700",
   driver_at_store: "bg-orange-100 text-orange-700",
   out_for_delivery: "bg-orange-100 text-orange-700",
@@ -36,6 +38,8 @@ const STATUS_COLOR: Record<string, string> = {
   delivered: "bg-green-100 text-green-700",
   failed_delivery: "bg-red-100 text-red-700",
   cancelled: "bg-red-100 text-red-700",
+  ready_for_pickup: "bg-green-100 text-green-700 font-black uppercase tracking-wide",
+  picked_up: "bg-green-100 text-green-700",
 };
 
 export function OrderHistory() {
@@ -86,7 +90,7 @@ export function OrderHistory() {
             </div>
             <div className="text-right">
               <span
-                className={`inline-block text-xs font-medium px-3 py-1 rounded-full ${STATUS_COLOR[order.status] ?? ""}`}
+                className={`inline-block text-xs px-3 py-1 rounded-full ${STATUS_COLOR[order.status] ?? "bg-gray-100 text-gray-600"} ${STATUS_COLOR[order.status]?.includes("font-black") ? "" : "font-medium"}`}
               >
                 {STATUS_LABEL[order.status] ?? order.status}
               </span>
@@ -94,8 +98,17 @@ export function OrderHistory() {
             </div>
           </div>
 
-          <div className="text-sm text-gray-600 mb-3">
-            <p>
+          <div className="flex items-center gap-2.5 text-sm text-gray-600 mb-3">
+            {(order.items ?? []).slice(0, 4).map((i: any, idx: number) =>
+              i.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={idx} src={i.imageUrl} alt={i.name}
+                  className="w-10 h-10 object-contain rounded-lg bg-gray-50 border shrink-0" />
+              ) : (
+                <div key={idx} className="w-10 h-10 rounded-lg bg-gray-50 border flex items-center justify-center text-base shrink-0">🥃</div>
+              ),
+            )}
+            <p className="min-w-0 flex-1">
               {order.items
                 ?.slice(0, 2)
                 .map((i: any) => `${i.name} ×${i.quantity}`)
@@ -105,7 +118,7 @@ export function OrderHistory() {
           </div>
 
           <div className="flex gap-3">
-            {["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(
+            {["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived","ready_for_pickup"].includes(
               order.status,
             ) && (
               <Link

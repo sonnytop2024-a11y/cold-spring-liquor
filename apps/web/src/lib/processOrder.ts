@@ -73,6 +73,13 @@ export async function processOrder(
       couponExcluded: product?.couponExcluded ?? false,
       pickupOnly: product?.pickupOnly ?? false,
       quantity: i.quantity,
+      // Snapshot display fields so order history / emails / reorder can show
+      // the product even if it's later edited or removed from the catalog
+      imageUrl: product?.imageUrl ?? null,
+      brand: product?.brand ?? "",
+      category: product?.category ?? "",
+      slug: product?.slug ?? i.productId,
+      volume: product?.volume ?? "",
     };
   }));
 

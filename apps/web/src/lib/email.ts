@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import type { MockOrder } from "../app/api/_mock/store";
+import { STORE_HOURS } from "./pickupWindows";
 
 let _resend: Resend | null = null;
 function getResend() {
@@ -19,6 +20,12 @@ function formatCurrency(n: number) {
 }
 
 // Shared pickup blocks — used in confirmation + ready emails
+const storeHoursRows = STORE_HOURS.map(h => `
+  <tr>
+    <td style="font-size:12px;color:#6b7280;padding:1px 0;">${h.day}</td>
+    <td style="font-size:12px;color:${h.closed ? "#dc2626" : "#374151"};font-weight:600;text-align:right;padding:1px 0;">${h.hours}</td>
+  </tr>`).join("");
+
 function pickupInfoBlock(order: MockOrder): string {
   const win = order.pickupWindow;
   return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
@@ -26,7 +33,9 @@ function pickupInfoBlock(order: MockOrder): string {
       <p style="margin:0 0 4px;font-size:11px;color:#9a3412;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">🏬 Pick Up In Store</p>
       ${win ? `<p style="margin:0 0 8px;font-size:20px;color:#ea580c;font-weight:800;">${win.dateLabel} · ${win.label} CT</p>` : ""}
       <p style="margin:0;font-size:14px;color:#111827;font-weight:600;">Cold Spring Liquor</p>
-      <p style="margin:0;font-size:13px;color:#6b7280;">${STORE_ADDRESS}</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">${STORE_ADDRESS}</p>
+      <p style="margin:0 0 4px;font-size:11px;color:#9a3412;font-weight:700;text-transform:uppercase;letter-spacing:1px;">🕐 Store Hours</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:280px;">${storeHoursRows}</table>
     </td></tr></table>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
     <tr><td style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 20px;">
@@ -42,7 +51,7 @@ function pickupInfoBlock(order: MockOrder): string {
 
 function orderConfirmationHtml(order: MockOrder): string {
   const isPickup = order.orderType === "pickup";
-  const items = (order.items as Array<{ name: string; quantity: number; price: number; salePrice?: number | null }>) ?? [];
+  const items = (order.items as Array<{ name: string; quantity: number; price: number; salePrice?: number | null; imageUrl?: string | null }>) ?? [];
   const addr = order.deliveryAddress as { street?: string; city?: string; state?: string; zip?: string } | null;
   const addrStr = addr ? [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", ") : "";
   const firstName = order.customerName.split(" ")[0];
@@ -52,6 +61,11 @@ function orderConfirmationHtml(order: MockOrder): string {
 
   const itemRows = items.map(i => `
     <tr>
+      <td width="56" style="padding:10px 12px 10px 0;border-bottom:1px solid #f3f4f6;">
+        ${i.imageUrl
+          ? `<img src="${i.imageUrl}" alt="" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;border-radius:10px;background:#f9fafb;border:1px solid #f3f4f6;" />`
+          : `<div style="width:44px;height:44px;border-radius:10px;background:#f9fafb;border:1px solid #f3f4f6;text-align:center;line-height:44px;font-size:20px;">🥃</div>`}
+      </td>
       <td style="padding:12px 0;border-bottom:1px solid #f3f4f6;font-size:15px;color:#111827;font-weight:500;">
         ${i.name} <span style="color:#9ca3af;font-weight:400;">×${i.quantity}</span>
       </td>
