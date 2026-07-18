@@ -197,6 +197,7 @@ const flashCSS = `
   }
   .fd-panel{position:relative;z-index:1;flex:0 0 250px;display:flex;flex-direction:column;justify-content:flex-start;gap:16px;}
   .fd-panel h3{font-size:36px;font-weight:900;line-height:1.05;color:#fff;}
+  .fd-panel h3 .fd-t1{display:block;}
   .fd-panel h3 .orange{color:#FF9F0A;}
   .fd-panel-sub{color:#c9c2b8;font-size:14px;line-height:1.4;max-width:210px;}
   .fd-cd{background:rgba(0,0,0,.4);border:1px solid #3a2c18;border-radius:14px;padding:14px 16px;max-width:210px;}
@@ -269,10 +270,23 @@ const flashCSS = `
   .fd-dot{width:6px;height:6px;border-radius:50%;background:#3a3a3a;cursor:pointer;transition:.2s;border:none;padding:0;}
   .fd-dot.active{width:18px;border-radius:3px;background:#FF9F0A;}
 
+  /* Mobile: the panel collapses into ONE compact row (title left, clock right)
+     so the product carousel sits right below it — same character as desktop
+     instead of a plain tall stack. */
   @media (max-width:760px){
-    .fd-box{flex-direction:column;padding:22px 18px;gap:18px;}
-    .fd-panel{flex:none;}
-    .fd-panel h3{font-size:30px;}
+    .fd-box{flex-direction:column;padding:16px 14px 20px;gap:14px;}
+    .fd-panel{flex:none;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;}
+    .fd-panel h3{font-size:23px;line-height:1.1;}
+    .fd-panel h3 .fd-t1{display:inline;}
+    .fd-panel h3 .fd-bolt-ico{width:17px;height:17px;}
+    .fd-panel-sub{display:none;}
+    .fd-cd{flex:none;max-width:186px;padding:7px 11px 8px;border-radius:12px;}
+    .fd-cd .lbl{font-size:8.5px;margin-bottom:3px;}
+    .fd-cd .digits{gap:4px;}
+    .fd-cd .digit{font-size:16px;}
+    .fd-cd .colon{font-size:14px;}
+    .fd-cd .digit-lbl{font-size:6.5px;}
+    .fd-cd-name{margin-top:4px;padding-top:4px;font-size:9.5px;max-width:164px;}
   }
 `;
 
@@ -537,9 +551,8 @@ export function FlashDeals() {
 
           <div className="fd-panel">
             <h3>
-              Flash<br />
-              <span className="orange">Deals</span>{" "}
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="#FF9F0A" className="inline align-[-2px]" aria-hidden="true">
+              <span className="fd-t1">Flash</span> <span className="orange">Deals</span>{" "}
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="#FF9F0A" className="fd-bolt-ico inline align-[-2px]" aria-hidden="true">
                 <path d="M13 2 L4 14 H11 L9 22 L20 9 H13 Z" />
               </svg>
             </h3>
