@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import Image from "next/image";
 import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 
@@ -30,6 +29,107 @@ async function fetchFlashDeals() {
   const res = await fetch("/api/deals/flash");
   if (!res.ok) return [];
   return res.json();
+}
+
+/* ── White-background removal for the dark circular plate ──────────────────
+   Catalog photos are shot on white; on the dark plate that shows as a white
+   box. This erases only the CONTIGUOUS near-white region connected to the
+   image border (flood fill), so white areas inside labels survive. Photos
+   without a white background come back unchanged (null → original URL is
+   used). Runs once per URL per session; falls back to the original image on
+   any error (CORS, decode, …). */
+const BG_WHITE_MIN = 232;   // r,g,b all above this count as background white
+const BG_MAX_SIDE  = 480;   // plate renders ≤185px, 480px covers 2x retina
+const bgRemovalCache = new Map<string, Promise<string | null>>();
+
+function removeWhiteBg(url: string): Promise<string | null> {
+  const cached = bgRemovalCache.get(url);
+  if (cached) return cached;
+  const job = new Promise<string | null>((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onerror = () => resolve(null);
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, BG_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.max(1, Math.round(img.naturalWidth * scale));
+        const h = Math.max(1, Math.round(img.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.drawImage(img, 0, 0, w, h);
+        const id = ctx.getImageData(0, 0, w, h);
+        const d = id.data;
+        const isBg = (p: number) => d[p * 4] > BG_WHITE_MIN && d[p * 4 + 1] > BG_WHITE_MIN && d[p * 4 + 2] > BG_WHITE_MIN;
+
+        // BFS flood fill from every near-white border pixel
+        const visited = new Uint8Array(w * h);
+        const queue: number[] = [];
+        for (let x = 0; x < w; x++) queue.push(x, (h - 1) * w + x);
+        for (let y = 0; y < h; y++) queue.push(y * w, y * w + w - 1);
+        const pending: number[] = [];
+        for (const p of queue) if (!visited[p] && isBg(p)) { visited[p] = 1; pending.push(p); }
+        let head = 0;
+        while (head < pending.length) {
+          const p = pending[head++];
+          const x = p % w, y = (p / w) | 0;
+          if (x > 0 && !visited[p - 1] && isBg(p - 1)) { visited[p - 1] = 1; pending.push(p - 1); }
+          if (x < w - 1 && !visited[p + 1] && isBg(p + 1)) { visited[p + 1] = 1; pending.push(p + 1); }
+          if (y > 0 && !visited[p - w] && isBg(p - w)) { visited[p - w] = 1; pending.push(p - w); }
+          if (y < h - 1 && !visited[p + w] && isBg(p + w)) { visited[p + w] = 1; pending.push(p + w); }
+        }
+
+        // No meaningful white background (dark/scene/transparent photo) — keep original
+        if (pending.length < w * h * 0.02) return resolve(null);
+
+        for (const p of pending) d[p * 4 + 3] = 0;
+
+        // Feather: bright pixels touching the cleared region get partial alpha
+        for (let p = 0; p < w * h; p++) {
+          if (visited[p]) continue;
+          const x = p % w, y = (p / w) | 0;
+          const touches =
+            (x > 0 && visited[p - 1]) || (x < w - 1 && visited[p + 1]) ||
+            (y > 0 && visited[p - w]) || (y < h - 1 && visited[p + w]);
+          if (!touches) continue;
+          const i = p * 4;
+          const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          if (lum > 200) d[i + 3] = Math.max(0, Math.min(255, Math.round(255 - ((lum - 200) * 255) / 55)));
+        }
+
+        ctx.putImageData(id, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(null); // tainted canvas (no CORS) or decode issue — use original
+      }
+    };
+    img.src = url;
+  });
+  bgRemovalCache.set(url, job);
+  return job;
+}
+
+/* Bottle photo on the dark plate: hidden until background removal resolves
+   (either way) to avoid flashing the white box, then fades in. */
+function BottleImg({ url, alt }: { url: string; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setSrc(null);
+    removeWhiteBg(url).then((res) => { if (alive) setSrc(res ?? url); });
+    return () => { alive = false; };
+  }, [url]);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src ?? url}
+      alt={alt}
+      className="absolute inset-0 w-full h-full object-contain p-4 max-[480px]:p-3 transition-opacity duration-200"
+      style={{ opacity: src ? 1 : 0 }}
+      loading="lazy"
+    />
+  );
 }
 
 const PLACEHOLDER_DEALS = [
@@ -208,7 +308,7 @@ function FlashDealCard({ deal }: { deal: Deal }) {
 
           <Link href={`/products/${deal.slug}`} className="fd-bottle block hover:opacity-90 transition-opacity">
             {deal.imageUrl ? (
-              <Image src={deal.imageUrl} alt={deal.name} fill className="object-contain p-4 max-[480px]:p-3" sizes="(max-width: 480px) 136px, 185px" />
+              <BottleImg url={deal.imageUrl} alt={deal.name} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl max-[480px]:text-4xl">🥃</div>
             )}
