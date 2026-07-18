@@ -10,7 +10,7 @@ interface ProductGridProps {
   searchParams: Record<string, string | undefined>;
 }
 
-const LIMIT = 20;
+const LIMIT = 40;
 
 function getPageNumbers(current: number, total: number): (number | "...")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);

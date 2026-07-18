@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star, Gift } from "lucide-react";
+import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star, Gift, Minus, Plus } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
@@ -632,6 +632,29 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     return Object.keys(e).length === 0;
   }
 
+  // Built from current cart + form state. Rebuilt live for the Stripe screen so
+  // quantity edits made on the review step are reflected in the final order.
+  function buildOrderPayload() {
+    return {
+      items: items.map(i => ({
+        productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity,
+        referenceImageUrl: i.referenceImageUrl, verificationNote: i.verificationNote,
+      })),
+      ...(isPickup
+        ? { orderType: "pickup", pickupWindow: pickupSlot, deliveryAddress: null, billingAddress: null, billingAddressSameAsDelivery: false }
+        : { orderType: "delivery", deliveryAddress: delivery, billingAddress: delivery, billingAddressSameAsDelivery: true }),
+      customerName: name,
+      customerEmail: email,
+      customerPhone: phone,
+      couponCode: promoCode,
+      couponDiscount: promoDiscount,
+      rewardsDiscount,
+      rewardsPointsToRedeem,
+      giftCardCode,
+      giftCardAmount: effectiveGiftCard,
+    };
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) {
@@ -667,26 +690,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       }
     }
 
-    const payload = {
-      items: items.map(i => ({
-        productId: i.product.id, name: i.product.name, price: i.product.salePrice ?? i.product.price, quantity: i.quantity,
-        referenceImageUrl: i.referenceImageUrl, verificationNote: i.verificationNote,
-      })),
-      ...(isPickup
-        ? { orderType: "pickup", pickupWindow: pickupSlot, deliveryAddress: null, billingAddress: null, billingAddressSameAsDelivery: false }
-        : { orderType: "delivery", deliveryAddress: delivery, billingAddress: delivery, billingAddressSameAsDelivery: true }),
-      customerName: name,
-      customerEmail: email,
-      customerPhone: phone,
-      couponCode: promoCode,
-      couponDiscount: promoDiscount,
-      rewardsDiscount,
-      rewardsPointsToRedeem,
-      giftCardCode,
-      giftCardAmount: effectiveGiftCard,
-    };
-
-    setOrderPayload(payload);
+    setOrderPayload(buildOrderPayload());
     // Gift card (+ rewards) covers full amount → show review before finalizing
     setPaymentStep(total === 0 ? "review-free" : "select");
     setSubmitting(false);
@@ -952,8 +956,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       }}>
         <StripePaymentForm
           clientSecret={clientSecret}
-          orderPayload={orderPayload!}
+          orderPayload={buildOrderPayload()}
           total={total}
+          minOrder={minOrder}
           reviewData={{
             customerName: name,
             customerEmail: email,
@@ -1430,15 +1435,17 @@ interface ReviewData {
   pickupDiscount?: number;
 }
 
-function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSuccess, onCancel }: {
+function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, reviewData, onSuccess, onCancel }: {
   clientSecret: string;
   orderPayload: object;
   total: number;
+  minOrder: number;
   reviewData: ReviewData;
   onSuccess: (order: { id: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null }) => void;
   onCancel: () => void;
 }) {
   const isPickup = !!reviewData.pickup;
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
   const stripe = useStripe();
   const elements = useElements();
   const [paying, setPaying] = useState(false);
@@ -1467,6 +1474,20 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
     setPaying(true);
     setPayError("");
     try {
+      // Quantities can be edited on this review screen — sync the PaymentIntent
+      // amount to the live total before confirming the charge
+      const sync = await fetch("/api/stripe/payment-intent", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientSecret, amount: total }),
+      });
+      if (!sync.ok) {
+        setPayError("Could not update your order total. Please try again.");
+        setPaying(false);
+        return;
+      }
+      await elements.fetchUpdates();
+
       // Stripe requires elements.submit() immediately before confirmPayment, before any async work
       const { error: submitErr } = await elements.submit();
       if (submitErr) {
@@ -1546,6 +1567,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
   const rd = reviewData;
   const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount + (rd.pickupDiscount ?? 0);
   const pointsEarned = Math.floor(total);
+  const belowMin = rd.subtotal < minOrder;
 
   return (
     <>
@@ -1572,11 +1594,27 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
                 const price = product.salePrice ?? product.price;
                 return (
                   <div key={product.id} className="flex items-center gap-3">
-                    <div className="relative shrink-0">
+                    <div className="shrink-0">
                       <ItemThumb imageUrl={(product as any).imageUrl} category={(product as any).category} name={product.name} size={44} />
-                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-500 rounded-full text-white text-[10px] font-black flex items-center justify-center border-2 border-white">{quantity}</span>
                     </div>
-                    <span className="flex-1 text-sm text-gray-700 leading-snug">{product.name}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 leading-snug">{product.name}</p>
+                      <div className="mt-1.5 inline-flex items-center gap-1 border border-gray-200 rounded-full bg-gray-50">
+                        <button type="button" onClick={() => updateQuantity(product.id, quantity - 1)}
+                          disabled={paying || quantity <= 1}
+                          aria-label={`Decrease quantity of ${product.name}`}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                          <Minus size={13} />
+                        </button>
+                        <span className="min-w-6 text-center text-sm font-bold text-gray-900">{quantity}</span>
+                        <button type="button" onClick={() => updateQuantity(product.id, quantity + 1)}
+                          disabled={paying}
+                          aria-label={`Increase quantity of ${product.name}`}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-semibold text-gray-900">{formatCurrency(price * quantity)}</p>
                       {product.salePrice != null && product.salePrice < product.price && (
@@ -1658,12 +1696,23 @@ function StripePaymentForm({ clientSecret, orderPayload, total, reviewData, onSu
             </div>
           )}
 
+          {belowMin && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800 text-center">
+              ⚠️ Minimum cart value is <strong>${minOrder}</strong> — please increase quantities or go back to add more items.
+            </div>
+          )}
+          {!belowMin && total < 0.5 && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-sm text-amber-800 text-center">
+              Your discounts now cover the full amount — please go back and restart checkout to complete this order.
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button type="button" onClick={() => { setReviewing(false); setPayError(""); }} disabled={paying}
               className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
               ← Edit Payment
             </button>
-            <button type="button" onClick={handleConfirmPay} disabled={paying || !stripe}
+            <button type="button" onClick={handleConfirmPay} disabled={paying || !stripe || belowMin || total < 0.5}
               className="flex-[2] flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/25 text-base">
               {paying
                 ? <><Loader2 size={18} className="animate-spin" /> Processing…</>

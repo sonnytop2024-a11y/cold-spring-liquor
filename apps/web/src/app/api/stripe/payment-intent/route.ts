@@ -27,3 +27,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create payment intent" }, { status: 500 });
   }
 }
+
+// Quantities can be edited on the checkout review screen after the intent is
+// created — this syncs the intent amount to the new total before confirmation.
+export async function PATCH(req: NextRequest) {
+  try {
+    const { clientSecret, amount } = await req.json();
+    if (typeof clientSecret !== "string" || !clientSecret.startsWith("pi_") || !amount || amount <= 0) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+    const intentId = clientSecret.split("_secret")[0];
+    await stripe.paymentIntents.update(intentId, { amount: Math.round(amount * 100) });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[stripe] payment intent update error:", err);
+    return NextResponse.json({ error: "Failed to update payment intent" }, { status: 500 });
+  }
+}
