@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
@@ -31,15 +31,15 @@ async function fetchFlashDeals() {
   return res.json();
 }
 
-/* ── White-background removal for the dark circular plate ──────────────────
-   Catalog photos are shot on white; on the dark plate that shows as a white
+/* ── White-background removal for the dark card ─────────────────────────────
+   Catalog photos are shot on white; on the dark card that shows as a white
    box. This erases only the CONTIGUOUS near-white region connected to the
    image border (flood fill), so white areas inside labels survive. Photos
    without a white background come back unchanged (null → original URL is
    used). Runs once per URL per session; falls back to the original image on
    any error (CORS, decode, …). */
 const BG_WHITE_MIN = 232;   // r,g,b all above this count as background white
-const BG_MAX_SIDE  = 480;   // plate renders ≤185px, 480px covers 2x retina
+const BG_MAX_SIDE  = 480;   // image area renders ≤170px tall, 480px covers 2x retina
 const bgRemovalCache = new Map<string, Promise<string | null>>();
 
 function removeWhiteBg(url: string): Promise<string | null> {
@@ -110,8 +110,10 @@ function removeWhiteBg(url: string): Promise<string | null> {
   return job;
 }
 
-/* Bottle photo on the dark plate: hidden until background removal resolves
-   (either way) to avoid flashing the white box, then fades in. */
+/* Bottle photo inside the fixed image frame: hidden until background removal
+   resolves (either way) to avoid flashing the white box, then fades in.
+   object-contain inside an absolutely-positioned box guarantees the product
+   always fits the frame — never cropped, never overflowing. */
 function BottleImg({ url, alt }: { url: string; alt: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
@@ -125,8 +127,8 @@ function BottleImg({ url, alt }: { url: string; alt: string }) {
     <img
       src={src ?? url}
       alt={alt}
-      className="absolute inset-0 w-full h-full object-contain p-4 max-[480px]:p-3 transition-opacity duration-200"
-      style={{ opacity: src ? 1 : 0 }}
+      className="absolute inset-2 w-[calc(100%-16px)] h-[calc(100%-16px)] object-contain rounded-[10px] transition-opacity duration-200"
+      style={{ opacity: src ? 1 : 0, filter: "drop-shadow(0 8px 14px rgba(0,0,0,.5))" }}
       loading="lazy"
     />
   );
@@ -176,79 +178,108 @@ const PLACEHOLDER_DEALS = [
 
 type Deal = (typeof PLACEHOLDER_DEALS)[0];
 
-/* Redesigned card UI (v2) — data, pricing, cart and countdown logic unchanged.
-   The border streak is a rotating conic-gradient on ::before; the glow ring
-   behind the bottle is static CSS. */
+/* Carousel redesign (v3) — data, pricing, cart and countdown logic unchanged.
+   One dark rounded box: left panel (title + shared countdown), right carousel
+   of cards with scroll-snap, desktop arrow + mouse drag, dots below. */
 const flashCSS = `
-  .fd-row{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
-  @media (max-width:1180px){ .fd-row{ grid-template-columns:repeat(2,1fr); } }
-  @media (max-width:760px){
-    /* full-bleed scroll row: cards snap flush with the container's left edge,
-       with a peek of the next card on the right */
-    .fd-row{display:flex;overflow-x:auto;gap:12px;scroll-snap-type:x mandatory;
-      margin-inline:-16px;padding-inline:16px;scroll-padding-left:16px;
-      padding-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-    .fd-row::-webkit-scrollbar{display:none;}
-    .fd-card{flex:0 0 80vw;scroll-snap-align:start;}
+  .fd-box{
+    position:relative;overflow:hidden;border-radius:28px;
+    background:
+      radial-gradient(ellipse 900px 500px at 0% 0%, rgba(210,90,20,.55), transparent 60%),
+      linear-gradient(135deg,#1c0f05 0%,#0a0704 55%,#000 100%);
+    border:1px solid #2a1c0e;
+    padding:26px;
+    display:flex;gap:26px;align-items:stretch;
   }
-  @media (max-width:480px){ .fd-card{ flex:0 0 76vw; } }
+  .fd-box-bolt{
+    position:absolute;left:-30px;top:-40px;width:260px;height:260px;
+    opacity:.06;transform:rotate(-8deg);pointer-events:none;
+  }
+  .fd-panel{position:relative;z-index:1;flex:0 0 250px;display:flex;flex-direction:column;justify-content:flex-start;gap:16px;}
+  .fd-panel h3{font-size:36px;font-weight:900;line-height:1.05;color:#fff;}
+  .fd-panel h3 .orange{color:#FF9F0A;}
+  .fd-panel-sub{color:#c9c2b8;font-size:14px;line-height:1.4;max-width:210px;}
+  .fd-cd{background:rgba(0,0,0,.4);border:1px solid #3a2c18;border-radius:14px;padding:14px 16px;max-width:210px;}
+  .fd-cd .lbl{font-size:11px;color:#a4a4a4;letter-spacing:.08em;text-align:center;margin-bottom:8px;}
+  .fd-cd .digits{display:flex;justify-content:center;gap:6px;}
+  .fd-cd .digit-block{text-align:center;}
+  .fd-cd .digit{font-size:24px;font-weight:900;color:#F6B94A;font-variant-numeric:tabular-nums;}
+  .fd-cd .digit-lbl{font-size:8px;color:#8a8a8a;letter-spacing:.05em;margin-top:2px;}
+  .fd-cd .colon{font-size:22px;font-weight:900;color:#5a4a30;align-self:flex-start;}
+  .fd-cd-name{display:block;margin-top:9px;padding-top:9px;border-top:1px solid #2a2010;font-size:11.5px;font-weight:800;color:#FF9F0A;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  .fd-cd-name:hover{text-decoration:underline;}
 
-  .fd-card{position:relative;border-radius:26px;overflow:hidden;isolation:isolate;background:#000;}
-  .fd-card::before{
-    content:"";position:absolute;inset:-1.5px;border-radius:inherit;
-    background:conic-gradient(from 0deg,
-      transparent 0deg, transparent 331deg,
-      rgba(255,122,0,0) 336deg, rgba(255,122,0,.9) 342deg,
-      rgba(255,59,48,1) 347deg, rgba(246,185,74,.95) 352deg,
-      rgba(255,122,0,0) 360deg);
-    animation:fdSpin 5s linear infinite;
+  .fd-carousel-wrap{position:relative;flex:1;min-width:0;display:flex;align-items:center;}
+  .fd-carousel{
+    display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;padding:2px 2px 6px;flex:1;
+    scrollbar-width:none;cursor:grab;
+  }
+  .fd-carousel::-webkit-scrollbar{display:none;}
+  .fd-carousel.dragging{cursor:grabbing;scroll-snap-type:none;}
+
+  .fd-card{
+    flex:0 0 82%;min-width:0;scroll-snap-align:start;
+    background:linear-gradient(180deg,#161311,#0c0a08);
+    border:1px solid #2a2420;
+    border-radius:20px;padding:16px;position:relative;color:#fff;
+    display:flex;flex-direction:column;
+    box-shadow:0 14px 28px rgba(0,0,0,.45);
+  }
+  @media (min-width:640px){ .fd-card{ flex:0 0 300px; } }
+  .fd-card.expired,.fd-card.soldout{ opacity:.55; }
+  .fd-card.expired .fd-imgwrap,.fd-card.soldout .fd-imgwrap{ filter:grayscale(.6); }
+
+  /* Fixed image frame: the product always renders INSIDE this box via
+     object-contain — any aspect ratio fits, nothing is cropped or overflows. */
+  .fd-imgwrap{position:relative;height:170px;flex:none;display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden;border-radius:14px;}
+  .fd-spotlight{
+    position:absolute;width:150px;height:150px;border-radius:50%;
+    background:radial-gradient(circle, rgba(255,140,0,.16) 0%, rgba(255,140,0,0) 70%);
     z-index:0;
   }
-  .fd-card.expiring::before{ animation-duration:2.5s; }
-  .fd-card.expired::before,.fd-card.soldout::before{ animation:none; background:transparent; }
-  .fd-card.expired,.fd-card.soldout{ border:1px solid #333; }
-  .fd-card.paused::before{ animation-play-state:paused; }
-  @media (prefers-reduced-motion:reduce){
-    .fd-card::before{ animation:none !important; background:conic-gradient(#F6B94A,#FF7A00,#FF3B30,#F6B94A); }
+  .fd-glow{
+    position:absolute;width:115px;height:115px;border-radius:50%;
+    box-shadow:0 0 26px 12px rgba(255,140,0,.22);
+    z-index:0;
   }
-  @keyframes fdSpin{ to{ transform:rotate(360deg); } }
+  .fd-imglink{position:absolute;inset:0;z-index:1;display:block;}
 
-  .fd-card-inner{position:relative;z-index:1;margin:2px;border-radius:24px;background:#090909;padding:16px 16px 18px;display:flex;flex-direction:column;height:calc(100% - 4px);border:1px solid #1c1c1c;}
-  @media (max-width:480px){ .fd-card-inner{ padding:12px 12px 14px; border-radius:20px; } }
-  .fd-card.expired .fd-card-inner,.fd-card.soldout .fd-card-inner{ opacity:.55; }
+  .fd-progress-track{background:#262220;border-radius:999px;height:6px;overflow:hidden;}
+  .fd-progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#FF9F0A,#FF7A00);}
 
-  .fd-imgwrap{position:relative;height:230px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
-  @media (max-width:480px){ .fd-imgwrap{ height:172px; margin-bottom:10px; } }
-  .fd-ring{
-    position:absolute;width:200px;height:200px;border-radius:50%;
-    background:radial-gradient(circle, rgba(255,140,30,.22) 0%, rgba(255,120,20,.10) 45%, transparent 72%);
-    box-shadow:0 0 40px 6px rgba(255,120,20,.18);
-    z-index:1;
+  .fd-buy{
+    margin-top:auto;border:1.5px solid #FF7A00;border-radius:999px;
+    background:#000;color:#fff;font-weight:800;font-size:14px;
+    padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;
+    cursor:pointer;transition:background .15s;min-height:46px;
   }
-  @media (max-width:480px){ .fd-ring{ width:150px; height:150px; } }
-  .fd-card.expired .fd-ring,.fd-card.soldout .fd-ring{ background:radial-gradient(circle, rgba(120,120,120,.12) 0%, transparent 70%); box-shadow:none; }
+  .fd-buy:hover{background:#1e1512;}
+  .fd-buy:disabled{border-color:#3a3a3a;color:#888;cursor:not-allowed;background:#111;}
 
-  /* Dark circular plate: transparent-background product photos sit directly
-     on the dark circle so they blend with the card (no white box). Photos
-     should be uploaded without a background. */
-  .fd-bottle{
-    position:relative;z-index:2;width:185px;height:185px;border-radius:50%;overflow:hidden;
-    background:radial-gradient(circle at 50% 32%, #1c1c1c 0%, #121212 62%, #0b0b0b 100%);
-    box-shadow:0 10px 22px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.08);
+  .fd-arrow{
+    position:absolute;right:-4px;top:50%;transform:translateY(-50%);
+    width:42px;height:42px;border-radius:50%;background:#111;border:1px solid #333;
+    color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;z-index:3;box-shadow:0 6px 16px rgba(0,0,0,.4);
   }
-  @media (max-width:480px){ .fd-bottle{ width:136px; height:136px; } }
-  .fd-bottle img{filter:drop-shadow(0 8px 18px rgba(0,0,0,.5));}
-  .fd-card.expired .fd-bottle,.fd-card.soldout .fd-bottle{ filter:grayscale(.6); }
+  @media (max-width:760px){ .fd-arrow{ display:none; } }
 
-  .fd-countdown .cd-time.critical{animation:cdPulse 1s ease-in-out infinite;}
-  @keyframes cdPulse{ 0%,100%{opacity:1;} 50%{opacity:.55;} }
-  @media (prefers-reduced-motion:reduce){ .fd-countdown .cd-time.critical{ animation:none; } }
+  .fd-dots{display:flex;justify-content:center;gap:6px;margin-top:16px;}
+  .fd-dot{width:6px;height:6px;border-radius:50%;background:#3a3a3a;cursor:pointer;transition:.2s;border:none;padding:0;}
+  .fd-dot.active{width:18px;border-radius:3px;background:#FF9F0A;}
+
+  @media (max-width:760px){
+    .fd-box{flex-direction:column;padding:22px 18px;gap:18px;}
+    .fd-panel{flex:none;}
+    .fd-panel h3{font-size:30px;}
+  }
 `;
 
 type DealState = "active" | "urgent" | "critical" | "expired" | "soldout";
 
 function FlashDealCard({ deal }: { deal: Deal }) {
-  const { h, m, s, remaining, expired } = useCountdown(deal.endsAt);
+  const { remaining, expired } = useCountdown(deal.endsAt);
   const addItem = useCartStore((st) => st.addItem);
   const [popping, setPopping] = useState(false);
 
@@ -273,90 +304,123 @@ function FlashDealCard({ deal }: { deal: Deal }) {
     setTimeout(() => setPopping(false), 300);
   }, [addItem, deal, buyable]);
 
-  const cardStateClass = state === "expired" ? "expired" : state === "soldout" ? "soldout" : state === "critical" ? "expiring" : "";
-  const barColor = stockPct <= 20 ? "#FF3B30" : stockPct <= 50 ? "linear-gradient(90deg,#FF7A00,#FF3B30)" : "linear-gradient(90deg,#FF9F0A,#FF7A00)";
-  const cdColor = state === "critical" ? "#FF3B30" : state === "urgent" ? "#FF9F0A" : "#F6B94A";
-  const cdText = state === "expired" ? "00 : 00 : 00"
-    : `${String(h).padStart(2, "0")} : ${String(m).padStart(2, "0")} : ${String(s).padStart(2, "0")}`;
+  const cardStateClass = state === "expired" ? "expired" : state === "soldout" ? "soldout" : "";
 
   return (
     <div className={`fd-card ${cardStateClass}`}>
-      <div className="fd-card-inner">
-        <div className="fd-imgwrap">
-          <div className="fd-ring" />
+      <div className="fd-imgwrap">
+        {state === "soldout" ? (
+          <span className="absolute top-0 left-0 z-[2] bg-[rgba(30,30,30,.7)] border border-[#555] rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#999] tracking-wide">SOLD OUT</span>
+        ) : state === "expired" ? (
+          <span className="absolute top-0 left-0 z-[2] bg-[rgba(30,30,30,.7)] border border-[#555] rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#999] tracking-wide">ENDED</span>
+        ) : (
+          <span className="absolute top-0 left-0 z-[2] flex items-center gap-[5px] bg-[rgba(0,0,0,.55)] border border-[rgba(255,159,10,.4)] rounded-full px-[11px] py-[5px] text-[10px] font-extrabold text-white tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FF9F0A]" style={{ boxShadow: "0 0 5px #FF9F0A" }} />
+            LIVE
+          </span>
+        )}
 
-          {state === "soldout" ? (
-            <div className="absolute top-2 left-2 z-[5] bg-[rgba(30,30,30,.7)] border border-[#555] rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#999] tracking-wide">SOLD OUT</div>
-          ) : state === "expired" ? (
-            <div className="absolute top-2 left-2 z-[5] bg-[rgba(30,30,30,.7)] border border-[#555] rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#999] tracking-wide">ENDED</div>
-          ) : (
-            <div className="absolute top-2 left-2 z-[5] flex items-center gap-1.5 bg-[rgba(10,20,12,.6)] border border-[#30D158] rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#30D158] tracking-wide">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#30D158]" style={{ boxShadow: "0 0 6px #30D158" }} />
-              LIVE
-            </div>
-          )}
-
-          {state !== "soldout" && (
-            <div
-              className="absolute top-1.5 right-1.5 z-[5] text-center text-white font-extrabold rounded-xl px-2.5 py-1.5 leading-tight"
-              style={{ background: "linear-gradient(135deg,#FF3B30,#FF7A00)", boxShadow: "0 4px 10px rgba(0,0,0,.4)" }}
-            >
-              <div className="text-base max-[480px]:text-sm">{pct}%</div>
-              <div className="text-[8px] tracking-widest">SAVE</div>
-            </div>
-          )}
-
-          <Link href={`/products/${deal.slug}`} className="fd-bottle block hover:opacity-90 transition-opacity">
-            {deal.imageUrl ? (
-              <BottleImg url={deal.imageUrl} alt={deal.name} />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-6xl max-[480px]:text-4xl">🥃</div>
-            )}
-          </Link>
-        </div>
-
-        <Link href={`/products/${deal.slug}`} className="text-white font-extrabold text-[19px] max-[480px]:text-[16px] leading-tight line-clamp-2 min-h-[2.5em] max-[480px]:min-h-[2.3em] hover:text-amber-400 transition-colors">
-          {deal.name}
-        </Link>
-        <p className="text-xs max-[480px]:text-[11px] text-[#A4A4A4] mt-0.5 mb-2">{deal.volume}</p>
-
-        <div className="flex items-baseline gap-2 mb-2.5">
-          <span className="text-[28px] max-[480px]:text-[22px] font-black text-[#FF9F0A]">{formatCurrency(deal.salePrice)}</span>
-          <span className="text-sm max-[480px]:text-xs text-[#8a8a8a] line-through">{formatCurrency(deal.price)}</span>
-        </div>
-
-        <div className="mb-2.5">
-          <div className="bg-[#1c1c1c] rounded-full h-[7px] overflow-hidden">
-            <div className="h-full rounded-full transition-all" style={{ width: `${stockPct}%`, background: barColor }} />
-          </div>
-          <div className={`flex justify-end text-[11px] max-[480px]:text-[10px] mt-1 ${stockPct <= 20 && state !== "soldout" ? "text-[#FF3B30] font-bold" : "text-[#A4A4A4]"}`}>
-            {state === "soldout" ? "Sold Out" : `${deal.stockQty} left`}
-          </div>
-        </div>
-
-        <div className="mt-auto flex items-center justify-between gap-2.5 pt-2.5 border-t border-[#1c1c1c]">
-          <div className="fd-countdown">
-            <div className="flex items-center gap-1 text-[#8a8a8a] text-[10px] max-[480px]:text-[9px] mb-0.5">⏱ ENDS IN</div>
-            <div className={`cd-time font-extrabold text-sm max-[480px]:text-[13px] tabular-nums tracking-wide ${state === "critical" ? "critical" : ""}`} style={{ color: cdColor }}>
-              {cdText}
-            </div>
-          </div>
-          <button
-            onClick={handleAdd}
-            disabled={!buyable}
-            className={`rounded-2xl px-5 py-3 max-[480px]:px-3.5 max-[480px]:py-2.5 min-h-[48px] max-[480px]:min-h-[42px] font-extrabold text-[15px] max-[480px]:text-[13px] whitespace-nowrap inline-flex items-center gap-1.5 transition-all
-              ${buyable
-                ? "text-white hover:-translate-y-0.5 hover:scale-[1.02]"
-                : state === "soldout"
-                  ? "bg-[#4a1414] text-[#d99] cursor-not-allowed"
-                  : "bg-[#333] text-[#888] cursor-not-allowed"}
-              ${popping ? "animate-add-to-cart" : ""}`}
-            style={buyable ? { background: "linear-gradient(90deg,#FF9F0A,#FF3B30)", boxShadow: "0 6px 14px rgba(255,90,20,.35)" } : undefined}
+        {state !== "soldout" && (
+          <span
+            className="absolute top-0 right-0 z-[2] text-center text-white font-extrabold rounded-xl px-3 py-1.5 leading-tight"
+            style={{ background: "linear-gradient(135deg,#FF9F0A,#FF3B30)", boxShadow: "0 4px 10px rgba(0,0,0,.4)" }}
           >
-            {buyable ? <>🛒 BUY NOW</> : state === "soldout" ? "SOLD OUT" : "DEAL ENDED"}
-          </button>
+            <span className="block text-[15px]">{pct}%</span>
+            <span className="block text-[8px] tracking-wide">OFF</span>
+          </span>
+        )}
+
+        <div className="fd-spotlight" />
+        <div className="fd-glow" />
+
+        <Link href={`/products/${deal.slug}`} className="fd-imglink hover:opacity-90 transition-opacity" draggable={false}>
+          {deal.imageUrl ? (
+            <BottleImg url={deal.imageUrl} alt={deal.name} />
+          ) : (
+            <span className="absolute inset-0 flex items-center justify-center text-6xl">🥃</span>
+          )}
+        </Link>
+      </div>
+
+      <Link href={`/products/${deal.slug}`} className="text-white font-extrabold text-base leading-tight truncate hover:text-amber-400 transition-colors" draggable={false}>
+        {deal.name}
+      </Link>
+      <p className="text-xs text-[#9a9a9a] mt-0.5 mb-2">{deal.volume}</p>
+
+      <div className="flex items-baseline gap-[9px] mb-2.5">
+        <span className="text-[13px] text-[#7a7a7a] line-through">{formatCurrency(deal.price)}</span>
+        <span className="text-[23px] font-black text-[#FF9F0A]">{formatCurrency(deal.salePrice)}</span>
+      </div>
+
+      <div className="mb-3.5">
+        <div className="fd-progress-track">
+          <div className="fd-progress-fill" style={{ width: `${stockPct}%`, background: stockPct <= 20 ? "#FF3B30" : undefined }} />
+        </div>
+        <div className={`flex justify-end text-[11px] mt-[5px] ${stockPct <= 20 && state !== "soldout" ? "text-[#FF3B30] font-bold" : "text-[#9a9a9a]"}`}>
+          {state === "soldout" ? "Sold Out" : `${deal.stockQty} left`}
         </div>
       </div>
+
+      <button className={`fd-buy ${popping ? "animate-add-to-cart" : ""}`} onClick={handleAdd} disabled={!buyable}>
+        {buyable ? (
+          <>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true">
+              <circle cx="9" cy="20" r="1.4" fill="#fff" stroke="none" />
+              <circle cx="18" cy="20" r="1.4" fill="#fff" stroke="none" />
+              <path d="M2 3h2l2.6 12.4a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.6L21 7H6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            BUY NOW
+          </>
+        ) : state === "soldout" ? "SOLD OUT" : "DEAL ENDED"}
+      </button>
+    </div>
+  );
+}
+
+/* The panel clock always tracks the deal ending SOONEST (still in stock),
+   shows that product's name under the digits, and rolls over to the next
+   soonest deal automatically when one expires. */
+function PanelCountdown({ deals }: { deals: Deal[] }) {
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const soonest = useMemo(() => {
+    const live = deals.filter((d) => new Date(d.endsAt).getTime() > nowTs && d.stockQty > 0);
+    if (!live.length) return null;
+    return live.reduce((a, b) => (new Date(a.endsAt).getTime() <= new Date(b.endsAt).getTime() ? a : b));
+  }, [deals, nowTs]);
+
+  if (!soonest) return null;
+
+  const remaining = Math.max(0, new Date(soonest.endsAt).getTime() - nowTs);
+  const h = Math.floor(remaining / 3_600_000);
+  const m = Math.floor((remaining % 3_600_000) / 60_000);
+  const s = Math.floor((remaining % 60_000) / 1000);
+  const blocks = [
+    { v: String(h).padStart(2, "0"), lbl: "HRS" },
+    { v: String(m).padStart(2, "0"), lbl: "MINS" },
+    { v: String(s).padStart(2, "0"), lbl: "SECS" },
+  ];
+  return (
+    <div className="fd-cd">
+      <div className="lbl">NEXT DEAL ENDS IN</div>
+      <div className="digits">
+        {blocks.map((b, i) => (
+          <span key={b.lbl} className="contents">
+            {i > 0 && <span className="colon">:</span>}
+            <span className="digit-block">
+              <span className="digit block">{b.v}</span>
+              <span className="digit-lbl block">{b.lbl}</span>
+            </span>
+          </span>
+        ))}
+      </div>
+      <Link href={`/products/${soonest.slug}`} className="fd-cd-name" title={soonest.name}>
+        ⚡ {soonest.name}
+      </Link>
     </div>
   );
 }
@@ -373,57 +437,144 @@ export function FlashDeals() {
     queryKey: ["flash-deals"],
     queryFn: fetchFlashDeals,
   });
-  const rowRef = useRef<HTMLDivElement>(null);
+  const carRef = useRef<HTMLDivElement>(null);
+  const [activeDot, setActiveDot] = useState(0);
 
-  const activeDeals = deals?.length ? deals : PLACEHOLDER_DEALS;
+  const activeDeals: Deal[] = deals?.length ? deals : PLACEHOLDER_DEALS;
 
-  // Pause the border animation for cards that are off-screen
+  // Scroll-driven dots
+  const syncDots = useCallback(() => {
+    const car = carRef.current;
+    if (!car || !car.children.length) return;
+    const center = car.scrollLeft + car.clientWidth / 2;
+    let best = 0, bestDist = Infinity;
+    Array.from(car.children).forEach((c, i) => {
+      const el = c as HTMLElement;
+      const dist = Math.abs(el.offsetLeft - car.offsetLeft + el.offsetWidth / 2 - center);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    });
+    setActiveDot(best);
+  }, []);
+
+  const scrollToIndex = useCallback((i: number) => {
+    const car = carRef.current;
+    if (!car) return;
+    const el = car.children[i] as HTMLElement | undefined;
+    if (!el) return;
+    car.scrollTo({ left: car.scrollLeft + el.getBoundingClientRect().left - car.getBoundingClientRect().left - 2, behavior: "smooth" });
+  }, []);
+
+  const arrowNext = useCallback(() => {
+    const car = carRef.current;
+    if (!car) return;
+    const first = car.firstElementChild as HTMLElement | null;
+    car.scrollBy({ left: first ? first.offsetWidth + 16 : 300, behavior: "smooth" });
+  }, []);
+
+  // Desktop mouse-drag scrolling; suppresses the click if the user dragged
   useEffect(() => {
-    const row = rowRef.current;
-    if (!row) return;
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.target.classList.toggle("paused", !e.isIntersecting)),
-      { threshold: 0.1 }
-    );
-    row.querySelectorAll(".fd-card").forEach((c) => io.observe(c));
-    return () => io.disconnect();
-  }, [activeDeals]);
+    const car = carRef.current;
+    if (!car) return;
+    let down = false, dragged = false, startX = 0, startScroll = 0;
+    const onDown = (e: MouseEvent) => {
+      down = true; dragged = false;
+      startX = e.pageX; startScroll = car.scrollLeft;
+      car.classList.add("dragging");
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!down) return;
+      if (Math.abs(e.pageX - startX) > 5) dragged = true;
+      if (dragged) { e.preventDefault(); car.scrollLeft = startScroll - (e.pageX - startX); }
+    };
+    const onUp = () => {
+      if (!down) return;
+      down = false;
+      car.classList.remove("dragging");
+    };
+    const onClick = (e: MouseEvent) => {
+      if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; }
+    };
+    car.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    car.addEventListener("click", onClick, true);
+    return () => {
+      car.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      car.removeEventListener("click", onClick, true);
+    };
+  }, []);
 
   return (
     <section id="flash-deals" className="bg-[#050505] py-8">
       <style dangerouslySetInnerHTML={{ __html: flashCSS }} />
       <div className="container-main">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
           <div className="flex items-center gap-3">
-            <span className="text-[34px] max-[480px]:text-[26px]" style={{ filter: "drop-shadow(0 0 8px rgba(255,159,10,.6))" }}>⚡</span>
+            <span className="text-[30px] max-[480px]:text-[24px]" style={{ filter: "drop-shadow(0 0 8px rgba(255,159,10,.6))" }}>⚡</span>
             <div>
-              <h2 className="font-heading text-[28px] max-[480px]:text-[22px] font-black text-white leading-none">
-                FLASH{" "}
-                <span style={{ background: "linear-gradient(90deg,#FF9F0A,#FF7A00)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
-                  DEALS
-                </span>
+              <h2 className="font-heading text-[24px] max-[480px]:text-[20px] font-black text-white leading-none">
+                FLASH <span className="text-[#FF9F0A]">DEALS</span>
               </h2>
-              <p className="text-[#A4A4A4] text-sm max-[480px]:text-xs mt-1">Premium deals. Limited time only.</p>
+              <p className="text-[#A4A4A4] text-[13px] max-[480px]:text-xs mt-1">Premium deals. Limited time only.</p>
             </div>
           </div>
           <Link
             href="/products?flashdeal=true"
-            className="bg-black border-[1.5px] border-[#FF7A00] rounded-full text-white font-extrabold text-sm max-[480px]:text-xs px-6 py-3 max-[480px]:px-4 max-[480px]:py-2 inline-flex items-center gap-2 whitespace-nowrap transition-all hover:-translate-y-px hover:shadow-[0_0_18px_rgba(255,122,0,.55)]"
+            className="bg-transparent border-[1.5px] border-[#FF7A00] rounded-full text-white font-extrabold text-[13px] max-[480px]:text-xs px-[22px] py-[11px] max-[480px]:px-4 max-[480px]:py-2 inline-flex items-center gap-2 whitespace-nowrap transition-all hover:shadow-[0_0_16px_rgba(255,122,0,.5)]"
           >
             VIEW ALL DEALS →
           </Link>
         </div>
 
-        {/* Cards */}
-        <div className="fd-row" ref={rowRef}>
-          {activeDeals.map((deal: Deal) => (
-            <FlashDealCard key={deal.id} deal={deal} />
-          ))}
+        {/* Dark box: left panel + carousel */}
+        <div className="fd-box">
+          <svg className="fd-box-bolt" viewBox="0 0 100 100" fill="#FF9F0A" aria-hidden="true">
+            <path d="M55 0 L20 55 H45 L35 100 L85 40 H55 Z" />
+          </svg>
+
+          <div className="fd-panel">
+            <h3>
+              Flash<br />
+              <span className="orange">Deals</span>{" "}
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="#FF9F0A" className="inline align-[-2px]" aria-hidden="true">
+                <path d="M13 2 L4 14 H11 L9 22 L20 9 H13 Z" />
+              </svg>
+            </h3>
+            <div className="fd-panel-sub">Unbeatable deals for a limited time</div>
+            <PanelCountdown deals={activeDeals} />
+          </div>
+
+          <div className="fd-carousel-wrap">
+            <div className="fd-carousel" ref={carRef} onScroll={() => requestAnimationFrame(syncDots)}>
+              {activeDeals.map((deal: Deal) => (
+                <FlashDealCard key={deal.id} deal={deal} />
+              ))}
+            </div>
+            {activeDeals.length > 1 && (
+              <button className="fd-arrow" onClick={arrowNext} aria-label="Next deals">❯</button>
+            )}
+          </div>
         </div>
 
+        {/* Dots */}
+        {activeDeals.length > 1 && (
+          <div className="fd-dots">
+            {activeDeals.map((d: Deal, i: number) => (
+              <button
+                key={d.id}
+                className={`fd-dot ${i === activeDot ? "active" : ""}`}
+                onClick={() => scrollToIndex(i)}
+                aria-label={`Go to deal ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Benefit strip */}
-        <div className="mt-6 bg-[#0B0B0B] border border-[#222] rounded-[20px] p-5 flex max-[700px]:flex-wrap max-[700px]:gap-4">
+        <div className="mt-5 bg-[#0B0B0B] border border-[#222] rounded-[20px] p-5 flex max-[700px]:flex-wrap max-[700px]:gap-4">
           {BENEFITS.map((b, i) => (
             <div key={b.title} className={`flex-1 max-[700px]:flex-none max-[700px]:w-[calc(50%-8px)] flex items-center gap-3 px-4 max-[700px]:px-0 relative ${i > 0 ? "min-[701px]:before:content-[''] min-[701px]:before:absolute min-[701px]:before:left-0 min-[701px]:before:top-[10%] min-[701px]:before:bottom-[10%] min-[701px]:before:w-px min-[701px]:before:bg-[#222]" : ""}`}>
               <div className="w-[42px] h-[42px] rounded-full border-[1.5px] border-[#F6B94A] flex items-center justify-center flex-none text-[#F6B94A] text-lg">
