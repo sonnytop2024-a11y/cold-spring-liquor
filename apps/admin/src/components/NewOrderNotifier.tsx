@@ -13,13 +13,15 @@ interface Order {
   status: string;
   customerName: string;
   customerPhone: string;
-  deliveryAddress: { street: string; city: string; state: string; zip?: string };
+  deliveryAddress?: { street: string; city: string; state: string; zip?: string } | null;
   total: number;
   createdAt: string;
   items: Array<{ name: string; quantity: number }>;
   distanceMiles?: number;
   etaMinutes?: number;
   deliveryType?: string;
+  orderType?: string;
+  pickupWindow?: { start?: string; end?: string; label?: string; dateLabel?: string } | null;
 }
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
@@ -117,9 +119,25 @@ function OrderCard({ order, onDismiss }: { order: Order; onDismiss: () => void }
           <p className="font-bold text-base">{order.customerName}</p>
           <p className="font-black text-green-600 text-base">${Number(order.total).toFixed(2)}</p>
         </div>
-        <p className="text-xs text-gray-500 flex items-center gap-1">
-          <MapPin size={11} /> {order.deliveryAddress?.city}, {order.deliveryAddress?.state}
-        </p>
+        {order.orderType === "pickup" ? (
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full bg-orange-100 text-orange-700">
+              🏬 Pick Up In Store
+            </span>
+            {order.pickupWindow?.label && (
+              <p className="text-xs font-semibold text-orange-700 flex items-center gap-1">
+                <Clock size={11} /> {order.pickupWindow.dateLabel ? `${order.pickupWindow.dateLabel} · ` : ""}{order.pickupWindow.label}
+              </p>
+            )}
+            {order.customerPhone && (
+              <p className="text-xs text-gray-500">📞 {order.customerPhone}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 flex items-center gap-1">
+            <MapPin size={11} /> {order.deliveryAddress?.city}, {order.deliveryAddress?.state}
+          </p>
+        )}
         {(order.distanceMiles !== undefined || order.etaMinutes !== undefined) && (
           <div className="flex items-center gap-3 text-xs font-semibold">
             {order.distanceMiles !== undefined && (
@@ -285,7 +303,9 @@ export function NewOrderNotifier() {
                     <Bell size={24} className="animate-bounce" />
                   </div>
                   <div>
-                    <p className="font-black text-2xl leading-tight">NEW ORDER!</p>
+                    <p className="font-black text-2xl leading-tight">
+                      {overlayOrder.orderType === "pickup" ? "NEW PICKUP ORDER!" : "NEW ORDER!"}
+                    </p>
                     <p className="text-red-200 text-sm font-medium">
                       {visibleOrders.length > 1
                         ? `${visibleOrders.length} orders waiting`
@@ -332,16 +352,27 @@ export function NewOrderNotifier() {
                 </div>
               </div>
 
-              {/* Customer + address */}
+              {/* Customer + address / pickup info */}
               <div className="bg-gray-50 rounded-2xl px-4 py-3 space-y-1.5">
                 <p className="font-bold text-base">{overlayOrder.customerName}</p>
-                <p className="text-sm text-gray-500 flex items-center gap-1.5">
-                  <MapPin size={13} className="text-brand-500 shrink-0" />
-                  {overlayOrder.deliveryAddress?.street && (
-                    <span>{overlayOrder.deliveryAddress.street}, </span>
-                  )}
-                  {overlayOrder.deliveryAddress?.city}, {overlayOrder.deliveryAddress?.state}
-                </p>
+                {overlayOrder.customerPhone && (
+                  <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                    📞 <a href={`tel:${overlayOrder.customerPhone}`} className="hover:underline">{overlayOrder.customerPhone}</a>
+                  </p>
+                )}
+                {overlayOrder.orderType === "pickup" ? (
+                  <span className="inline-block text-xs font-black uppercase tracking-wide px-2.5 py-1 rounded-full bg-orange-100 text-orange-700">
+                    🏬 Pick Up In Store
+                  </span>
+                ) : (
+                  <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                    <MapPin size={13} className="text-brand-500 shrink-0" />
+                    {overlayOrder.deliveryAddress?.street && (
+                      <span>{overlayOrder.deliveryAddress.street}, </span>
+                    )}
+                    {overlayOrder.deliveryAddress?.city}, {overlayOrder.deliveryAddress?.state}
+                  </p>
+                )}
                 {overlayOrder.deliveryType === "next-morning" && (
                   <span className="inline-block text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
                     🌅 Next Morning Delivery
@@ -349,8 +380,19 @@ export function NewOrderNotifier() {
                 )}
               </div>
 
+              {/* Pickup window — big and prominent */}
+              {overlayOrder.orderType === "pickup" && overlayOrder.pickupWindow?.label && (
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 text-center">
+                  <Clock size={16} className="text-orange-600 mx-auto mb-1" />
+                  <p className="font-black text-2xl text-orange-700">{overlayOrder.pickupWindow.label}</p>
+                  <p className="text-[11px] font-bold text-orange-600 uppercase tracking-wide">
+                    {overlayOrder.pickupWindow.dateLabel ?? "Pickup time"}
+                  </p>
+                </div>
+              )}
+
               {/* Distance + ETA — big and prominent */}
-              {(overlayOrder.distanceMiles !== undefined || overlayOrder.etaMinutes !== undefined) && (
+              {overlayOrder.orderType !== "pickup" && (overlayOrder.distanceMiles !== undefined || overlayOrder.etaMinutes !== undefined) && (
                 <div className="grid grid-cols-2 gap-3">
                   {overlayOrder.distanceMiles !== undefined && (
                     <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 text-center">

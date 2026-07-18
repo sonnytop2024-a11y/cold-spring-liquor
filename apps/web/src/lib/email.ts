@@ -32,8 +32,8 @@ function pickupInfoBlock(order: MockOrder): string {
     <tr><td style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:2px solid #f97316;border-radius:14px;padding:18px 24px;">
       <p style="margin:0 0 4px;font-size:11px;color:#9a3412;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">🏬 Pick Up In Store</p>
       ${win ? `<p style="margin:0 0 8px;font-size:20px;color:#ea580c;font-weight:800;">${win.dateLabel} · ${win.label} CT</p>` : ""}
-      <p style="margin:0;font-size:14px;color:#111827;font-weight:600;">Cold Spring Liquor</p>
-      <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">${STORE_ADDRESS}</p>
+      <p style="margin:0;font-size:15px;color:#c2410c;font-weight:800;">Cold Spring Liquor</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#7c2d12;font-weight:500;">${STORE_ADDRESS}</p>
       <p style="margin:0 0 4px;font-size:11px;color:#9a3412;font-weight:700;text-transform:uppercase;letter-spacing:1px;">🕐 Store Hours</p>
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:280px;">${storeHoursRows}</table>
     </td></tr></table>
@@ -83,7 +83,7 @@ function orderConfirmationHtml(order: MockOrder): string {
 
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order Confirmed</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>Order Confirmed</title></head>
 <body style="margin:0;padding:0;background:#f0f0f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f0;padding:24px 12px;">
 <tr><td align="center">
@@ -160,7 +160,7 @@ function orderConfirmationHtml(order: MockOrder): string {
 function giftCardHtml(code: string, amount: number, senderName: string, message: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your Gift Card</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>Your Gift Card</title></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px;">
     <tr><td align="center">
@@ -238,7 +238,7 @@ function pickupReadyHtml(order: MockOrder): string {
   const win = order.pickupWindow;
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ready for Pick Up</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>Ready for Pick Up</title></head>
 <body style="margin:0;padding:0;background:#f0f0f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f0;padding:24px 12px;">
 <tr><td align="center">

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetOrdersByCustomer } from "@/lib/db";
+import { dbGetOrdersByCustomer, dbOverlayCurrentProductImages } from "@/lib/db";
 import { verifySessionToken } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -10,5 +10,5 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json([]);
 
   const orders = await dbGetOrdersByCustomer(userId);
-  return NextResponse.json(orders);
+  return NextResponse.json(await dbOverlayCurrentProductImages(orders));
 }

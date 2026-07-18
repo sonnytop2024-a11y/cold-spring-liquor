@@ -124,6 +124,52 @@ export async function dbGetProduct(idOrSlug: string): Promise<MockProduct | unde
   return all.find((p) => p.id === idOrSlug || p.slug === idOrSlug);
 }
 
+export async function dbGetProductsByIds(ids: string[]): Promise<Map<string, MockProduct>> {
+  const map = new Map<string, MockProduct>();
+  const unique = [...new Set(ids)].filter(Boolean);
+  if (unique.length === 0) return map;
+  const t = tbl("csl_products");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").in("id", unique);
+      if (!error && data) {
+        for (const r of data as any[]) {
+          const p = r.data as MockProduct;
+          if (p?.id) map.set(p.id, p);
+        }
+        return map;
+      }
+    } catch {}
+  }
+  for (const p of store.getAllProducts()) if (unique.includes(p.id)) map.set(p.id, p);
+  return map;
+}
+
+// Orders snapshot item data at creation; overlay each item with the product's
+// CURRENT image/category so order views always show up-to-date artwork.
+export async function dbOverlayCurrentProductImages<T extends { items?: any[] }>(orders: T[]): Promise<T[]> {
+  try {
+    const ids = orders.flatMap(o => (o.items ?? []).map((i: any) => i.productId).filter(Boolean));
+    if (ids.length === 0) return orders;
+    const products = await dbGetProductsByIds(ids);
+    if (products.size === 0) return orders;
+    return orders.map(o => ({
+      ...o,
+      items: (o.items ?? []).map((i: any) => {
+        const p = products.get(i.productId);
+        if (!p) return i;
+        return {
+          ...i,
+          imageUrl: p.imageUrl ?? i.imageUrl ?? null,
+          category: p.category ?? i.category ?? null,
+        };
+      }),
+    }));
+  } catch {
+    return orders;
+  }
+}
+
 // Catalog display order: products WITH an image first, then grouped by brand
 // (falls back to name — imported items carry the brand in the name prefix,
 // e.g. "Deep Eddy Peach Vodka"), then alphabetical A→Z.

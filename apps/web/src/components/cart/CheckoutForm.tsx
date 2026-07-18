@@ -283,7 +283,7 @@ function ThankYouPopup({
                 <p>🕐 <strong className="text-gray-900">Pick up:</strong> {pickup.dateLabel} · {pickup.label}</p>
                 <p>📍 <strong className="text-gray-900">{STORE_INFO.name}</strong></p>
                 <p className="text-gray-500 text-xs pl-5">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
-                <div className="pl-5"><StoreHoursList compact /></div>
+                <div className="border-t border-gray-200 pt-2 mt-2"><StoreHoursList compact /></div>
               </div>
               <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
                 🪪 <strong>Bring a valid photo ID</strong> — the person picking up must be 21+, and the name on the ID should match the order.

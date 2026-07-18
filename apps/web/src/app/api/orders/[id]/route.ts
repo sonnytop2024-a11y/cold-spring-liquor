@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetOrder, dbUpdateOrder } from "@/lib/db";
+import { dbGetOrder, dbUpdateOrder, dbOverlayCurrentProductImages } from "@/lib/db";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const order = await dbGetOrder(params.id);
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-  return NextResponse.json(order);
+  const [withImages] = await dbOverlayCurrentProductImages([order]);
+  return NextResponse.json(withImages);
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

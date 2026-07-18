@@ -8,11 +8,11 @@ export function StoreHoursList({ compact }: { compact?: boolean } = {}) {
   return (
     <div className={compact ? "mt-2" : "mt-3"}>
       <p className={`font-bold text-gray-700 uppercase tracking-wide mb-1 ${compact ? "text-[10px]" : "text-xs"}`}>🕐 Store Hours</p>
-      <div className={`grid grid-cols-2 gap-x-4 gap-y-0.5 ${compact ? "text-[11px]" : "text-xs"}`}>
+      <div className={compact ? "space-y-0.5 text-[11px]" : "grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs"}>
         {STORE_HOURS.map(h => (
-          <div key={h.day} className="flex justify-between gap-2">
-            <span className="text-gray-500">{h.day}</span>
-            <span className={`whitespace-nowrap ${h.closed ? "text-red-500 font-semibold" : "text-gray-700 font-medium"}`}>{h.hours}</span>
+          <div key={h.day} className="flex items-baseline justify-between gap-3">
+            <span className="text-gray-500 shrink-0">{h.day}</span>
+            <span className={`whitespace-nowrap text-right ${h.closed ? "text-red-500 font-semibold" : "text-gray-700 font-medium"}`}>{h.hours}</span>
           </div>
         ))}
       </div>
