@@ -18,6 +18,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { PayPalPaymentForm } from "./PayPalPaymentForm";
 import { FulfillmentSelector } from "./FulfillmentSelector";
+import { StoreClosingBanner } from "./StoreClosingBanner";
 import { PaymentMethodCard, CardOutlineIcon, PayPalPIcon, CARD_BRAND_LOGOS, PAYPAL_BRAND_LOGOS } from "./PaymentMethodCard";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -1345,18 +1346,15 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         )}
       </div>
 
-      {/* Delivery timing (delivery only) */}
-      {!isPickup && (timing.type === "same-day" ? (
+      {/* Delivery timing (delivery only). After the 8:30 PM cutoff the
+          StoreClosingBanner above the submit button takes over — no small
+          amber note here, so the message isn't shown twice. */}
+      {!isPickup && timing.type === "same-day" && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
           <Clock size={15} className="shrink-0 text-green-600" />
           <span>{timing.message}</span>
         </div>
-      ) : (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <AlertTriangle size={15} className="shrink-0 text-amber-500 mt-0.5" />
-          <span>{timing.message}</span>
-        </div>
-      ))}
+      )}
 
       {/* Pickup Only conflict — blocks checkout in Delivery mode */}
       {pickupOnlyConflictItems.length > 0 && (
@@ -1391,6 +1389,11 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       )}
 
       </div>
+
+      {/* After 8:30 PM Central (or Sunday): emphasize next-morning prep for
+          delivery orders, directly above the submit button. Pickup is exempt —
+          it has an explicit time-window picker. */}
+      {!isPickup && <StoreClosingBanner />}
 
       {!clientSecret && (
         <button type="submit" disabled={submitting || items.length === 0 || !meetsMinimum || pickupOnlyConflictItems.length > 0}

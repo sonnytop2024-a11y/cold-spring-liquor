@@ -117,27 +117,29 @@ const flashCSS = `
   @media (max-width:480px){ .fd-card-inner{ padding:12px 12px 14px; border-radius:20px; } }
   .fd-card.expired .fd-card-inner,.fd-card.soldout .fd-card-inner{ opacity:.55; }
 
-  .fd-imgwrap{position:relative;height:230px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
-  @media (max-width:480px){ .fd-imgwrap{ height:172px; margin-bottom:10px; } }
-  .fd-ring{
-    position:absolute;width:200px;height:200px;border-radius:50%;
-    background:radial-gradient(circle, rgba(255,140,30,.22) 0%, rgba(255,120,20,.10) 45%, transparent 72%);
-    box-shadow:0 0 40px 6px rgba(255,120,20,.18);
-    z-index:1;
+  /* Full-bleed image area: the product photo itself, blurred and oversized,
+     fills the whole area as a backdrop (so no rectangle edge shows on the
+     dark card), the sharp photo sits centered on top with side-edge fades,
+     and a vignette blends everything into the card body. Works with white
+     catalog photos and dark scene photos alike — no per-image cropping. */
+  .fd-imgwrap{position:relative;height:250px;margin-bottom:14px;overflow:hidden;border-radius:16px;background:#0D0D0D;}
+  @media (max-width:480px){ .fd-imgwrap{ height:180px; margin-bottom:10px; border-radius:12px; } }
+  .fd-bgblur{position:absolute;inset:-24px;z-index:0;pointer-events:none;}
+  .fd-bgblur img{filter:blur(24px) saturate(1.1) brightness(.85);}
+  .fd-card.expired .fd-bgblur img,.fd-card.soldout .fd-bgblur img{filter:blur(24px) grayscale(1) brightness(.5);}
+  .fd-sharp{
+    position:absolute;inset:0;z-index:2;
+    -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%);
+    mask-image:linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%);
   }
-  @media (max-width:480px){ .fd-ring{ width:150px; height:150px; } }
-  .fd-card.expired .fd-ring,.fd-card.soldout .fd-ring{ background:radial-gradient(circle, rgba(120,120,120,.12) 0%, transparent 70%); box-shadow:none; }
-
-  /* White circular plate: catalog photos have white backgrounds, so they blend
-     seamlessly into the plate instead of showing as a white rectangle on the
-     dark card. Transparent images look fine on it too. */
-  .fd-bottle{
-    position:relative;z-index:2;width:185px;height:185px;border-radius:50%;overflow:hidden;
-    background:radial-gradient(circle at 50% 32%, #ffffff 0%, #f5f5f5 62%, #e9e9e9 100%);
-    box-shadow:0 10px 22px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.5);
+  .fd-sharp img{filter:drop-shadow(0 12px 28px rgba(0,0,0,.55));}
+  .fd-card.expired .fd-sharp,.fd-card.soldout .fd-sharp{ filter:grayscale(.6); }
+  .fd-vignette{
+    position:absolute;inset:0;z-index:3;pointer-events:none;
+    background:
+      radial-gradient(115% 95% at 50% 45%, transparent 48%, rgba(9,9,9,.6) 100%),
+      linear-gradient(180deg, rgba(9,9,9,.25), transparent 26%, transparent 74%, rgba(9,9,9,.45));
   }
-  @media (max-width:480px){ .fd-bottle{ width:136px; height:136px; } }
-  .fd-card.expired .fd-bottle,.fd-card.soldout .fd-bottle{ filter:grayscale(.6); }
 
   .fd-countdown .cd-time.critical{animation:cdPulse 1s ease-in-out infinite;}
   @keyframes cdPulse{ 0%,100%{opacity:1;} 50%{opacity:.55;} }
@@ -182,7 +184,11 @@ function FlashDealCard({ deal }: { deal: Deal }) {
     <div className={`fd-card ${cardStateClass}`}>
       <div className="fd-card-inner">
         <div className="fd-imgwrap">
-          <div className="fd-ring" />
+          {deal.imageUrl && (
+            <div className="fd-bgblur">
+              <Image src={deal.imageUrl} alt="" aria-hidden fill className="object-cover" sizes="480px" />
+            </div>
+          )}
 
           {state === "soldout" ? (
             <div className="absolute top-2 left-2 z-[5] bg-[rgba(30,30,30,.7)] border border-[#555] rounded-full px-2.5 py-1 text-[10px] font-extrabold text-[#999] tracking-wide">SOLD OUT</div>
@@ -205,13 +211,14 @@ function FlashDealCard({ deal }: { deal: Deal }) {
             </div>
           )}
 
-          <Link href={`/products/${deal.slug}`} className="fd-bottle block hover:opacity-90 transition-opacity">
+          <Link href={`/products/${deal.slug}`} className="fd-sharp block hover:opacity-90 transition-opacity">
             {deal.imageUrl ? (
-              <Image src={deal.imageUrl} alt={deal.name} fill className="object-contain p-4 max-[480px]:p-3" sizes="(max-width: 480px) 136px, 185px" />
+              <Image src={deal.imageUrl} alt={deal.name} fill className="object-contain py-2" sizes="(max-width: 480px) 76vw, 400px" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl max-[480px]:text-4xl">🥃</div>
             )}
           </Link>
+          <div className="fd-vignette" />
         </div>
 
         <Link href={`/products/${deal.slug}`} className="text-white font-extrabold text-[19px] max-[480px]:text-[16px] leading-tight line-clamp-2 min-h-[2.5em] max-[480px]:min-h-[2.3em] hover:text-amber-400 transition-colors">
