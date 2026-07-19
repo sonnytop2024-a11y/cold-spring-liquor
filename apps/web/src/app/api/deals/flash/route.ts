@@ -8,7 +8,7 @@ interface FlashDeal {
   price: number; salePrice: number; imageUrl: string | null;
   volume: string; stockQty: number; maxStock: number;
   active: boolean; startAt: string | null; endsAt: string | null;
-  createdAt: string; productId?: string | null;
+  createdAt: string; productId?: string | null; sortOrder?: number;
 }
 
 export async function GET() {
@@ -28,6 +28,13 @@ export async function GET() {
       if (d.endsAt && new Date(d.endsAt) < now) return false;
       return true;
     });
+
+    // Admin-set order first; legacy deals without sortOrder fall back to newest-first
+    active.sort(
+      (a, b) =>
+        (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 
     return NextResponse.json(active);
   } catch {

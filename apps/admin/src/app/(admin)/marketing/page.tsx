@@ -668,6 +668,8 @@ function FlashDealsTab() {
   const [showModal, setShowModal] = useState(false);
   const [editDeal, setEditDeal] = useState<FlashDeal | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const { data: deals = [], isLoading } = useQuery<FlashDeal[]>({
@@ -706,9 +708,31 @@ function FlashDealsTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-flash-deals"] }),
   });
 
+  const reorderM = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await fetch(`${API}/admin/flash-deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reorder", ids }) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-flash-deals"] }),
+  });
+
   async function handleSave(data: any) {
     if (data.id) await updateM.mutateAsync(data);
     else await createM.mutateAsync(data);
+  }
+
+  // Drag-to-reorder — same pattern as BannersTab
+  function onDragStart(id: string) { setDragId(id); }
+  function onDragOver(e: React.DragEvent, id: string) { e.preventDefault(); setDragOverId(id); }
+  function onDrop(targetId: string) {
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+    const ids = deals.map(d => d.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    const reordered = [...ids];
+    reordered.splice(from, 1);
+    reordered.splice(to, 0, dragId);
+    reorderM.mutate(reordered);
+    setDragId(null); setDragOverId(null);
   }
 
   const now = new Date();
@@ -740,6 +764,11 @@ function FlashDealsTab() {
         ))}
       </div>
 
+      <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex gap-2 text-xs text-yellow-700">
+        <GripVertical size={14} className="mt-0.5 shrink-0" />
+        <span>Drag deals to reorder. The first live deal appears first in the Flash Deals carousel on the website.</span>
+      </div>
+
       <div className="space-y-2">
         {isLoading ? (
           <div className="bg-white rounded-xl border p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
@@ -748,13 +777,30 @@ function FlashDealsTab() {
             <Zap size={32} className="mx-auto mb-2 opacity-30" />
             <p>No flash deals yet. Create your first!</p>
           </div>
-        ) : deals.map(d => {
+        ) : deals.map((d, idx) => {
           const expired = isExpired(d.endsAt);
           const live = d.active && !expired && (!d.startAt || new Date(d.startAt) <= now);
           const pct = discountPct(d.price, d.salePrice);
           const stockPct = d.maxStock > 0 ? Math.round((d.stockQty / d.maxStock) * 100) : 100;
+          const isDragOver = dragOverId === d.id;
           return (
-            <div key={d.id} className={`bg-white rounded-xl border p-4 flex items-center gap-3 ${expired ? "opacity-70" : ""}`}>
+            <div
+              key={d.id}
+              draggable
+              onDragStart={() => onDragStart(d.id)}
+              onDragOver={e => onDragOver(e, d.id)}
+              onDrop={() => onDrop(d.id)}
+              onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+              className={`bg-white rounded-xl border p-4 flex items-center gap-3 transition-all ${expired ? "opacity-70" : ""} ${isDragOver ? "border-yellow-400 bg-yellow-50 scale-[1.01]" : ""} ${dragId === d.id ? "opacity-50" : ""}`}
+            >
+              {/* Drag handle */}
+              <div className="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 touch-none">
+                <GripVertical size={18} />
+              </div>
+
+              {/* Sort # */}
+              <span className="shrink-0 w-5 text-xs text-gray-400 font-mono text-center">{idx + 1}</span>
+
               {/* Thumbnail */}
               <div className="w-12 h-12 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
                 {d.imageUrl

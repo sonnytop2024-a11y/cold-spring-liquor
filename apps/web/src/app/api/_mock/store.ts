@@ -194,6 +194,7 @@ export interface MockFlashDeal {
   endsAt: string | null;
   createdAt: string;
   productId?: string | null;
+  sortOrder?: number;
 }
 
 export interface MockBundleTier {

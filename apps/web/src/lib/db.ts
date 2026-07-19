@@ -445,7 +445,18 @@ async function dbSaveFlashDealMap(map: Record<string, MockFlashDeal>): Promise<v
 
 export async function dbGetAllFlashDeals(): Promise<MockFlashDeal[]> {
   const map = await dbLoadFlashDealMap();
-  return Object.values(map).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // Explicit sortOrder first; legacy deals without one fall back to newest-first
+  return Object.values(map).sort(
+    (a, b) =>
+      (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+export async function dbReorderFlashDeals(orderedIds: string[]): Promise<void> {
+  const map = await dbLoadFlashDealMap();
+  orderedIds.forEach((id, i) => { if (map[id]) map[id].sortOrder = i; });
+  await dbSaveFlashDealMap(map);
 }
 
 export async function dbGetActiveFlashDeals(): Promise<MockFlashDeal[]> {
