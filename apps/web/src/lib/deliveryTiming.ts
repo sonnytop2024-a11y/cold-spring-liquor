@@ -3,12 +3,18 @@
 
 export type DeliveryType = "same-day" | "next-morning";
 
+export type ClosedReason = "sunday" | "before-open" | "after-close" | "cutoff";
+
 export interface DeliveryTiming {
   type: DeliveryType;
   estimatedDelivery: Date;
   label: string;
   message: string;
   isStoreClosed: boolean;
+  // Distinguishes WHY next-morning applies, so the UI can word each case correctly:
+  // "cutoff" = store still open but past the 8:30 PM delivery cutoff,
+  // "after-close" = past the actual 9 PM closing time, "sunday" = closed all day.
+  closedReason?: ClosedReason;
 }
 
 const OPEN_HOUR   = 10;  // 10:00 AM
@@ -66,6 +72,7 @@ export function getDeliveryTiming(now: Date = new Date(), range: DeliveryTimeRan
       label: `${dayName} morning`,
       message: "We are closed on Sunday. Your order will be prepared for Monday morning delivery.",
       isStoreClosed: true,
+      closedReason: "sunday",
     };
   }
 
@@ -84,23 +91,30 @@ export function getDeliveryTiming(now: Date = new Date(), range: DeliveryTimeRan
       label: "Today by 10:30 AM",
       message: "Our store is not open yet. Your order will be prepared and delivered today by 10:30 AM.",
       isStoreClosed: true,
+      closedReason: "before-open",
     };
   }
 
-  // Past cutoff (8:30 PM) — next business morning
+  // Past cutoff (8:30 PM) — next business morning. Split into two distinct
+  // states so the wording stays accurate: 8:30–9:00 PM the store is still
+  // technically open (just past the delivery cutoff); after 9:00 PM it's
+  // actually closed for the night.
   if (pastCutoff || !storeOpen) {
     const eta = nextOpenMorning(now);
     const dayName = eta.toLocaleDateString("en-US", { weekday: "long" });
     const isSaturdayNight = day === 6; // Saturday after cutoff → Monday
-    const msg = isSaturdayNight
-      ? `Our store is near closing time. Your order will be prepared for Monday morning delivery.`
-      : `Our store is near closing time. Your order will be prepared for ${dayName} morning delivery.`;
+    const nextMorningLabel = isSaturdayNight ? "Monday" : dayName;
+    const afterClose = mins >= closeMins;
+    const msg = afterClose
+      ? `We're closed for the night. Your order will be prepared for ${nextMorningLabel} morning delivery.`
+      : `Our store is near closing time. Your order will be prepared for ${nextMorningLabel} morning delivery.`;
     return {
       type: "next-morning",
       estimatedDelivery: eta,
       label: `${dayName} morning`,
       message: msg,
-      isStoreClosed: false,
+      isStoreClosed: afterClose,
+      closedReason: afterClose ? "after-close" : "cutoff",
     };
   }
 

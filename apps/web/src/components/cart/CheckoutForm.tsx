@@ -565,11 +565,21 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   // Pick Up In Store: automatic discount, tax on the discounted subtotal
   const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
-  const tax = (subtotal - pickupDiscount) * TAX;
+  // Rounded to cents at each step — matches processOrder.ts server-side math exactly.
+  // Without this, a rounded gift-card amount (capped to cents when applied) can leave
+  // a sub-cent float residue in an unrounded total (e.g. $0.0025) that displays as
+  // "$0.00" but isn't exactly zero, so checkout skips the free-order path and instead
+  // tries to create a Stripe charge below its $0.50 minimum — which always fails.
+  const tax = Math.round((subtotal - pickupDiscount) * TAX * 100) / 100;
   // Re-cap gift card to what the order actually owes (guards against over-application when rewards added after gift card)
   const preGiftOwed = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - pickupDiscount + tax);
   const effectiveGiftCard = Math.min(giftCardAmount, preGiftOwed);
-  const total = Math.max(0, preGiftOwed - effectiveGiftCard);
+  const total = Math.round(Math.max(0, preGiftOwed - effectiveGiftCard) * 100) / 100;
+  // Card processors (Stripe) reject charges under $0.50 — any leftover below that after
+  // rewards/gift card is uncollectable, so treat it the same as a full $0 order rather
+  // than sending the customer into a payment flow that will always fail.
+  const STRIPE_MIN_CHARGE = 0.5;
+  const uncollectableRemainder = total > 0 && total < STRIPE_MIN_CHARGE;
   const pointsEarned = Math.floor(total); // 1 pt per $1
   const userPoints = user?.points ?? 0;
   const bestEligibleTier = [1000, 500, 250].find(t => userPoints >= t) ?? 0;
@@ -692,7 +702,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
 
     setOrderPayload(buildOrderPayload());
     // Gift card (+ rewards) covers full amount → show review before finalizing
-    setPaymentStep(total === 0 ? "review-free" : "select");
+    // Anything under Stripe's $0.50 minimum can't be charged to a card, so route it
+    // through the same no-payment confirmation screen as a fully-covered $0 order.
+    setPaymentStep(total === 0 || uncollectableRemainder ? "review-free" : "select");
     setSubmitting(false);
   }
 
@@ -768,7 +780,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             </div>
             <div>
               <h2 className="font-bold text-gray-900 text-base">Review Your Order</h2>
-              <p className="text-xs text-gray-400">Paid in full by gift card — confirm to complete</p>
+              <p className="text-xs text-gray-400">
+                {total > 0 ? "Remaining balance too small to charge — confirm to complete" : "Paid in full by gift card — confirm to complete"}
+              </p>
             </div>
           </div>
         </div>
@@ -832,10 +846,12 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           </div>
           <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-baseline">
             <span className="font-bold text-gray-900">Total</span>
-            <span className="font-black text-2xl text-gray-900">$0.00</span>
+            <span className="font-black text-2xl text-gray-900">{formatCurrency(total)}</span>
           </div>
           <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center">
-            <p className="text-xs text-emerald-700 font-semibold">🎁 Fully covered by your gift card!</p>
+            <p className="text-xs text-emerald-700 font-semibold">
+              {total > 0 ? "🎁 Remaining balance is below our card minimum — no charge needed!" : "🎁 Fully covered by your gift card!"}
+            </p>
           </div>
         </div>
 
@@ -847,7 +863,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
 
         <button onClick={confirmFreeOrder} disabled={confirming}
           className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 text-white font-black py-4 rounded-2xl text-base transition-all shadow-lg shadow-brand-500/25">
-          {confirming ? <><Loader2 size={18} className="animate-spin" /> Placing Order…</> : <>Confirm Order — $0.00 →</>}
+          {confirming ? <><Loader2 size={18} className="animate-spin" /> Placing Order…</> : <>Confirm Order →</>}
         </button>
 
         <button type="button" onClick={() => setPaymentStep(null)} disabled={confirming}

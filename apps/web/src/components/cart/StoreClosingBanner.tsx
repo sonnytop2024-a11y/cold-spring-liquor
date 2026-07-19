@@ -70,7 +70,10 @@ export function StoreClosingBanner() {
   // Only after the 8:30 PM cutoff or on Sunday — hidden during business hours
   if (!timing || timing.type !== "next-morning") return null;
 
-  const headline = timing.isStoreClosed ? "We are closed on Sunday" : "Our store is near closing time!";
+  const headline =
+    timing.closedReason === "sunday" ? "We are closed on Sunday"
+    : timing.closedReason === "after-close" ? "We're closed for the night"
+    : "Our store is near closing time!";
   const body = <>Your order will be prepared for <b className="text-[#E8590C] font-extrabold">{timing.label} delivery</b>.</>;
 
   return (
