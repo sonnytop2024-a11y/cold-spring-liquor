@@ -9,13 +9,8 @@ import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { formatCurrency, calcCartTotals, calcPointsEarned, calcPointsValue, MIN_ORDER } from "@/lib/utils";
 import { calcDiscounts } from "@/lib/discountRules";
-
-// Cheap add-on suggestions to help reach the $20 minimum
-const ADDONS = [
-  { id: "imp995", name: "Bud Light 6pk", price: 12.99, volume: "12oz cans", emoji: "🍺" },
-  { id: "imp1149", name: "Modelo Especial 6pk", price: 15.99, volume: "12oz bottles", emoji: "🍺" },
-  { id: "imp1215", name: "Barefoot Cabernet Sauvignon", price: 10.99, volume: "750mL", emoji: "🍷" },
-];
+import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
+import type { Product } from "@/types";
 
 interface CartDrawerProps {
   open: boolean;
@@ -67,8 +62,26 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const amountToMin = Math.max(0, minOrder - subtotal);
   const progressPct = Math.min(100, (subtotal / minOrder) * 100);
 
-  // Suggest items not already in cart
-  const suggestions = ADDONS.filter(a => !items.find(i => i.product.id === a.id)).slice(0, 2);
+  // Cheap real in-stock products to help reach the minimum, not just the top-priced catalog page
+  const { data: addonProducts } = useQuery({
+    queryKey: ["cart-addon-suggestions"],
+    enabled: !meetsMinimum,
+    queryFn: async () => {
+      const r = await fetch("/api/products?limit=100");
+      if (!r.ok) throw new Error("products failed");
+      const json = await r.json();
+      return (json.products ?? []) as Product[];
+    },
+    staleTime: 60_000,
+  });
+
+  // Suggest cheapest real products not already in cart
+  const suggestions = useMemo(() => {
+    return [...(addonProducts ?? [])]
+      .filter(p => p.inStock && !items.find(i => i.product.id === p.id))
+      .sort((a, b) => (a.salePrice ?? a.price) - (b.salePrice ?? b.price))
+      .slice(0, 2);
+  }, [addonProducts, items]);
 
   return (
     <>
@@ -130,11 +143,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               {items.map(({ product, quantity }) => (
                 <div key={product.id} className="flex gap-3">
                   <Link href={`/products/${product.slug}`} onClick={onClose} className="relative w-16 h-16 bg-gray-50 rounded-lg overflow-hidden shrink-0">
-                    {product.imageUrl ? (
-                      <Image src={product.imageUrl} alt={product.name} fill sizes="64px" className="object-contain p-1" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl">🍾</div>
-                    )}
+                    <Image src={product.imageUrl || categoryPlaceholder(product.category)} alt={product.name} fill sizes="64px" className="object-contain p-1" />
                   </Link>
                   <div className="flex-1 min-w-0">
                     <Link href={`/products/${product.slug}`} onClick={onClose} className="flex items-center gap-1.5 flex-wrap hover:text-brand-600">
@@ -174,16 +183,24 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   <div className="space-y-2">
                     {suggestions.map(item => (
                       <div key={item.id} className="flex items-center justify-between bg-white rounded-lg border px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{item.emoji}</span>
-                          <div>
-                            <p className="text-xs font-semibold">{item.name}</p>
-                            <p className="text-xs text-gray-400">{item.volume} · {formatCurrency(item.price)}</p>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="relative w-9 h-9 bg-gray-50 rounded shrink-0 overflow-hidden">
+                            <Image
+                              src={item.imageUrl || categoryPlaceholder(item.category)}
+                              alt={item.name}
+                              fill
+                              sizes="36px"
+                              className="object-contain p-0.5"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold line-clamp-1">{item.name}</p>
+                            <p className="text-xs text-gray-400">{item.volume} · {formatCurrency(item.salePrice ?? item.price)}</p>
                           </div>
                         </div>
                         <button
-                          onClick={() => addItem({ id: item.id, name: item.name, price: item.price, salePrice: null, imageUrl: null, stockQty: 99, inStock: true, volume: item.volume } as any)}
-                          className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-0.5">
+                          onClick={() => addItem(item)}
+                          className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-0.5 shrink-0">
                           Add <Plus size={12} />
                         </button>
                       </div>
