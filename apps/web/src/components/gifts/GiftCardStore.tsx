@@ -1,13 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Gift, Mail, User, MessageSquare, CreditCard, Check, Loader2, ArrowLeft, ShieldCheck, Martini } from "lucide-react";
+import { Gift, Mail, User, MessageSquare, CreditCard, Check, Loader2, ArrowLeft, ShieldCheck, Martini, Sparkles } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 const AMOUNTS = [25, 50, 100, 250];
+
+interface BonusTier {
+  id: string;
+  minAmount: number;
+  bonusAmount: number;
+  expiryDays: number;
+  active: boolean;
+}
+
+interface GiftCardBonus {
+  code: string;
+  amount: number;
+  expiresAt?: string;
+}
+
+// Highest-value tier the amount clears — mirrors computeBonusTier() server-side.
+// Purely for the "you'll get a bonus" preview banner; the server recomputes and
+// creates the actual bonus card independently, so this can't be gamed.
+function bonusForAmount(amount: number, tiers: BonusTier[]): BonusTier | null {
+  const matches = tiers.filter((t) => amount >= t.minAmount);
+  if (matches.length === 0) return null;
+  return matches.reduce((best, t) => (t.minAmount > best.minAmount ? t : best));
+}
 
 const DESIGNS = [
   { id: "birthday", label: "Birthday", src: "/gift-cards/birthday.png" },
@@ -34,13 +57,15 @@ interface GiftCardFormData {
 function PaymentStep({
   data,
   clientSecret,
+  bonus,
   onBack,
   onSuccess,
 }: {
   data: GiftCardFormData;
   clientSecret: string;
+  bonus: BonusTier | null;
   onBack: () => void;
-  onSuccess: (code: string, paymentIntentId: string) => void;
+  onSuccess: (code: string, paymentIntentId: string, bonus: GiftCardBonus | null) => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -91,7 +116,7 @@ function PaymentStep({
         });
         const json = await res.json();
         if (res.ok) {
-          onSuccess(json.code, pi.id);
+          onSuccess(json.code, pi.id, json.bonus ?? null);
         } else {
           setError(json.error ?? "Failed to issue gift card");
         }
@@ -121,6 +146,14 @@ function PaymentStep({
             <p className="text-2xl font-heading font-bold text-[#f2d896] mt-0.5">${data.amount}.00</p>
           </div>
         </div>
+        {bonus && (
+          <div className="flex items-center gap-2 bg-gradient-to-r from-[#2a2110] to-[#1c1608] border border-[#d4af6a]/40 rounded-xl px-3 py-2 mb-4">
+            <Sparkles size={14} className="text-[#f2d896] shrink-0" />
+            <p className="text-xs text-[#f2d896] font-semibold">
+              + ${bonus.bonusAmount} Bonus Card included <span className="font-normal text-[#c9bcae]">— separate code, auto-applied</span>
+            </p>
+          </div>
+        )}
         <div className="flex justify-between items-center text-xs text-[#a8907a] border-t border-[#2a1f16] pt-3">
           <span>To: {data.recipientEmail}</span>
           <span className="text-green-500 font-semibold">Email delivery — FREE</span>
@@ -172,10 +205,20 @@ export function GiftCardStore() {
   const [clientSecret, setClientSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [successCode, setSuccessCode] = useState("");
+  const [successBonus, setSuccessBonus] = useState<GiftCardBonus | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
+  const [bonusTiers, setBonusTiers] = useState<BonusTier[]>([]);
+
+  useEffect(() => {
+    fetch("/api/gift-cards/bonus-tiers")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((tiers) => setBonusTiers(Array.isArray(tiers) ? tiers : []))
+      .catch(() => {});
+  }, []);
 
   const design = DESIGNS.find((d) => d.id === data.design) ?? DESIGNS[0];
+  const bonus = bonusForAmount(data.amount || 0, bonusTiers);
 
   function selectAmount(amt: number) {
     setCustomOpen(false);
@@ -222,13 +265,27 @@ export function GiftCardStore() {
           <p className="text-[#a8907a] mb-6">
             A <strong className="text-[#e6dccf]">${data.amount}</strong> gift card has been sent to <strong className="text-[#e6dccf]">{data.recipientEmail}</strong>.
           </p>
-          <div className="bg-[#17110c] border border-[#3a2c1e] rounded-2xl px-6 py-4 inline-block mb-6">
+          <div className="bg-[#17110c] border border-[#3a2c1e] rounded-2xl px-6 py-4 inline-block mb-4">
             <p className="text-xs text-[#a8907a] mb-1 tracking-widest uppercase">Gift Card Code</p>
             <p className="text-2xl font-black text-[#f2d896] tracking-widest font-mono">{successCode}</p>
           </div>
+
+          {successBonus && (
+            <div className="bg-gradient-to-br from-[#2a2110] to-[#1c1608] border border-[#d4af6a]/50 rounded-2xl px-6 py-4 inline-block mb-6">
+              <p className="text-xs text-[#f2d896] mb-1 tracking-widest uppercase flex items-center justify-center gap-1.5">
+                <Sparkles size={12} /> ${successBonus.amount} Bonus Card
+              </p>
+              <p className="text-2xl font-black text-[#f2d896] tracking-widest font-mono">{successBonus.code}</p>
+              <p className="text-[11px] text-[#c9bcae] mt-2">
+                {successBonus.expiresAt
+                  ? `Separate code — expires ${new Date(successBonus.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  : "Separate code — no expiration"}
+              </p>
+            </div>
+          )}
           <br />
           <button
-            onClick={() => { setStep("form"); setSuccessCode(""); setData(initialData); setCustomOpen(false); setCustomAmount(""); }}
+            onClick={() => { setStep("form"); setSuccessCode(""); setSuccessBonus(null); setData(initialData); setCustomOpen(false); setCustomAmount(""); }}
             className="text-sm text-[#d4af6a] hover:underline"
           >
             Send another gift card
@@ -335,6 +392,16 @@ export function GiftCardStore() {
             </div>
           )}
 
+          {bonus && (
+            <div className="flex items-center gap-2.5 mt-3 bg-gradient-to-r from-[#2a2110] to-[#1c1608] border border-[#d4af6a]/40 rounded-xl px-4 py-3">
+              <Sparkles size={16} className="text-[#f2d896] shrink-0" />
+              <p className="text-sm text-[#f2d896] font-semibold">
+                You&apos;ll also get a ${bonus.bonusAmount} Bonus Card!{" "}
+                <span className="font-normal text-[#c9bcae]">— applied automatically, no code needed.</span>
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-3 mt-10">
             <TrustBadge icon={Mail} label="Instant Delivery" sub="via email" />
             <TrustBadge icon={ShieldCheck} label="Secure Payment" sub="100% safe" />
@@ -408,6 +475,12 @@ export function GiftCardStore() {
                   <span className="text-[#a8907a]">Gift card amount</span>
                   <span className="font-bold text-[#e6dccf]">${(data.amount || 0).toFixed(2)}</span>
                 </div>
+                {bonus && (
+                  <div className="flex justify-between">
+                    <span className="text-[#c9bcae]">+ Bonus Card (auto-applied)</span>
+                    <span className="font-semibold text-[#f2d896]">${bonus.bonusAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-green-500 font-semibold">
                   <span>🚚 Delivery (email)</span>
                   <span>FREE & Instant</span>
@@ -427,7 +500,8 @@ export function GiftCardStore() {
               </button>
 
               <p className="text-xs text-center text-[#6b5c4d] mt-3">
-                Gift cards are delivered instantly via email · Never expire · Redeemable at checkout
+                Gift cards are delivered instantly via email · Redeemable at checkout
+                {bonus ? " · Bonus card is a separate, time-limited code" : " · Never expires"}
               </p>
             </>
           ) : clientSecret ? (
@@ -444,8 +518,9 @@ export function GiftCardStore() {
               <PaymentStep
                 data={data}
                 clientSecret={clientSecret}
+                bonus={bonus}
                 onBack={() => setStep("form")}
-                onSuccess={(code) => { setSuccessCode(code); setStep("success"); }}
+                onSuccess={(code, _pid, bonusResult) => { setSuccessCode(code); setSuccessBonus(bonusResult); setStep("success"); }}
               />
             </Elements>
           ) : null}

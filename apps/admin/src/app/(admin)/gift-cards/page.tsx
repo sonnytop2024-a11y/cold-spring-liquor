@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Gift, Plus, Copy, Check, Search, Loader2, Mail, X,
   BadgeCheck, Clock, Ban, ShoppingCart, Shield,
+  Sparkles, ChevronDown, ChevronUp, Edit2, Trash2, ToggleLeft, ToggleRight, AlertTriangle,
 } from "lucide-react";
 import { API } from "@/lib/api";
 
@@ -17,8 +18,10 @@ interface GiftCard {
   message: string;
   status: "active" | "partial" | "redeemed";
   issuedAt: string;
-  source?: "customer_purchase" | "admin_issued";
+  source?: "customer_purchase" | "admin_issued" | "bonus_promo";
   buyerEmail?: string;
+  expiresAt?: string;
+  linkedCode?: string;
 }
 
 const AMOUNTS = [5, 10, 25, 50, 100, 250];
@@ -36,6 +39,8 @@ function statusBadge(status: GiftCard["status"]) {
 function sourceBadge(source?: GiftCard["source"]) {
   if (source === "customer_purchase")
     return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700"><ShoppingCart size={9} /> Purchased</span>;
+  if (source === "bonus_promo")
+    return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"><Sparkles size={9} /> Bonus</span>;
   return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500"><Shield size={9} /> Admin</span>;
 }
 
@@ -49,6 +54,205 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
     </button>
+  );
+}
+
+// ─── Bonus Tiers ("buy $X, get a $Y bonus card" — automatic, no promo code) ───
+
+interface BonusTier {
+  id: string;
+  minAmount: number;
+  bonusAmount: number;
+  expiryDays: number;
+  active: boolean;
+}
+
+function BonusTierModal({ tier, onClose, onSave }: { tier: Partial<BonusTier> | null; onClose: () => void; onSave: (d: any) => Promise<void> }) {
+  const isEdit = !!tier?.id;
+  const [form, setForm] = useState<Partial<BonusTier>>(tier ?? { minAmount: 50, bonusAmount: 10, expiryDays: 45, active: true });
+  const [saving, setSaving] = useState(false);
+  function set(k: keyof BonusTier, v: any) { setForm((f) => ({ ...f, [k]: v })); }
+
+  const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
+  function setNum(k: keyof BonusTier, raw: string) {
+    setRawInputs((r) => ({ ...r, [k]: raw }));
+    const n = parseFloat(raw);
+    if (!isNaN(n)) set(k, n);
+    else if (raw === "") set(k, 0);
+  }
+  function numVal(k: keyof BonusTier): string {
+    return k in rawInputs ? rawInputs[k] : String((form as any)[k] ?? "");
+  }
+
+  async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <Sparkles size={18} className="text-amber-500" />
+            {isEdit ? "Edit Bonus Tier" : "New Bonus Tier"}
+          </h2>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Purchase ≥ ($) *</label>
+              <input type="text" inputMode="decimal" value={numVal("minAmount")} onChange={(e) => setNum("minAmount", e.target.value)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <p className="text-xs text-gray-400 mt-1">Amount that triggers this bonus</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Bonus Value ($) *</label>
+              <input type="text" inputMode="decimal" value={numVal("bonusAmount")} onChange={(e) => setNum("bonusAmount", e.target.value)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <p className="text-xs text-gray-400 mt-1">Value of the free bonus card</p>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Bonus Card Expires After (days)</label>
+            <input type="text" inputMode="decimal" value={numVal("expiryDays")} onChange={(e) => setNum("expiryDays", e.target.value)}
+              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <p className="text-xs text-gray-400 mt-1">0 = never expires. This only applies to the bonus card — the customer's paid gift card never expires.</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2.5">
+            <AlertTriangle size={15} className="text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-800">Confirm the expiration policy with your accountant/legal counsel for your state before relying on it — gift card expiration rules vary, and this is a bonus/promotional card, not the customer's paid balance.</p>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => set("active", !form.active)}>
+              {form.active ? <ToggleRight size={28} className="text-green-500" /> : <ToggleLeft size={28} className="text-gray-300" />}
+            </div>
+            <span className="text-sm font-medium">{form.active ? "Active — applied automatically at checkout" : "Inactive — disabled"}</span>
+          </label>
+        </div>
+        <div className="flex gap-3 p-5 border-t">
+          <button onClick={onClose} className="flex-1 border rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !form.minAmount || !form.bonusAmount}
+            className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {isEdit ? "Save Changes" : "Create Tier"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BonusTiersPanel() {
+  const [expanded, setExpanded] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editTier, setEditTier] = useState<BonusTier | null>(null);
+  const qc = useQueryClient();
+
+  const { data: tiers = [], isLoading } = useQuery<BonusTier[]>({
+    queryKey: ["admin-bonus-tiers"],
+    queryFn: () => fetch(`${API}/admin/bonus-tiers`).then((r) => r.json()),
+    refetchInterval: 30_000,
+    enabled: expanded,
+  });
+
+  const createM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/bonus-tiers`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-bonus-tiers"] }); setShowModal(false); },
+    onError: (e: any) => alert(e.message),
+  });
+  const updateM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/bonus-tiers/${data.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-bonus-tiers"] }); setEditTier(null); setShowModal(false); },
+  });
+  const deleteM = useMutation({
+    mutationFn: async (id: string) => fetch(`${API}/admin/bonus-tiers/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-bonus-tiers"] }),
+  });
+  const toggleM = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const r = await fetch(`${API}/admin/bonus-tiers/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) });
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-bonus-tiers"] }),
+  });
+
+  async function handleSave(data: any) {
+    if (data.id) await updateM.mutateAsync(data);
+    else await createM.mutateAsync(data);
+  }
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+      {showModal && <BonusTierModal tier={editTier} onClose={() => { setShowModal(false); setEditTier(null); }} onSave={handleSave} />}
+
+      <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center justify-between px-5 py-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+            <Sparkles size={15} className="text-amber-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-bold text-gray-900 text-sm">Bonus Tiers</p>
+            <p className="text-xs text-gray-500">Automatic &quot;buy $X, get a $Y bonus card&quot; — no promo code needed</p>
+          </div>
+        </div>
+        {expanded ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+      </button>
+
+      {expanded && (
+        <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs text-gray-500">{tiers.length} tier{tiers.length === 1 ? "" : "s"} · {tiers.filter((t) => t.active).length} active</p>
+            <button onClick={() => { setEditTier(null); setShowModal(true); }}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors">
+              <Plus size={13} /> New Tier
+            </button>
+          </div>
+
+          {isLoading ? (
+            <div className="py-8 text-center text-gray-400"><Loader2 size={20} className="animate-spin mx-auto" /></div>
+          ) : tiers.length === 0 ? (
+            <div className="py-8 text-center text-gray-400 text-sm">No bonus tiers configured.</div>
+          ) : (
+            <div className="space-y-2">
+              {tiers.map((t) => (
+                <div key={t.id} className={`flex items-center gap-3 border rounded-xl p-3 ${!t.active ? "opacity-60" : ""}`}>
+                  <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-amber-100 flex flex-col items-center justify-center">
+                    <span className="text-base font-black text-amber-700">${t.bonusAmount}</span>
+                    <span className="text-[9px] font-semibold text-amber-500 uppercase">bonus</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">Spend ${t.minAmount}+ → get ${t.bonusAmount} bonus card</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {t.expiryDays > 0 ? `Bonus card expires in ${t.expiryDays} days` : "Bonus card never expires"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => toggleM.mutate({ id: t.id, active: !t.active })}
+                      className={`flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${t.active ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                      {t.active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                      {t.active ? "Active" : "Off"}
+                    </button>
+                    <button onClick={() => { setEditTier(t); setShowModal(true); }} className="text-gray-400 hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50"><Edit2 size={14} /></button>
+                    <button
+                      onClick={() => { if (confirm(`Delete the $${t.minAmount}+ → $${t.bonusAmount} bonus tier?`)) deleteM.mutate(t.id); }}
+                      className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"
+                    ><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -133,6 +337,8 @@ export default function GiftCardsPage() {
         </div>
       </div>
 
+      <BonusTiersPanel />
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-48">
@@ -216,6 +422,11 @@ export default function GiftCardsPage() {
                     <td className="px-4 py-3">{statusBadge(card.status)}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                       {new Date(card.issuedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      {card.expiresAt && (
+                        <div className={new Date(card.expiresAt) < new Date() ? "text-red-500 font-semibold mt-0.5" : "text-amber-500 mt-0.5"}>
+                          exp {new Date(card.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

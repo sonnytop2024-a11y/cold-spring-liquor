@@ -5,6 +5,7 @@ async function lookupCode(code: string) {
   if (!code) return null;
   const card = await dbGetGiftCard(code.toUpperCase());
   if (!card || card.status === "redeemed" || card.remainingBalance <= 0) return null;
+  if (card.expiresAt && new Date(card.expiresAt).getTime() < Date.now()) return null;
   return card;
 }
 

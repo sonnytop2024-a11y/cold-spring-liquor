@@ -159,7 +159,34 @@ function orderConfirmationHtml(order: MockOrder): string {
 
 const GIFT_CARD_DESIGN_IDS = new Set(["birthday", "thank-you", "congratulations", "anniversary", "love"]);
 
-function giftCardHtml(code: string, amount: number, senderName: string, message: string, design?: string): string {
+export interface GiftCardBonus {
+  code: string;
+  amount: number;
+  expiresAt?: string; // ISO date — omitted means the bonus card never expires
+}
+
+function bonusCardBlock(bonus?: GiftCardBonus): string {
+  if (!bonus) return "";
+  const expiryLabel = bonus.expiresAt
+    ? `it expires <strong style="color:#f2d896;">${new Date(bonus.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>, so use it before then`
+    : "it does not expire";
+  return `
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#2a2110" style="background:#2a2110;border:1px dashed #d4af6a;border-radius:16px;margin-bottom:28px;">
+            <tr><td align="center" style="padding:24px 32px;">
+              <p style="margin:0 0 6px;font-size:11px;color:#f2d896;text-transform:uppercase;letter-spacing:2px;font-weight:700;">🎁 Plus, a Bonus Card — On Us</p>
+              <p style="margin:0 0 16px;font-size:36px;font-weight:900;color:#f2d896;">${formatCurrency(bonus.amount)}</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" bgcolor="#1a1108" style="background:#1a1108;border:1px solid #d4af6a;border-radius:10px;">
+                <tr><td align="center" style="padding:12px 24px;">
+                  <p style="margin:0 0 2px;font-size:11px;color:#d4af6a;letter-spacing:2px;">BONUS CODE</p>
+                  <p style="margin:0;font-size:20px;font-weight:800;color:#f2d896;letter-spacing:3px;font-family:monospace;">${bonus.code}</p>
+                </td></tr>
+              </table>
+              <p style="margin:14px 0 0;font-size:12px;color:#e0c9a0;">This bonus card is a separate code from your gift card above — ${expiryLabel}.</p>
+            </td></tr>
+          </table>`;
+}
+
+function giftCardHtml(code: string, amount: number, senderName: string, message: string, design?: string, bonus?: GiftCardBonus): string {
   const designUrl = design && GIFT_CARD_DESIGN_IDS.has(design)
     ? `${STORE_URL}/gift-cards/${design}.png`
     : null;
@@ -203,7 +230,9 @@ function giftCardHtml(code: string, amount: number, senderName: string, message:
             </td></tr>
           </table>
 
-          <p style="margin:0 0 20px;font-size:14px;color:#6b7280;text-align:center;">Enter the code above at checkout under <strong style="color:#111827;">Gift Cards</strong></p>
+          ${bonusCardBlock(bonus)}
+
+          <p style="margin:0 0 20px;font-size:14px;color:#6b7280;text-align:center;">Enter ${bonus ? "either code" : "the code above"} at checkout under <strong style="color:#111827;">Gift Cards</strong></p>
 
           <!-- CTA -->
           <div style="text-align:center;">
@@ -315,14 +344,17 @@ export async function sendGiftCardEmail(
   senderName: string,
   message: string,
   design?: string,
+  bonus?: GiftCardBonus,
 ): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
   try {
     await getResend().emails.send({
       from: FROM,
       to: recipientEmail,
-      subject: `${senderName} sent you a $${amount} gift card 🎁`,
-      html: giftCardHtml(code, amount, senderName, message, design),
+      subject: bonus
+        ? `${senderName} sent you a $${amount} gift card — plus a $${bonus.amount} bonus! 🎁`
+        : `${senderName} sent you a $${amount} gift card 🎁`,
+      html: giftCardHtml(code, amount, senderName, message, design, bonus),
     });
   } catch (e) {
     console.error("[email] sendGiftCardEmail failed:", e);

@@ -390,9 +390,12 @@ export interface GiftCard {
   message: string;
   status: "active" | "redeemed" | "partial";
   issuedAt: string;
-  source?: "customer_purchase" | "admin_issued";
+  source?: "customer_purchase" | "admin_issued" | "bonus_promo";
   buyerEmail?: string; // who paid (customer purchases only)
   design?: string; // selected card design id (see GiftCardStore DESIGNS)
+  expiresAt?: string; // ISO date — bonus cards only; undefined/null = never expires
+  linkedCode?: string; // bonus cards only: code of the qualifying purchase card
+  bonusTierId?: string; // bonus cards only: which BonusTier granted this
 }
 
 async function dbLoadGiftCardMap(): Promise<Record<string, GiftCard>> {
@@ -409,6 +412,82 @@ export async function dbSaveGiftCard(card: GiftCard): Promise<void> {
   const map = await dbLoadGiftCardMap();
   map[card.code.toUpperCase()] = card;
   await dbSaveSettings({ giftCards: map } as any);
+}
+
+// ── Gift Card Bonus Tiers (stored in csl_settings under bonusTiers key) ──────
+// Automatic "buy $X, get a $Y bonus card" promo — mirrors bundleTiers below.
+// No promo code: the frontend reads the active tiers and applies whichever one
+// matches the purchase amount, same as the checkout bundle-discount flow.
+
+export interface BonusTier {
+  id: string;
+  minAmount: number; // purchase amount threshold, e.g. 50
+  bonusAmount: number; // value of the bonus card granted, e.g. 10
+  expiryDays: number; // bonus card expires this many days after issue (0 = never)
+  active: boolean;
+}
+
+function getDefaultBonusTiers(): BonusTier[] {
+  return [
+    { id: "bonus1", minAmount: 50, bonusAmount: 10, expiryDays: 45, active: true },
+    { id: "bonus2", minAmount: 100, bonusAmount: 20, expiryDays: 45, active: true },
+  ];
+}
+
+async function dbLoadBonusTiers(): Promise<BonusTier[]> {
+  const settings = await dbGetSettings();
+  const existing = (settings as any).bonusTiers;
+  if (existing) return existing as BonusTier[];
+  const defaults = getDefaultBonusTiers();
+  await dbSaveSettings({ bonusTiers: defaults } as any);
+  return defaults;
+}
+
+async function dbSaveBonusTiers(tiers: BonusTier[]): Promise<void> {
+  await dbSaveSettings({ bonusTiers: tiers } as any);
+}
+
+export async function dbGetAllBonusTiers(): Promise<BonusTier[]> {
+  return dbLoadBonusTiers();
+}
+
+export async function dbGetActiveBonusTiers(): Promise<BonusTier[]> {
+  return (await dbLoadBonusTiers()).filter((t) => t.active);
+}
+
+export async function dbCreateBonusTier(fields: Omit<BonusTier, "id">): Promise<BonusTier> {
+  const tiers = await dbLoadBonusTiers();
+  const tier: BonusTier = { id: `bonus${Date.now()}`, ...fields };
+  tiers.push(tier);
+  await dbSaveBonusTiers(tiers);
+  return tier;
+}
+
+export async function dbUpdateBonusTier(id: string, fields: Partial<BonusTier>): Promise<BonusTier | undefined> {
+  const tiers = await dbLoadBonusTiers();
+  const idx = tiers.findIndex((t) => t.id === id);
+  if (idx === -1) return undefined;
+  tiers[idx] = { ...tiers[idx], ...fields };
+  await dbSaveBonusTiers(tiers);
+  return tiers[idx];
+}
+
+export async function dbDeleteBonusTier(id: string): Promise<boolean> {
+  const tiers = await dbLoadBonusTiers();
+  const idx = tiers.findIndex((t) => t.id === id);
+  if (idx === -1) return false;
+  tiers.splice(idx, 1);
+  await dbSaveBonusTiers(tiers);
+  return true;
+}
+
+// Highest-value active tier whose threshold the amount clears, or null.
+// Threshold-based (not an exact preset match) so custom amounts qualify too —
+// e.g. a $120 custom purchase gets the $100 tier's bonus, not the $50 one.
+export function computeBonusTier(amount: number, tiers: BonusTier[]): BonusTier | null {
+  const matches = tiers.filter((t) => t.active && amount >= t.minAmount);
+  if (matches.length === 0) return null;
+  return matches.reduce((best, t) => (t.minAmount > best.minAmount ? t : best));
 }
 
 // ── Flash Deals (stored in csl_settings row id=1 under flashDeals key) ───────
