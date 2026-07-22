@@ -176,7 +176,7 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
 
         <div className="flex items-center justify-between gap-2 mt-auto">
           <div className="min-w-0">
-            <span className="font-product text-base font-black text-gray-900 block">
+            <span className={`font-product text-base font-black block ${product.salePrice ? "text-red-600" : "text-gray-900"}`}>
               ${(product.salePrice ?? product.price).toFixed(2)}
             </span>
             {product.salePrice && (
