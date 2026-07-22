@@ -189,15 +189,19 @@ function giftCardHtml(code: string, amount: number, senderName: string, message:
 
           <!-- Gift Card Visual -->
           ${designUrl ? `<img src="${designUrl}" alt="Gift card" width="536" style="width:100%;max-width:536px;height:auto;border-radius:16px;display:block;margin:0 0 16px;" />` : ""}
-          <div style="background:linear-gradient(135deg,#111827 0%,#1f2937 50%,#0f172a 100%);border-radius:16px;padding:28px 32px;margin-bottom:28px;text-align:center;">
-            <p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:2px;">Gift Card Value</p>
-            <p style="margin:0 0 20px;font-size:52px;font-weight:900;color:#f97316;">${formatCurrency(amount)}</p>
-            <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:12px 24px;display:inline-block;">
-              <p style="margin:0 0 2px;font-size:11px;color:#6b7280;letter-spacing:2px;">YOUR CODE</p>
-              <p style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:4px;font-family:monospace;">${code}</p>
-            </div>
-            <p style="margin:14px 0 0;font-size:12px;color:#4b5563;">Valid for any purchase · Never expires</p>
-          </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0f0d0a" style="background:#0f0d0a;border-radius:16px;margin-bottom:28px;">
+            <tr><td align="center" style="padding:28px 32px;">
+              <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:2px;">Gift Card Value</p>
+              <p style="margin:0 0 20px;font-size:52px;font-weight:900;color:#f97316;">${formatCurrency(amount)}</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" bgcolor="#2a2115" style="background:#2a2115;border:1px solid #d4af6a;border-radius:10px;">
+                <tr><td align="center" style="padding:12px 24px;">
+                  <p style="margin:0 0 2px;font-size:11px;color:#d4af6a;letter-spacing:2px;">YOUR CODE</p>
+                  <p style="margin:0;font-size:22px;font-weight:800;color:#f2d896;letter-spacing:4px;font-family:monospace;">${code}</p>
+                </td></tr>
+              </table>
+              <p style="margin:14px 0 0;font-size:12px;color:#9ca3af;">Valid for any purchase · Never expires</p>
+            </td></tr>
+          </table>
 
           <p style="margin:0 0 20px;font-size:14px;color:#6b7280;text-align:center;">Enter the code above at checkout under <strong style="color:#111827;">Gift Cards</strong></p>
 

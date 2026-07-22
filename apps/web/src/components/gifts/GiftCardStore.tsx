@@ -46,6 +46,7 @@ function PaymentStep({
   const elements = useElements();
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
+  const selectedDesign = DESIGNS.find((d) => d.id === data.design) ?? DESIGNS[0];
 
   async function handlePay() {
     if (!stripe || !elements) return;
@@ -111,11 +112,16 @@ function PaymentStep({
       {/* Order summary */}
       <div className="bg-[#0e0c09] border border-[#2a1f16] rounded-2xl p-5 mb-6">
         <p className="text-xs text-[#a8907a] font-medium uppercase tracking-widest mb-3">Order Summary</p>
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-[#e6dccf]">${data.amount} Gift Card</span>
-          <span className="font-bold text-[#f2d896]">${data.amount}.00</span>
+        <div className="flex gap-3 mb-4">
+          <div className="relative w-24 aspect-[16/10] rounded-lg overflow-hidden shrink-0 border border-[#2a1f16]">
+            <Image src={selectedDesign.src} alt={selectedDesign.label} fill sizes="96px" className="object-cover" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#e6dccf]">{selectedDesign.label} Gift Card</p>
+            <p className="text-2xl font-heading font-bold text-[#f2d896] mt-0.5">${data.amount}.00</p>
+          </div>
         </div>
-        <div className="flex justify-between items-center text-xs text-[#a8907a]">
+        <div className="flex justify-between items-center text-xs text-[#a8907a] border-t border-[#2a1f16] pt-3">
           <span>To: {data.recipientEmail}</span>
           <span className="text-green-500 font-semibold">Email delivery — FREE</span>
         </div>
