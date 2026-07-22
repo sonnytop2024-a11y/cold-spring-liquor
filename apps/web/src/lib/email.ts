@@ -324,3 +324,30 @@ export async function sendGiftCardEmail(
     console.error("[email] sendGiftCardEmail failed:", e);
   }
 }
+
+const ADMIN_EMAIL = "sonnytop2024@gmail.com";
+
+export async function sendGiftCardAdminAlert(
+  code: string,
+  amount: number,
+  recipientEmail: string,
+  senderName: string,
+  buyerEmail?: string,
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  try {
+    await getResend().emails.send({
+      from: FROM,
+      to: ADMIN_EMAIL,
+      subject: `🎁 New gift card purchase — $${amount}`,
+      html: `<div style="font-family:-apple-system,sans-serif;font-size:14px;color:#111827;line-height:1.6;">
+        <p style="font-size:18px;font-weight:800;margin:0 0 12px;">New gift card sold: $${amount}</p>
+        <p style="margin:0;"><strong>Code:</strong> ${code}</p>
+        <p style="margin:0;"><strong>Buyer:</strong> ${senderName}${buyerEmail ? ` (${buyerEmail})` : ""}</p>
+        <p style="margin:0;"><strong>Sent to:</strong> ${recipientEmail}</p>
+      </div>`,
+    });
+  } catch (e) {
+    console.error("[email] sendGiftCardAdminAlert failed:", e);
+  }
+}

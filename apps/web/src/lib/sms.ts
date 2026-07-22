@@ -1,5 +1,5 @@
 // SMS via Twilio REST API (no SDK — plain fetch).
-// Requires env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER.
+// Requires env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER.
 // If not configured, sendSms resolves { sent: false } without throwing so
 // callers can degrade gracefully (email still goes out).
 
@@ -18,7 +18,7 @@ function normalizeUsPhone(phone: string): string | null {
 export async function sendSms(to: string, bodyText: string): Promise<SmsResult> {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_FROM_NUMBER;
+  const from = process.env.TWILIO_PHONE_NUMBER;
   if (!sid || !token || !from) {
     return { sent: false, error: "SMS not configured" };
   }

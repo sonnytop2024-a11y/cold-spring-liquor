@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { dbSaveGiftCard } from "@/lib/db";
-import { sendGiftCardEmail } from "@/lib/email";
+import { sendGiftCardEmail, sendGiftCardAdminAlert } from "@/lib/email";
+import { sendSms } from "@/lib/sms";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
+const OWNER_PHONE = "5127202489";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -41,6 +43,8 @@ export async function POST(req: NextRequest) {
 
   await dbSaveGiftCard(card);
   sendGiftCardEmail(code, amount, recipientEmail, senderName, message, design).catch(() => {});
+  sendGiftCardAdminAlert(code, amount, recipientEmail, senderName, card.buyerEmail).catch(() => {});
+  sendSms(OWNER_PHONE, `🎁 New gift card sold: $${amount} (${code}) sent to ${recipientEmail}, from ${senderName}`).catch(() => {});
 
   return NextResponse.json({ code, amount, recipientEmail });
 }
