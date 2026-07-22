@@ -392,6 +392,7 @@ export interface GiftCard {
   issuedAt: string;
   source?: "customer_purchase" | "admin_issued";
   buyerEmail?: string; // who paid (customer purchases only)
+  design?: string; // selected card design id (see GiftCardStore DESIGNS)
 }
 
 async function dbLoadGiftCardMap(): Promise<Record<string, GiftCard>> {

@@ -12,7 +12,7 @@ function genCode(): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { paymentIntentId, amount, recipientEmail, senderName, message = "", buyerEmail } = await req.json();
+  const { paymentIntentId, amount, design, recipientEmail, senderName, message = "", buyerEmail } = await req.json();
 
   if (!paymentIntentId || !amount || !recipientEmail || !senderName) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -36,10 +36,11 @@ export async function POST(req: NextRequest) {
     issuedAt: new Date().toISOString(),
     source: "customer_purchase" as const,
     buyerEmail: buyerEmail ?? pi.receipt_email ?? undefined,
+    design: typeof design === "string" ? design : undefined,
   };
 
   await dbSaveGiftCard(card);
-  sendGiftCardEmail(code, amount, recipientEmail, senderName, message).catch(() => {});
+  sendGiftCardEmail(code, amount, recipientEmail, senderName, message, design).catch(() => {});
 
   return NextResponse.json({ code, amount, recipientEmail });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Gift, Mail, User, MessageSquare, CreditCard, Check, Loader2, ArrowLeft } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -8,8 +9,17 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 const AMOUNTS = [25, 50, 100, 250];
 
+const DESIGNS = [
+  { id: "birthday", label: "Birthday", src: "/gift-cards/birthday.png" },
+  { id: "thank-you", label: "Thank You", src: "/gift-cards/thank-you.png" },
+  { id: "congratulations", label: "Congrats", src: "/gift-cards/congratulations.png" },
+  { id: "anniversary", label: "Anniversary", src: "/gift-cards/anniversary.png" },
+  { id: "love", label: "I Love You", src: "/gift-cards/love.png" },
+] as const;
+
 interface GiftCardFormData {
   amount: number;
+  design: string;
   recipientEmail: string;
   senderName: string;
   senderEmail: string;
@@ -68,6 +78,7 @@ function PaymentStep({
           body: JSON.stringify({
             paymentIntentId: pi.id,
             amount: data.amount,
+            design: data.design,
             recipientEmail: data.recipientEmail,
             senderName: data.senderName,
             message: data.message,
@@ -141,6 +152,7 @@ export function GiftCardStore() {
   const [step, setStep] = useState<"form" | "payment" | "success">("form");
   const [data, setData] = useState<GiftCardFormData>({
     amount: 50,
+    design: DESIGNS[0].id,
     recipientEmail: "",
     senderName: "",
     senderEmail: "",
@@ -189,7 +201,7 @@ export function GiftCardStore() {
         </div>
         <br />
         <button
-          onClick={() => { setStep("form"); setSuccessCode(""); setData({ amount: 50, recipientEmail: "", senderName: "", senderEmail: "", message: "" }); }}
+          onClick={() => { setStep("form"); setSuccessCode(""); setData({ amount: 50, design: DESIGNS[0].id, recipientEmail: "", senderName: "", senderEmail: "", message: "" }); }}
           className="text-sm text-brand-600 hover:underline"
         >
           Send another gift card
@@ -210,8 +222,40 @@ export function GiftCardStore() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Left: Amount + Card Preview */}
+        {/* Left: Design + Amount + Card Preview */}
         <div>
+          {/* Card preview — shows the selected design */}
+          <div className="relative rounded-2xl overflow-hidden aspect-video shadow-xl mb-6">
+            <Image
+              src={DESIGNS.find(d => d.id === data.design)?.src ?? DESIGNS[0].src}
+              alt="Gift card design preview"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
+              priority
+            />
+            <span className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-lg font-black px-3 py-1 rounded-lg">
+              ${data.amount}
+            </span>
+          </div>
+
+          <h2 className="font-semibold mb-3">Choose a Design</h2>
+          <div className="grid grid-cols-5 gap-2 mb-6">
+            {DESIGNS.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setData(prev => ({ ...prev, design: d.id }))}
+                disabled={step === "payment"}
+                title={d.label}
+                className={`relative rounded-lg overflow-hidden aspect-video border-2 transition-all disabled:cursor-not-allowed ${
+                  data.design === d.id ? "border-brand-500 ring-2 ring-brand-500/30" : "border-transparent hover:border-brand-300"
+                }`}
+              >
+                <Image src={d.src} alt={d.label} fill sizes="120px" className="object-cover" />
+              </button>
+            ))}
+          </div>
+
           <h2 className="font-semibold mb-4">Select Amount</h2>
           <div className="grid grid-cols-2 gap-3 mb-6">
             {AMOUNTS.map((amt) => (
@@ -228,25 +272,6 @@ export function GiftCardStore() {
                 ${amt}
               </button>
             ))}
-          </div>
-
-          {/* Card mockup */}
-          <div className="bg-gradient-to-br from-dark-900 to-brand-900 rounded-2xl p-6 text-white aspect-video flex flex-col justify-between shadow-xl">
-            <div className="flex items-center justify-between">
-              <span className="font-heading text-sm font-bold">Cold Spring Liquor</span>
-              <Gift size={20} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Gift Card Value</p>
-              <p className="font-heading text-5xl font-black">${data.amount}</p>
-            </div>
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-xs text-gray-400">Valid for any purchase</p>
-                <p className="text-xs text-brand-400">Never expires</p>
-              </div>
-              <p className="text-xs font-mono text-gray-500">GIFT-XXXX-XXXX</p>
-            </div>
           </div>
         </div>
 

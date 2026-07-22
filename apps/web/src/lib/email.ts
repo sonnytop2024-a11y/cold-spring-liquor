@@ -157,7 +157,13 @@ function orderConfirmationHtml(order: MockOrder): string {
 </html>`;
 }
 
-function giftCardHtml(code: string, amount: number, senderName: string, message: string): string {
+const GIFT_CARD_DESIGN_IDS = new Set(["birthday", "thank-you", "congratulations", "anniversary", "love"]);
+
+function giftCardHtml(code: string, amount: number, senderName: string, message: string, design?: string): string {
+  const designUrl = design && GIFT_CARD_DESIGN_IDS.has(design)
+    ? `${STORE_URL}/gift-cards/${design}.png`
+    : null;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>Your Gift Card</title></head>
@@ -182,6 +188,7 @@ function giftCardHtml(code: string, amount: number, senderName: string, message:
           </div>` : ""}
 
           <!-- Gift Card Visual -->
+          ${designUrl ? `<img src="${designUrl}" alt="Gift card" width="536" style="width:100%;max-width:536px;height:auto;border-radius:16px;display:block;margin:0 0 16px;" />` : ""}
           <div style="background:linear-gradient(135deg,#111827 0%,#1f2937 50%,#0f172a 100%);border-radius:16px;padding:28px 32px;margin-bottom:28px;text-align:center;">
             <p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:2px;">Gift Card Value</p>
             <p style="margin:0 0 20px;font-size:52px;font-weight:900;color:#f97316;">${formatCurrency(amount)}</p>
@@ -303,6 +310,7 @@ export async function sendGiftCardEmail(
   recipientEmail: string,
   senderName: string,
   message: string,
+  design?: string,
 ): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
   try {
@@ -310,7 +318,7 @@ export async function sendGiftCardEmail(
       from: FROM,
       to: recipientEmail,
       subject: `${senderName} sent you a $${amount} gift card 🎁`,
-      html: giftCardHtml(code, amount, senderName, message),
+      html: giftCardHtml(code, amount, senderName, message, design),
     });
   } catch (e) {
     console.error("[email] sendGiftCardEmail failed:", e);
