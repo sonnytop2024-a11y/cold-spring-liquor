@@ -21,6 +21,13 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const { items, updateQuantity, removeItem, addItem, couponCode, couponDiscount, giftCardAmount, rewardsPointsToRedeem, setRewardsRedeem } = useCartStore();
   const { user } = useAuthStore();
 
+  // Going to checkout is a forward action — skip the drawer's own slide-out-right
+  // close animation so it doesn't read as "going back" while the page pushes in.
+  const [skipCloseAnim, setSkipCloseAnim] = useState(false);
+  useEffect(() => {
+    if (open) setSkipCloseAnim(false);
+  }, [open]);
+
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
   useEffect(() => {
     fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
@@ -86,7 +93,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
   return (
     <>
       {open && <div className="fixed inset-0 z-[9999] bg-black/40" onClick={onClose} />}
-      <div className={`fixed top-0 right-0 z-[9999] h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}>
+      <div className={`fixed top-0 right-0 z-[9999] h-full w-full max-w-md bg-white shadow-2xl flex flex-col ${skipCloseAnim ? "" : "transition-transform duration-300"} ${open ? "translate-x-0" : "translate-x-full"}`}>
         <div className="flex items-center justify-between px-5 py-4 border-b bg-dark-900 text-white">
           <h2 className="font-heading text-lg font-bold">Your Cart ({items.length})</h2>
           <button onClick={onClose}><X size={22} /></button>
@@ -173,18 +180,22 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   <button onClick={() => removeItem(product.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                 </div>
               ))}
+            </div>
 
-              {/* Add-on suggestions when below minimum */}
-              {!meetsMinimum && suggestions.length > 0 && (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+            {/* Add-on suggestions when below minimum — pinned above the totals so it's
+                always fully visible, instead of getting scrolled out of view when the
+                item list is long. */}
+            {!meetsMinimum && suggestions.length > 0 && (
+              <div className="px-5 pt-3 border-t bg-gray-50">
+                <div className="bg-white border border-gray-200 rounded-xl p-3 mb-3">
                   <p className="text-xs font-bold text-gray-600 mb-2 flex items-center gap-1">
                     <ShoppingBag size={12} /> Add items to reach $20 minimum:
                   </p>
                   <div className="space-y-2">
                     {suggestions.map(item => (
-                      <div key={item.id} className="flex items-center justify-between bg-white rounded-lg border px-3 py-2">
+                      <div key={item.id} className="flex items-center justify-between bg-gray-50 rounded-lg border px-3 py-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="relative w-9 h-9 bg-gray-50 rounded shrink-0 overflow-hidden">
+                          <div className="relative w-9 h-9 bg-white rounded shrink-0 overflow-hidden">
                             <Image
                               src={item.imageUrl || categoryPlaceholder(item.category)}
                               alt={item.name}
@@ -210,10 +221,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     </Link>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="border-t px-5 py-4 space-y-2 text-sm">
+            <div className={`px-5 py-4 space-y-2 text-sm ${!meetsMinimum && suggestions.length > 0 ? "" : "border-t"}`}>
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotal)}</span>
@@ -253,7 +264,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               </p>
 
               {meetsMinimum ? (
-                <Link href="/checkout" onClick={onClose}
+                <Link href="/checkout" onClick={() => { setSkipCloseAnim(true); onClose(); }}
                   className="block w-full text-center bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl transition-colors mt-2">
                   Checkout — {formatCurrency(total)}
                 </Link>
