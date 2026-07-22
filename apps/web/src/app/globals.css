@@ -153,6 +153,16 @@
   .csl-slide-in-right, .csl-slide-in-left { animation: none; }
 }
 
+/* ── Cart → Checkout: whole page pushes in from the right, like "Continue" ── */
+@keyframes csl-page-enter-forward {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.csl-page-enter-forward { animation: csl-page-enter-forward 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .csl-page-enter-forward { animation: none; }
+}
+
 /* ── iOS Safari: date inputs have an intrinsic width that ignores w-full and
    overflows the viewport. Normalize them site-wide. ── */
 input[type="date"] {
