@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Gift, Mail, User, MessageSquare, CreditCard, Check, Loader2, ArrowLeft } from "lucide-react";
+import { Gift, Mail, User, MessageSquare, CreditCard, Check, Loader2, ArrowLeft, ShieldCheck, Martini } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
@@ -16,6 +16,9 @@ const DESIGNS = [
   { id: "anniversary", label: "Anniversary", src: "/gift-cards/anniversary.png" },
   { id: "love", label: "I Love You", src: "/gift-cards/love.png" },
 ] as const;
+
+const inputCls =
+  "w-full pl-9 pr-4 py-2.5 bg-[#0e0c09] border border-[#2a1f16] rounded-xl text-sm text-[#f2e9df] placeholder:text-[#6b5c4d] focus:outline-none focus:border-[#d4af6a] focus:ring-1 focus:ring-[#d4af6a]/30";
 
 interface GiftCardFormData {
   amount: number;
@@ -101,36 +104,36 @@ function PaymentStep({
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-[#a8907a] hover:text-[#f2e9df] mb-6 transition-colors">
         <ArrowLeft size={14} /> Back
       </button>
 
       {/* Order summary */}
-      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 mb-6">
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-3">Order Summary</p>
+      <div className="bg-[#0e0c09] border border-[#2a1f16] rounded-2xl p-5 mb-6">
+        <p className="text-xs text-[#a8907a] font-medium uppercase tracking-widest mb-3">Order Summary</p>
         <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-gray-700">${data.amount} Gift Card</span>
-          <span className="font-bold text-gray-900">${data.amount}.00</span>
+          <span className="text-sm text-[#e6dccf]">${data.amount} Gift Card</span>
+          <span className="font-bold text-[#f2d896]">${data.amount}.00</span>
         </div>
-        <div className="flex justify-between items-center text-xs text-gray-400">
+        <div className="flex justify-between items-center text-xs text-[#a8907a]">
           <span>To: {data.recipientEmail}</span>
-          <span className="text-green-600 font-semibold">Email delivery — FREE</span>
+          <span className="text-green-500 font-semibold">Email delivery — FREE</span>
         </div>
       </div>
 
-      <h3 className="font-semibold text-sm text-gray-700 mb-3">Payment Details</h3>
-      <div className="border border-gray-200 rounded-xl p-4 mb-4">
+      <h3 className="font-semibold text-sm text-[#e6dccf] mb-3">Payment Details</h3>
+      <div className="border border-[#2a1f16] rounded-xl p-4 mb-4">
         <PaymentElement options={{ layout: "tabs" }} />
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">{error}</p>
+        <p className="text-sm text-red-400 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 mb-4">{error}</p>
       )}
 
       <button
         onClick={handlePay}
         disabled={paying || !stripe}
-        className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3.5 rounded-xl transition-colors"
+        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#f2d896] to-[#c9973f] hover:brightness-105 disabled:bg-[#3a2c1e] disabled:from-[#3a2c1e] disabled:to-[#3a2c1e] disabled:text-[#7a6a58] text-[#1a1108] font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-[#d4af6a]/20"
       >
         {paying ? (
           <><Loader2 size={18} className="animate-spin" /> Processing…</>
@@ -139,7 +142,7 @@ function PaymentStep({
         )}
       </button>
 
-      <p className="text-xs text-center text-gray-400 mt-3">
+      <p className="text-xs text-center text-[#6b5c4d] mt-3">
         Secured by Stripe · Gift card delivered instantly after payment
       </p>
     </div>
@@ -148,22 +151,39 @@ function PaymentStep({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+const initialData: GiftCardFormData = {
+  amount: 50,
+  design: DESIGNS[0].id,
+  recipientEmail: "",
+  senderName: "",
+  senderEmail: "",
+  message: "",
+};
+
 export function GiftCardStore() {
   const [step, setStep] = useState<"form" | "payment" | "success">("form");
-  const [data, setData] = useState<GiftCardFormData>({
-    amount: 50,
-    design: DESIGNS[0].id,
-    recipientEmail: "",
-    senderName: "",
-    senderEmail: "",
-    message: "",
-  });
+  const [data, setData] = useState<GiftCardFormData>(initialData);
   const [clientSecret, setClientSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [successCode, setSuccessCode] = useState("");
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
+
+  const design = DESIGNS.find((d) => d.id === data.design) ?? DESIGNS[0];
+
+  function selectAmount(amt: number) {
+    setCustomOpen(false);
+    setData((d) => ({ ...d, amount: amt }));
+  }
+
+  function setCustom(value: string) {
+    setCustomAmount(value);
+    const n = Number(value);
+    if (n > 0) setData((d) => ({ ...d, amount: n }));
+  }
 
   async function handleContinue() {
-    if (!data.recipientEmail || !data.senderName) return;
+    if (!data.recipientEmail || !data.senderName || !data.amount) return;
     setLoading(true);
     try {
       const res = await fetch("/api/stripe/payment-intent", {
@@ -187,179 +207,220 @@ export function GiftCardStore() {
 
   if (step === "success") {
     return (
-      <div className="max-w-md mx-auto text-center py-16">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-          <Check size={40} className="text-green-600" />
+      <div className="bg-[#0a0806] py-24 px-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="w-20 h-20 bg-green-500/10 border border-green-500/30 rounded-full flex items-center justify-center mx-auto mb-5">
+            <Check size={40} className="text-green-400" />
+          </div>
+          <h2 className="font-heading text-3xl font-bold mb-2 text-[#f2d896]">Gift Card Sent! 🎁</h2>
+          <p className="text-[#a8907a] mb-6">
+            A <strong className="text-[#e6dccf]">${data.amount}</strong> gift card has been sent to <strong className="text-[#e6dccf]">{data.recipientEmail}</strong>.
+          </p>
+          <div className="bg-[#17110c] border border-[#3a2c1e] rounded-2xl px-6 py-4 inline-block mb-6">
+            <p className="text-xs text-[#a8907a] mb-1 tracking-widest uppercase">Gift Card Code</p>
+            <p className="text-2xl font-black text-[#f2d896] tracking-widest font-mono">{successCode}</p>
+          </div>
+          <br />
+          <button
+            onClick={() => { setStep("form"); setSuccessCode(""); setData(initialData); setCustomOpen(false); setCustomAmount(""); }}
+            className="text-sm text-[#d4af6a] hover:underline"
+          >
+            Send another gift card
+          </button>
         </div>
-        <h2 className="font-heading text-3xl font-bold mb-2">Gift Card Sent! 🎁</h2>
-        <p className="text-gray-600 mb-6">
-          A <strong>${data.amount}</strong> gift card has been sent to <strong>{data.recipientEmail}</strong>.
-        </p>
-        <div className="bg-gray-900 rounded-2xl px-6 py-4 inline-block mb-6">
-          <p className="text-xs text-gray-400 mb-1 tracking-widest uppercase">Gift Card Code</p>
-          <p className="text-2xl font-black text-white tracking-widest font-mono">{successCode}</p>
-        </div>
-        <br />
-        <button
-          onClick={() => { setStep("form"); setSuccessCode(""); setData({ amount: 50, design: DESIGNS[0].id, recipientEmail: "", senderName: "", senderEmail: "", message: "" }); }}
-          className="text-sm text-brand-600 hover:underline"
-        >
-          Send another gift card
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="text-center mb-10">
-        <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Gift size={32} className="text-brand-600" />
+    <div className="bg-[#0a0806] text-[#f2e9df] pb-20">
+      {/* ── Hero: bar photo backdrop ── */}
+      <div className="relative overflow-hidden py-20 px-4 text-center">
+        <Image src="/gift-cards/hero-bar.png" alt="" fill priority className="object-cover object-[center_65%]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0806] via-[#0a0806]/85 to-[#0a0806]" />
+        <div className="relative">
+          <div className="w-14 h-14 rounded-full border border-[#d4af6a] flex items-center justify-center mx-auto mb-5">
+            <Gift size={24} className="text-[#d4af6a]" />
+          </div>
+          <h1 className="font-heading text-4xl sm:text-5xl font-bold text-[#f2e0b0]">Digital Gift Cards</h1>
+          <p className="text-[#a8907a] text-base mt-3 max-w-sm mx-auto">
+            Give the gift of great drinks — delivered instantly via email.
+          </p>
         </div>
-        <h1 className="font-heading text-4xl font-bold mb-2">Digital Gift Cards</h1>
-        <p className="text-gray-500 text-lg">Give the gift of great drinks. Delivered instantly via email.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Left: Design + Amount + Card Preview */}
+      {/* ── Main content ── */}
+      <div className="container-main grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
+        {/* LEFT: preview + design + amount */}
         <div>
-          {/* Card preview — shows the selected design */}
-          <div className="relative rounded-2xl overflow-hidden aspect-video shadow-xl mb-6">
+          <div className="relative rounded-2xl overflow-hidden aspect-[16/9.4] shadow-2xl shadow-black/60 border border-[#d4af6a]/25 mb-8">
             <Image
-              src={DESIGNS.find(d => d.id === data.design)?.src ?? DESIGNS[0].src}
+              src={design.src}
               alt="Gift card design preview"
               fill
-              sizes="(max-width: 768px) 100vw, 50vw"
+              sizes="(max-width: 1024px) 100vw, 55vw"
               className="object-cover"
               priority
             />
-            <span className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm text-gray-900 text-sm font-bold px-3 py-1 rounded-full shadow-sm">
-              ${data.amount}
+            <span className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm text-[#1a1108] text-sm font-bold px-3 py-1 rounded-full shadow-sm">
+              ${data.amount || 0}
             </span>
           </div>
 
-          <h2 className="font-semibold mb-3">Choose a Design</h2>
-          <div className="grid grid-cols-5 gap-2 mb-6">
+          <p className="text-xs font-bold tracking-[0.16em] text-[#a8907a] mb-3">CHOOSE A DESIGN</p>
+          <div className="flex gap-3 overflow-x-auto pb-2 mb-8 -mx-1 px-1">
             {DESIGNS.map((d) => (
               <button
                 key={d.id}
-                onClick={() => setData(prev => ({ ...prev, design: d.id }))}
+                onClick={() => setData((prev) => ({ ...prev, design: d.id }))}
                 disabled={step === "payment"}
                 title={d.label}
-                className={`relative rounded-lg overflow-hidden aspect-video border-2 transition-all disabled:cursor-not-allowed ${
-                  data.design === d.id ? "border-brand-500 ring-2 ring-brand-500/30" : "border-transparent hover:border-brand-300"
+                className={`relative shrink-0 w-28 aspect-[16/10] rounded-lg overflow-hidden border-2 transition-all disabled:cursor-not-allowed ${
+                  data.design === d.id ? "border-[#d4af6a] shadow-[0_0_0_3px_rgba(212,175,106,0.25)]" : "border-[#2a1f16] hover:border-[#5a4632]"
                 }`}
               >
-                <Image src={d.src} alt={d.label} fill sizes="120px" className="object-cover" />
+                <Image src={d.src} alt={d.label} fill sizes="112px" className="object-cover" />
               </button>
             ))}
           </div>
 
-          <h2 className="font-semibold mb-4">Select Amount</h2>
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {AMOUNTS.map((amt) => (
-              <button
-                key={amt}
-                onClick={() => setData(d => ({ ...d, amount: amt }))}
-                disabled={step === "payment"}
-                className={`py-5 rounded-2xl font-bold text-2xl border-2 transition-all disabled:cursor-not-allowed ${
-                  data.amount === amt
-                    ? "bg-brand-500 text-white border-brand-500 scale-105 shadow-lg shadow-brand-500/30"
-                    : "border-gray-200 hover:border-brand-300 text-gray-700"
-                }`}
-              >
-                ${amt}
-              </button>
-            ))}
+          <p className="text-xs font-bold tracking-[0.16em] text-[#a8907a] mb-3">SELECT AMOUNT</p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {AMOUNTS.map((amt) => {
+              const isSel = !customOpen && data.amount === amt;
+              return (
+                <button
+                  key={amt}
+                  onClick={() => selectAmount(amt)}
+                  disabled={step === "payment"}
+                  className={`py-5 rounded-2xl font-heading font-bold text-2xl border transition-all disabled:cursor-not-allowed ${
+                    isSel
+                      ? "bg-[#1c140b] border-[#d4af6a] text-[#f2d896] shadow-[0_0_0_3px_rgba(212,175,106,0.15)]"
+                      : "bg-[#12100c] border-[#2a1f16] text-[#e6dccf] hover:border-[#5a4632]"
+                  }`}
+                >
+                  ${amt}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => setCustomOpen((v) => !v)}
+            disabled={step === "payment"}
+            className={`w-full py-3 rounded-2xl text-sm font-bold border transition-colors disabled:cursor-not-allowed ${
+              customOpen ? "bg-[#1c140b] border-[#d4af6a] text-[#f2d896]" : "border-dashed border-[#3a2c1e] text-[#a8907a] hover:border-[#5a4632]"
+            }`}
+          >
+            {customOpen ? "Custom amount selected" : "+ Enter a custom amount"}
+          </button>
+          {customOpen && (
+            <div className="flex items-center gap-2 mt-2 bg-[#0e0c09] border border-[#2a1f16] rounded-xl px-4 py-2.5">
+              <span className="text-lg text-[#a8907a]">$</span>
+              <input
+                type="number"
+                min={5}
+                max={1000}
+                value={customAmount}
+                onChange={(e) => setCustom(e.target.value)}
+                placeholder="Any amount"
+                className="flex-1 bg-transparent outline-none text-[#f2e9df] font-heading text-lg"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3 mt-10">
+            <TrustBadge icon={Mail} label="Instant Delivery" sub="via email" />
+            <TrustBadge icon={ShieldCheck} label="Secure Payment" sub="100% safe" />
+            <TrustBadge icon={Martini} label="Perfect For" sub="any occasion" />
           </div>
         </div>
 
-        {/* Right: Form or Payment */}
-        <div className="space-y-4">
+        {/* RIGHT: form / payment */}
+        <div className="bg-[#17110c] border border-[#3a2c1e] rounded-2xl p-6 lg:sticky lg:top-24">
           {step === "form" ? (
             <>
-              <h2 className="font-semibold mb-4">Delivery Details</h2>
+              <h2 className="font-heading font-bold text-xl text-[#f2d896] mb-5">Delivery Details</h2>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Recipient&apos;s Email</label>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1 text-[#e6dccf]">Recipient&apos;s Email</label>
                 <div className="relative">
-                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b5c4d]" />
                   <input
                     type="email"
                     value={data.recipientEmail}
-                    onChange={(e) => setData(d => ({ ...d, recipientEmail: e.target.value }))}
+                    onChange={(e) => setData((d) => ({ ...d, recipientEmail: e.target.value }))}
                     placeholder="friend@example.com"
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
+                    className={inputCls}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Your Name</label>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1 text-[#e6dccf]">Your Name</label>
                 <div className="relative">
-                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b5c4d]" />
                   <input
                     value={data.senderName}
-                    onChange={(e) => setData(d => ({ ...d, senderName: e.target.value }))}
+                    onChange={(e) => setData((d) => ({ ...d, senderName: e.target.value }))}
                     placeholder="From: Your Name"
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
+                    className={inputCls}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Your Email <span className="text-gray-400">(for your receipt)</span></label>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1 text-[#e6dccf]">Your Email <span className="text-[#6b5c4d]">(for your receipt)</span></label>
                 <div className="relative">
-                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b5c4d]" />
                   <input
                     type="email"
                     value={data.senderEmail}
-                    onChange={(e) => setData(d => ({ ...d, senderEmail: e.target.value }))}
+                    onChange={(e) => setData((d) => ({ ...d, senderEmail: e.target.value }))}
                     placeholder="you@example.com"
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
+                    className={inputCls}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Personal Message <span className="text-gray-400">(optional)</span></label>
+              <div className="mb-5">
+                <label className="block text-sm font-medium mb-1 text-[#e6dccf]">Personal Message <span className="text-[#6b5c4d]">(optional)</span></label>
                 <div className="relative">
-                  <MessageSquare size={16} className="absolute left-3 top-3 text-gray-400" />
+                  <MessageSquare size={16} className="absolute left-3 top-3 text-[#6b5c4d]" />
                   <textarea
                     value={data.message}
-                    onChange={(e) => setData(d => ({ ...d, message: e.target.value }))}
+                    onChange={(e) => setData((d) => ({ ...d, message: e.target.value }))}
                     rows={3}
                     placeholder="Enjoy your drinks! 🥂"
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 resize-none"
+                    className={`${inputCls} resize-none`}
                   />
                 </div>
               </div>
 
-              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-sm space-y-2">
+              <div className="bg-[#0e0c09] border border-[#2a1f16] rounded-xl p-4 text-sm space-y-2 mb-5">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Gift card amount</span>
-                  <span className="font-bold">${data.amount}.00</span>
+                  <span className="text-[#a8907a]">Gift card amount</span>
+                  <span className="font-bold text-[#e6dccf]">${(data.amount || 0).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-green-600 font-semibold">
+                <div className="flex justify-between text-green-500 font-semibold">
                   <span>🚚 Delivery (email)</span>
                   <span>FREE & Instant</span>
                 </div>
-                <div className="border-t pt-2 flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>${data.amount}.00</span>
+                <div className="border-t border-[#2a1f16] pt-2 flex justify-between font-bold text-lg">
+                  <span className="text-[#e6dccf]">Total</span>
+                  <span className="text-[#f2d896]">${(data.amount || 0).toFixed(2)}</span>
                 </div>
               </div>
 
               <button
                 onClick={handleContinue}
-                disabled={!data.recipientEmail || !data.senderName || loading}
-                className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3.5 rounded-xl transition-colors"
+                disabled={!data.recipientEmail || !data.senderName || !data.amount || loading}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#f2d896] to-[#c9973f] hover:brightness-105 disabled:bg-[#3a2c1e] disabled:from-[#3a2c1e] disabled:to-[#3a2c1e] disabled:text-[#7a6a58] text-[#1a1108] font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-[#d4af6a]/20"
               >
                 {loading ? <><Loader2 size={18} className="animate-spin" /> Preparing…</> : <>Continue to Payment →</>}
               </button>
 
-              <p className="text-xs text-center text-gray-400">
+              <p className="text-xs text-center text-[#6b5c4d] mt-3">
                 Gift cards are delivered instantly via email · Never expire · Redeemable at checkout
               </p>
             </>
@@ -369,8 +430,8 @@ export function GiftCardStore() {
               options={{
                 clientSecret,
                 appearance: {
-                  theme: "stripe",
-                  variables: { colorPrimary: "#f97316", borderRadius: "12px", fontFamily: "inherit" },
+                  theme: "night",
+                  variables: { colorPrimary: "#d4af6a", borderRadius: "12px", fontFamily: "inherit", colorBackground: "#0e0c09" },
                 },
               }}
             >
@@ -384,6 +445,18 @@ export function GiftCardStore() {
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+function TrustBadge({ icon: Icon, label, sub }: { icon: typeof Mail; label: string; sub: string }) {
+  return (
+    <div className="text-center">
+      <div className="w-9 h-9 rounded-full border border-[#3a2c1e] flex items-center justify-center mx-auto mb-2">
+        <Icon size={15} className="text-[#d4af6a]" />
+      </div>
+      <div className="text-[10.5px] font-bold text-[#e6dccf]">{label}</div>
+      <div className="text-[9.5px] text-[#8a776b] mt-0.5">{sub}</div>
     </div>
   );
 }

@@ -7,9 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function GiftCardsPage() {
-  return (
-    <div className="container-main py-10">
-      <GiftCardStore />
-    </div>
-  );
+  return <GiftCardStore />;
 }
