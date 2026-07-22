@@ -300,7 +300,7 @@ export function GiftCardStore() {
       {/* ── Hero: bar photo backdrop ── */}
       <div className="relative overflow-hidden py-20 px-4 text-center">
         <Image src="/gift-cards/hero-bar.png" alt="" fill priority className="object-cover object-[center_65%]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0806] via-[#0a0806]/85 to-[#0a0806]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0806]/55 via-[#0a0806]/40 to-[#0a0806]" />
         <div className="relative">
           <div className="w-14 h-14 rounded-full border border-[#d4af6a] flex items-center justify-center mx-auto mb-5">
             <Gift size={24} className="text-[#d4af6a]" />
