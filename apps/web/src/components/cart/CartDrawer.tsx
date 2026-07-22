@@ -180,22 +180,20 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   <button onClick={() => removeItem(product.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                 </div>
               ))}
-            </div>
 
-            {/* Add-on suggestions when below minimum — pinned above the totals so it's
-                always fully visible, instead of getting scrolled out of view when the
-                item list is long. */}
-            {!meetsMinimum && suggestions.length > 0 && (
-              <div className="px-5 pt-3 border-t bg-gray-50">
-                <div className="bg-white border border-gray-200 rounded-xl p-3 mb-3">
+              {/* Add-on suggestions when below minimum — scrolls with the item list so
+                  cart items always get full, un-cramped space; this is supplementary,
+                  below-the-fold content like the rest of a normal scrollable list. */}
+              {!meetsMinimum && suggestions.length > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
                   <p className="text-xs font-bold text-gray-600 mb-2 flex items-center gap-1">
                     <ShoppingBag size={12} /> Add items to reach $20 minimum:
                   </p>
                   <div className="space-y-2">
                     {suggestions.map(item => (
-                      <div key={item.id} className="flex items-center justify-between bg-gray-50 rounded-lg border px-3 py-2">
+                      <div key={item.id} className="flex items-center justify-between bg-white rounded-lg border px-3 py-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="relative w-9 h-9 bg-white rounded shrink-0 overflow-hidden">
+                          <div className="relative w-9 h-9 bg-gray-50 rounded shrink-0 overflow-hidden">
                             <Image
                               src={item.imageUrl || categoryPlaceholder(item.category)}
                               alt={item.name}
@@ -221,10 +219,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     </Link>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            <div className={`px-5 py-4 space-y-2 text-sm ${!meetsMinimum && suggestions.length > 0 ? "" : "border-t"}`}>
+            <div className="border-t px-5 py-4 space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotal)}</span>
