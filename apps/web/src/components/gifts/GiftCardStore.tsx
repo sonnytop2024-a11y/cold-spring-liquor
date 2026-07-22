@@ -234,7 +234,7 @@ export function GiftCardStore() {
               className="object-cover"
               priority
             />
-            <span className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-lg font-black px-3 py-1 rounded-lg">
+            <span className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm text-gray-900 text-sm font-bold px-3 py-1 rounded-full shadow-sm">
               ${data.amount}
             </span>
           </div>
