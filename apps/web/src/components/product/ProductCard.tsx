@@ -99,7 +99,7 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
               alt={product.name}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-contain p-4 rounded-xl group-hover:scale-105 transition-transform duration-300"
+              className="object-cover rounded-xl group-hover:scale-105 transition-transform duration-300"
               loading={priority ? undefined : "lazy"}
               priority={priority}
               onError={() => setImgError(true)}
