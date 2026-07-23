@@ -1413,7 +1413,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
 
         {isLoggedIn && bestEligibleTier > 0 && !rewardsDismissed && (
           rewardsPointsToRedeem > 0 ? (
-            <div className="flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+            <div className="mt-4 flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
               <Gift size={15} className="text-purple-600 shrink-0" />
               <div className="flex-1">
                 <p className="font-bold text-purple-800 text-sm">{rewardsPointsToRedeem} pts redeemed!</p>
@@ -1422,7 +1422,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
               <button type="button" onClick={() => setRewardsRedeem(0)} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
             </div>
           ) : (
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <div className="mt-4 bg-purple-50 border border-purple-200 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Gift size={14} className="text-purple-600 shrink-0" />
                 <p className="font-bold text-sm text-purple-800">You have rewards available!</p>
