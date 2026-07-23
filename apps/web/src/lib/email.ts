@@ -105,7 +105,7 @@ function orderConfirmationHtml(order: MockOrder): string {
   <tr><td style="background:#ffffff;padding:36px 40px;">
 
     <p style="margin:0 0 28px;font-size:16px;color:#374151;line-height:1.6;">
-      Hi <strong style="color:#0a0a0a;">${firstName}</strong>, thank you for your order at Cold Spring Liquor!
+      Hi <strong style="color:#0a0a0a;">${firstName}</strong>, Thank You for your order at Cold Spring Liquor!
       ${isPickup ? "We're getting it ready for pick up — we'll email you the moment it's ready. 🛍️" : "We're getting it ready and will be on our way to you soon. 🚗"}
     </p>
 

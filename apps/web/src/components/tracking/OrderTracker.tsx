@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, Circle, Clock, Loader2, Bell } from "lucide-react";
+import { CheckCircle, Circle, Clock, Loader2, Bell, RefreshCw } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { useCartStore } from "@/store/cartStore";
+import { ReorderModal, type ReorderDraft } from "@/components/account/AccountDashboard";
+import { ItemThumb } from "@/components/shared/orderDisplay";
 
 const STEPS = [
   {
@@ -161,6 +166,45 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
   storeAddress?: string;
 }) {
   const [notifDismissed, setNotifDismissed] = useState(false);
+  const router = useRouter();
+  const addToCart = useCartStore((s) => s.addItem);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const [reorderDraft, setReorderDraft] = useState<ReorderDraft | null>(null);
+  const [reorderLoading, setReorderLoading] = useState(false);
+
+  // Reorder goes through the server so availability/stock/current prices are
+  // validated — old promo codes and sale prices are never carried over.
+  async function handleReorder() {
+    setReorderLoading(true);
+    try {
+      const res = await fetch(`/api/orders/reorder/${orderId}`, { method: "POST" });
+      if (!res.ok) { alert("Could not load this order for reorder. Please try again."); return; }
+      setReorderDraft(await res.json());
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setReorderLoading(false);
+    }
+  }
+
+  function confirmReorder() {
+    if (!reorderDraft) return;
+    clearCart();
+    for (const { product, quantity } of reorderDraft.validItems) {
+      addToCart(product, quantity);
+    }
+    localStorage.setItem("csl-reorder-prefill", JSON.stringify({
+      customerName: reorderDraft.customerName,
+      customerEmail: reorderDraft.customerEmail,
+      customerPhone: reorderDraft.customerPhone,
+      deliveryAddress: reorderDraft.deliveryAddress,
+      billingAddress: reorderDraft.billingAddress,
+      billingAddressSameAsDelivery: reorderDraft.billingAddressSameAsDelivery,
+      fromOrderNumber: reorderDraft.originalOrderNumber,
+    }));
+    setReorderDraft(null);
+    router.push(reorderDraft.orderType === "pickup" ? "/checkout/pickup" : "/checkout");
+  }
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["order", orderId],
@@ -425,30 +469,83 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
         </div>
       )}
 
-      {/* Order summary */}
-      <div className="border-t px-6 py-4 bg-gray-50 rounded-b-xl">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">{order.items?.length ?? 0} item(s)</span>
-          <span className="font-bold">${Number(order.total).toFixed(2)}</span>
-        </div>
-        {isPickupOrder ? (
-          <>
-            <p className="text-xs text-gray-400 mt-1">
-              Pick up at: 15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641
+      {/* Post-delivery thank you */}
+      {isDelivered && (
+        <div className="px-6 pt-5">
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-5 text-center">
+            <p className="text-2xl mb-1">🎉</p>
+            <p className="font-bold text-green-800">Enjoy your order!</p>
+            <p className="text-sm text-green-700 mt-1">
+              Thanks for shopping with Cold Spring Liquor — we hope to see you again soon.
             </p>
-            <p className="text-xs text-green-600 font-medium mt-1">🏬 Pick Up In Store · 💚 5% Discount Applied</p>
-          </>
-        ) : (
-          <>
-            {order.deliveryAddress && (
-              <p className="text-xs text-gray-400 mt-1">
-                Delivering to: {order.deliveryAddress.street}, {order.deliveryAddress.city}
-              </p>
+            {reorderDraft === null && (
+              <button
+                onClick={handleReorder}
+                disabled={reorderLoading}
+                className="mt-4 inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all"
+              >
+                {reorderLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                Order Again
+              </button>
             )}
-            <p className="text-xs text-green-600 font-medium mt-1">🚚 FREE Delivery · 💰 No Tip Required</p>
-          </>
+          </div>
+        </div>
+      )}
+
+      {/* Order summary */}
+      <div className="border-t mt-5 px-6 py-4 bg-gray-50 rounded-b-xl space-y-4">
+        {/* Itemized list */}
+        {order.items?.length > 0 && (
+          <div className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-h-56 overflow-y-auto">
+            {order.items.map((it: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+                <ItemThumb imageUrl={it.imageUrl} category={it.category} name={it.name} size={38} />
+                <span className="flex-1 min-w-0 text-sm text-gray-700 leading-snug">
+                  {it.name} <span className="text-gray-400">×{it.quantity}</span>
+                </span>
+                <span className="text-sm font-semibold text-gray-900 shrink-0">
+                  {formatCurrency((it.salePrice ?? it.price) * it.quantity)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Price breakdown */}
+        <div className="text-sm space-y-1.5">
+          <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(order.subtotal ?? order.total)}</span></div>
+          {order.bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle</span><span>-{formatCurrency(order.bundleDiscount)}</span></div>}
+          {order.couponDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {order.couponCode ?? "Coupon"}</span><span>-{formatCurrency(order.couponDiscount)}</span></div>}
+          {order.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(order.rewardsDiscount)}</span></div>}
+          {order.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card{order.giftCardCode ? ` (${order.giftCardCode})` : ""}</span><span>-{formatCurrency(order.giftCardAmount)}</span></div>}
+          {isPickupOrder ? (
+            order.pickupDiscount > 0 && <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount</span><span>-{formatCurrency(order.pickupDiscount)}</span></div>
+          ) : (
+            <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+          )}
+          <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(order.tax ?? 0)}</span></div>
+          <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between items-baseline">
+            <span className="font-bold text-gray-900">Total</span>
+            <span className="font-black text-base text-gray-900">{formatCurrency(order.total)}</span>
+          </div>
+        </div>
+
+        {isPickupOrder ? (
+          <p className="text-xs text-gray-400">
+            📍 Pick up at: 15609 Ronald Reagan Blvd Suite B-100, Leander, TX 78641
+          </p>
+        ) : (
+          order.deliveryAddress && (
+            <p className="text-xs text-gray-400">
+              📍 Delivering to: {order.deliveryAddress.street}, {order.deliveryAddress.city}, {order.deliveryAddress.state} {order.deliveryAddress.zip}
+            </p>
+          )
         )}
       </div>
+
+      {reorderDraft && (
+        <ReorderModal draft={reorderDraft} onConfirm={confirmReorder} onClose={() => setReorderDraft(null)} />
+      )}
     </div>
   );
 }

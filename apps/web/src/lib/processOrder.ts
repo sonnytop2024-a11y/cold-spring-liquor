@@ -2,7 +2,7 @@
 import { store, createOrderNumber } from "../app/api/_mock/store";
 import { TAX_RATE } from "../app/api/_mock/data";
 import { getDeliveryTiming } from "./deliveryTiming";
-import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct, dbGetSettings } from "./db";
+import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct, dbGetSettings, dbOverlayCurrentProductImages } from "./db";
 import { notifyNewOrder } from "./notify";
 import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
@@ -211,6 +211,14 @@ export async function processOrder(
   };
 
   await dbCreateOrder(order);
+
+  // The saved order only snapshots productId/name/price/quantity — overlay current
+  // product images/category (same helper the track page and admin use) so the
+  // confirmation email and the immediate "Thank You" response can show real photos
+  // instead of a generic icon. Not written back to the DB row: images are meant to
+  // stay fresh at read time, same as everywhere else this helper is used.
+  const [orderWithImages] = await dbOverlayCurrentProductImages([order]);
+  order.items = orderWithImages.items;
 
   // Deduct inventory for each purchased item
   for (const item of items) {
