@@ -20,6 +20,7 @@ import { PayPalPaymentForm } from "./PayPalPaymentForm";
 import { FulfillmentSelector } from "./FulfillmentSelector";
 import { StoreClosingBanner } from "./StoreClosingBanner";
 import { PaymentMethodCard, CardOutlineIcon, PayPalPIcon, CARD_BRAND_LOGOS, PAYPAL_BRAND_LOGOS } from "./PaymentMethodCard";
+import { WhyCustomersTrustUs } from "./WhyCustomersTrustUs";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -201,9 +202,61 @@ function AddressFields({ addr, onChange, prefix }: { addr: AddrForm; onChange: (
 }
 
 // ─── Thank You Popup ──────────────────────────────────────────────────────────
+
+interface ThankYouOrderData {
+  orderId: string;
+  orderNumber: string;
+  total: number;
+  subtotal: number;
+  tax: number;
+  bundleDiscount: number;
+  couponDiscount: number;
+  couponCode?: string | null;
+  rewardsDiscount: number;
+  giftCardAmount: number;
+  giftCardCode?: string | null;
+  pickupDiscount: number;
+  pickupWindow?: PickupSlot | null;
+  deliveryAddress?: { street: string; city: string; state: string; zip: string } | null;
+  items: { name: string; quantity: number; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null }[];
+}
+
+// The three payment paths all resolve with the raw order API response (shape
+// varies slightly — Stripe/PayPal pass it straight through, the $0-order path
+// constructs it inline) — this normalizes any of them into what the popup needs.
+function thankYouDataFromOrder(order: any): ThankYouOrderData {
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    total: order.total,
+    subtotal: order.subtotal ?? order.total,
+    tax: order.tax ?? 0,
+    bundleDiscount: order.bundleDiscount ?? 0,
+    couponDiscount: order.couponDiscount ?? 0,
+    couponCode: order.couponCode ?? null,
+    rewardsDiscount: order.rewardsDiscount ?? 0,
+    giftCardAmount: order.giftCardAmount ?? 0,
+    giftCardCode: order.giftCardCode ?? null,
+    pickupDiscount: order.pickupDiscount ?? 0,
+    pickupWindow: order.pickupWindow ?? null,
+    deliveryAddress: order.deliveryAddress ?? null,
+    items: order.items ?? [],
+  };
+}
+
 function ThankYouPopup({
   orderNumber,
   total,
+  subtotal,
+  tax,
+  bundleDiscount,
+  couponDiscount,
+  couponCode,
+  rewardsDiscount,
+  giftCardAmount,
+  giftCardCode,
+  pickupDiscount,
+  deliveryAddress,
   customerName,
   onTrack,
   pickup,
@@ -211,10 +264,20 @@ function ThankYouPopup({
 }: {
   orderNumber: string;
   total: number;
+  subtotal: number;
+  tax: number;
+  bundleDiscount: number;
+  couponDiscount: number;
+  couponCode?: string | null;
+  rewardsDiscount: number;
+  giftCardAmount: number;
+  giftCardCode?: string | null;
+  pickupDiscount: number;
+  deliveryAddress?: { street: string; city: string; state: string; zip: string } | null;
   customerName: string;
   onTrack: () => void;
   pickup?: { dateLabel: string; label: string } | null;
-  items?: { name: string; quantity: number; imageUrl?: string | null; category?: string | null }[];
+  items?: { name: string; quantity: number; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null }[];
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -259,24 +322,42 @@ function ThankYouPopup({
 
         {/* White body */}
         <div className="px-8 py-7 space-y-5">
-          {/* Ordered items preview */}
+          {/* Ordered items — full list with qty + price, not just thumbnails */}
           {items.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-              {items.slice(0, 6).map((it, i) => (
-                <div key={i} className="relative shrink-0">
-                  <ItemThumb imageUrl={it.imageUrl} category={it.category} name={it.name} size={48} />
-                  {it.quantity > 1 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
-                      {it.quantity}
-                    </span>
-                  )}
+            <div className="border border-gray-100 rounded-2xl divide-y divide-gray-100 max-h-52 overflow-y-auto">
+              {items.map((it, i) => (
+                <div key={i} className="flex items-center gap-3 px-3.5 py-2.5">
+                  <ItemThumb imageUrl={it.imageUrl} category={it.category} name={it.name} size={38} />
+                  <span className="flex-1 min-w-0 text-sm text-gray-700 leading-snug">
+                    {it.name} <span className="text-gray-400">×{it.quantity}</span>
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900 shrink-0">
+                    {formatCurrency((it.salePrice ?? it.price) * it.quantity)}
+                  </span>
                 </div>
               ))}
-              {items.length > 6 && (
-                <span className="text-xs text-gray-400 font-semibold shrink-0">+{items.length - 6} more</span>
-              )}
             </div>
           )}
+
+          {/* Price breakdown */}
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm space-y-1.5">
+            <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+            {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
+            {couponDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {couponCode ?? "Coupon"}</span><span>-{formatCurrency(couponDiscount)}</span></div>}
+            {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
+            {giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card{giftCardCode ? ` (${giftCardCode})` : ""}</span><span>-{formatCurrency(giftCardAmount)}</span></div>}
+            {pickup ? (
+              pickupDiscount > 0 && <div className="flex justify-between text-green-600 font-bold"><span>💚 Pick Up Discount</span><span>-{formatCurrency(pickupDiscount)}</span></div>
+            ) : (
+              <div className="flex justify-between text-green-600 font-medium"><span>🚚 Delivery</span><span>FREE</span></div>
+            )}
+            <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(tax)}</span></div>
+            <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between items-baseline">
+              <span className="font-bold text-gray-900">Total</span>
+              <span className="font-black text-lg text-gray-900">{formatCurrency(total)}</span>
+            </div>
+          </div>
+
           {pickup ? (
             <>
               {/* Pickup details */}
@@ -304,6 +385,15 @@ function ThankYouPopup({
                 Sit back, relax and enjoy your day —<br />
                 <strong className="text-gray-900">we'll take care of everything from here.</strong>
               </p>
+
+              {/* Delivery address */}
+              {deliveryAddress && (
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm text-gray-700">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">📍 Delivering To</p>
+                  <p className="text-gray-900 font-medium">{deliveryAddress.street}</p>
+                  <p className="text-gray-500 text-xs">{deliveryAddress.city}, {deliveryAddress.state} {deliveryAddress.zip}</p>
+                </div>
+              )}
 
               {/* 2 perks */}
               <div className="grid grid-cols-2 gap-3">
@@ -470,7 +560,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const [orderPayload, setOrderPayload] = useState<object | null>(null);
   const [paymentStep, setPaymentStep] = useState<null | "select" | "paypal" | "review-free">(null);
   const [selectedMethod, setSelectedMethod] = useState<null | "stripe" | "paypal">(null);
-  const [thankYouOrder, setThankYouOrder] = useState<{ orderId: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null; items?: { name: string; quantity: number; imageUrl?: string | null; category?: string | null }[] } | null>(null);
+  const [thankYouOrder, setThankYouOrder] = useState<ThankYouOrderData | null>(null);
   const [rewardsDismissed, setRewardsDismissed] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -506,7 +596,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         if (res.ok) {
           const order = await res.json();
           clearCart();
-          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null, items: (order as any).items ?? [] });
+          setThankYouOrder(thankYouDataFromOrder(order));
         }
       }
     });
@@ -736,6 +826,16 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       <ThankYouPopup
         orderNumber={thankYouOrder.orderNumber}
         total={thankYouOrder.total}
+        subtotal={thankYouOrder.subtotal}
+        tax={thankYouOrder.tax}
+        bundleDiscount={thankYouOrder.bundleDiscount}
+        couponDiscount={thankYouOrder.couponDiscount}
+        couponCode={thankYouOrder.couponCode}
+        rewardsDiscount={thankYouOrder.rewardsDiscount}
+        giftCardAmount={thankYouOrder.giftCardAmount}
+        giftCardCode={thankYouOrder.giftCardCode}
+        pickupDiscount={thankYouOrder.pickupDiscount}
+        deliveryAddress={thankYouOrder.deliveryAddress}
         customerName={name}
         pickup={thankYouOrder.pickupWindow ?? (isPickup ? pickupSlot : null)}
         items={thankYouOrder.items ?? []}
@@ -768,7 +868,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         const order = await res.json();
         if (!res.ok) throw new Error(order.error ?? "Failed to place order");
         clearCart();
-        setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null, items: (order as any).items ?? [] });
+        setThankYouOrder(thankYouDataFromOrder(order));
       } catch (err: any) {
         setConfirmError(err.message ?? "Something went wrong. Please try again.");
         setConfirming(false);
@@ -892,6 +992,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           className="w-full border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-40">
           ← Edit Order
         </button>
+        <WhyCustomersTrustUs context={isPickup ? "pickup" : "delivery"} />
         <p className="text-center text-xs text-gray-400">🔒 Must be 21+, valid ID checked at delivery.</p>
       </div>
     );
@@ -961,7 +1062,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         }}
         onSuccess={(order) => {
           clearCart();
-          setThankYouOrder({ orderId: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null, items: (order as any).items ?? [] });
+          setThankYouOrder(thankYouDataFromOrder(order));
         }}
         onCancel={() => setPaymentStep("select")}
       />
@@ -1022,13 +1123,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           }}
           onSuccess={(order) => {
             clearCart();
-            setThankYouOrder({
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              total: order.total,
-              pickupWindow: order.pickupWindow ?? null,
-              items: (order as any).items ?? [],
-            });
+            setThankYouOrder(thankYouDataFromOrder(order));
           }}
           onCancel={() => { setClientSecret(null); setPaymentStep("select"); setSubmitting(false); }}
         />
@@ -1483,7 +1578,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
   minOrder: number;
   reviewData: ReviewData;
   onCustomerNotesChange: (value: string) => void;
-  onSuccess: (order: { id: string; orderNumber: string; total: number; pickupWindow?: PickupSlot | null }) => void;
+  onSuccess: (order: any) => void;
   onCancel: () => void;
 }) {
   const isPickup = !!reviewData.pickup;
@@ -1777,6 +1872,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
                 : <>Confirm & Pay {formatCurrency(total)} →</>}
             </button>
           </div>
+          <WhyCustomersTrustUs context={isPickup ? "pickup" : "delivery"} />
           <p className="text-center text-xs text-gray-400">🔒 Your payment is encrypted and secure. Must be 21+, valid ID checked at {isPickup ? "pickup" : "delivery"}.</p>
         </div>
       )}

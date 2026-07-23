@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2, MapPin, Mail, Phone, CreditCard, ChevronLeft } 
 import { useState, useEffect, useRef } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
+import { WhyCustomersTrustUs } from "./WhyCustomersTrustUs";
 
 interface ReviewData {
   customerName: string;
@@ -34,7 +35,7 @@ interface Props {
   orderPayload: object;
   reviewData: ReviewData;
   onCustomerNotesChange: (value: string) => void;
-  onSuccess: (order: { id: string; orderNumber: string; total: number; pickupWindow?: { start: string; end: string; label: string; dateLabel: string } | null }) => void;
+  onSuccess: (order: any) => void;
   onCancel: () => void;
 }
 
@@ -144,7 +145,7 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onCustomerN
       });
       const order = await res.json();
       if (!res.ok) throw new Error(order.error ?? "Capture failed");
-      onSuccess({ id: order.id, orderNumber: order.orderNumber, total: order.total, pickupWindow: order.pickupWindow ?? null });
+      onSuccess(order);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Payment failed. Please try again.");
       setCapturing(false);
@@ -269,6 +270,8 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onCustomerN
         >
           <ChevronLeft size={15} /> Back — choose different payment
         </button>
+
+        <WhyCustomersTrustUs context={rd.pickup ? "pickup" : "delivery"} />
       </div>
     );
   }
