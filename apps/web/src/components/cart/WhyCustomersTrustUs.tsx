@@ -1,8 +1,19 @@
 // "Why customers trust us" — static trust card shown on every payment review
 // screen (Stripe, PayPal, $0 gift-card order), right after the confirm/back
-// buttons and before the encrypted-payment disclaimer. Content is fixed text;
-// only the ID line adapts to pickup vs delivery, matching how the disclaimer
-// below it already words that difference.
+// buttons and before the encrypted-payment disclaimer. Same design for both
+// contexts; pickup swaps the delivery-specific lines so customers picking up
+// in store aren't told about drivers.
+const TRUST_COPY = {
+  delivery: {
+    lines: ["Delivered by our own staff", "No third-party drivers", "Private & secure information", "ID verified upon delivery"],
+    foot: "Your information is used only to process your order and delivery.",
+  },
+  pickup: {
+    lines: ["Prepared by our store team", "Secure online payment", "Private & secure information", "ID verified at pickup"],
+    foot: "Your information is used only to process your order and prepare it for pickup.",
+  },
+} as const;
+
 export function WhyCustomersTrustUs({ context = "delivery" }: { context?: "delivery" | "pickup" }) {
   const check = (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[#E8590C]">
@@ -28,10 +39,9 @@ export function WhyCustomersTrustUs({ context = "delivery" }: { context?: "deliv
             Why customers trust us
           </p>
           <ul className="space-y-1.5">
-            <li className="flex items-center gap-2 text-[12.5px] leading-tight text-[#3a3a3a]">{check}Delivered by our own staff</li>
-            <li className="flex items-center gap-2 text-[12.5px] leading-tight text-[#3a3a3a]">{check}No third-party drivers</li>
-            <li className="flex items-center gap-2 text-[12.5px] leading-tight text-[#3a3a3a]">{check}Private &amp; secure information</li>
-            <li className="flex items-center gap-2 text-[12.5px] leading-tight text-[#3a3a3a]">{check}ID verified upon {context}</li>
+            {TRUST_COPY[context].lines.map((line) => (
+              <li key={line} className="flex items-center gap-2 text-[12.5px] leading-tight text-[#3a3a3a]">{check}{line}</li>
+            ))}
           </ul>
         </div>
         <div className="shrink-0 w-[50px] h-[50px] ml-auto self-center text-[#E8590C]">
@@ -46,7 +56,7 @@ export function WhyCustomersTrustUs({ context = "delivery" }: { context?: "deliv
         </div>
       </div>
       <p className="text-center text-[11px] text-[#9c9080] mt-3 leading-relaxed">
-        Your information is used only to process your order and {context}.
+        {TRUST_COPY[context].foot}
       </p>
     </div>
   );
