@@ -295,13 +295,14 @@ function ThankYouPopup({
       }`}
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
     >
-      {/* Card */}
-      <div className={`relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-500 ${
+      {/* Card — capped to the viewport so the header is never clipped;
+          the white body scrolls when the order has many items */}
+      <div className={`relative w-full max-w-md max-h-[calc(100dvh-2rem)] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-500 ${
         visible ? "translate-y-0 scale-100" : "translate-y-8 scale-95"
       }`}>
 
         {/* Orange header */}
-        <div className="px-8 pt-8 pb-7 text-center bg-brand-500">
+        <div className="shrink-0 px-8 pt-8 pb-7 text-center bg-brand-500">
           <div className="flex justify-center gap-3 mb-4">
             {["🎉", "🥃", "✨"].map((e, i) => (
               <span key={i} className="text-2xl animate-bounce" style={{ animationDelay: `${i * 0.15}s` }}>{e}</span>
@@ -321,7 +322,7 @@ function ThankYouPopup({
         </div>
 
         {/* White body */}
-        <div className="px-8 py-7 space-y-5">
+        <div className="flex-1 overflow-y-auto px-8 py-7 space-y-5">
           {/* Ordered items — full list with qty + price, not just thumbnails */}
           {items.length > 0 && (
             <div className="border border-gray-100 rounded-2xl divide-y divide-gray-100 max-h-52 overflow-y-auto">
