@@ -33,6 +33,7 @@ interface Props {
   total: number;
   orderPayload: object;
   reviewData: ReviewData;
+  onCustomerNotesChange: (value: string) => void;
   onSuccess: (order: { id: string; orderNumber: string; total: number; pickupWindow?: { start: string; end: string; label: string; dateLabel: string } | null }) => void;
   onCancel: () => void;
 }
@@ -45,7 +46,7 @@ declare global {
   }
 }
 
-export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, onCancel }: Props) {
+export function PayPalPaymentForm({ total, orderPayload, reviewData, onCustomerNotesChange, onSuccess, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
@@ -137,7 +138,9 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
       const res = await fetch("/api/paypal/capture-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paypalOrderId: approvedPaypalId, orderPayload }),
+        // customerNotes spread fresh from reviewData — orderPayload was snapshotted
+        // before this review screen mounted, so an edit made here wouldn't stick otherwise.
+        body: JSON.stringify({ paypalOrderId: approvedPaypalId, orderPayload: { ...orderPayload, customerNotes: rd.customerNotes } }),
       });
       const order = await res.json();
       if (!res.ok) throw new Error(order.error ?? "Capture failed");
@@ -175,12 +178,21 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
         </div>
 
         {/* Note */}
-        {rd.customerNotes && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-sm p-5">
-            <h3 className="font-bold text-sm text-amber-800 uppercase tracking-wide mb-1">📝 Note</h3>
-            <p className="text-sm text-amber-800 whitespace-pre-wrap">{rd.customerNotes}</p>
-          </div>
-        )}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">📝 Note <span className="font-normal normal-case text-gray-400">(Optional)</span></h3>
+          <p className="text-xs text-gray-400 mb-2">Add a note for the store</p>
+          <textarea
+            value={rd.customerNotes ?? ""}
+            onChange={e => onCustomerNotesChange(e.target.value.slice(0, 200))}
+            maxLength={200}
+            rows={3}
+            placeholder={"e.g. Please leave at the front door.\ne.g. Don't ring the bell."}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all resize-none"
+          />
+          <p className={`text-xs text-right mt-1.5 ${(rd.customerNotes?.length ?? 0) >= 180 ? "text-blue-600 font-semibold" : "text-gray-400"}`}>
+            {rd.customerNotes?.length ?? 0}/200
+          </p>
+        </div>
 
         {/* Contact */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
