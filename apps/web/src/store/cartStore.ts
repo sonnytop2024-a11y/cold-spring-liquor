@@ -2,10 +2,20 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Product, CartItem } from "@/types";
 
+export interface AppliedGiftCard {
+  code: string;
+  amount: number;
+}
+
 interface CartState {
   items: CartItem[];
   couponCode: string | null;
   couponDiscount: number;
+  // Source of truth for gift cards — customers can stack several on one order.
+  giftCards: AppliedGiftCard[];
+  // Derived aggregates kept in sync with giftCards so every existing consumer
+  // (cart summary, order payload, email/admin display) keeps working unchanged:
+  // code = all codes joined with ", ", amount = sum of all cards.
   giftCardCode: string | null;
   giftCardAmount: number;
   rewardsPointsToRedeem: number;
@@ -17,7 +27,17 @@ interface CartState {
 
   setCoupon: (code: string | null, discount: number) => void;
   setGiftCard: (code: string | null, amount: number) => void;
+  addGiftCard: (code: string, amount: number) => void;
+  removeGiftCard: (code: string) => void;
   setRewardsRedeem: (points: number) => void;
+}
+
+function giftAggregates(giftCards: AppliedGiftCard[]) {
+  return {
+    giftCards,
+    giftCardCode: giftCards.length ? giftCards.map((c) => c.code).join(", ") : null,
+    giftCardAmount: Math.round(giftCards.reduce((a, c) => a + c.amount, 0) * 100) / 100,
+  };
 }
 
 export const useCartStore = create<CartState>()(
@@ -26,6 +46,7 @@ export const useCartStore = create<CartState>()(
       items: [],
       couponCode: null,
       couponDiscount: 0,
+      giftCards: [],
       giftCardCode: null,
       giftCardAmount: 0,
       rewardsPointsToRedeem: 0,
@@ -81,15 +102,34 @@ export const useCartStore = create<CartState>()(
           items: [],
           couponCode: null,
           couponDiscount: 0,
+          giftCards: [],
           giftCardCode: null,
           giftCardAmount: 0,
           rewardsPointsToRedeem: 0,
         }),
 
       setCoupon: (code, discount) => set({ couponCode: code, couponDiscount: discount }),
-      setGiftCard: (code, amount) => set({ giftCardCode: code, giftCardAmount: amount }),
+      // Legacy single-card setter: null clears all cards, a code replaces the list
+      setGiftCard: (code, amount) =>
+        set(giftAggregates(code ? [{ code, amount }] : [])),
+      addGiftCard: (code, amount) =>
+        set((state) => giftAggregates([...state.giftCards.filter((c) => c.code !== code), { code, amount }])),
+      removeGiftCard: (code) =>
+        set((state) => giftAggregates(state.giftCards.filter((c) => c.code !== code))),
       setRewardsRedeem: (points) => set({ rewardsPointsToRedeem: points }),
     }),
-    { name: "csl-cart" },
+    {
+      name: "csl-cart",
+      version: 1,
+      // v0 carts persisted a single giftCardCode/giftCardAmount — convert to the array
+      migrate: (persisted: any) => {
+        if (persisted && !Array.isArray(persisted.giftCards)) {
+          persisted.giftCards = persisted.giftCardCode
+            ? [{ code: persisted.giftCardCode, amount: persisted.giftCardAmount ?? 0 }]
+            : [];
+        }
+        return persisted;
+      },
+    },
   ),
 );

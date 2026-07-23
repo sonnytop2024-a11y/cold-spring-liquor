@@ -18,14 +18,14 @@ import { calcDiscounts } from "@/lib/discountRules";
 export function CartView() {
   const {
     items, updateQuantity, removeItem,
-    setCoupon, setGiftCard, setRewardsRedeem,
-    couponCode, couponDiscount, giftCardCode, giftCardAmount, rewardsPointsToRedeem,
+    setCoupon, addGiftCard, setRewardsRedeem,
+    couponCode, couponDiscount, giftCards, giftCardAmount, rewardsPointsToRedeem,
   } = useCartStore();
   const { user, isLoggedIn } = useAuthStore();
   const userPoints = user?.points ?? 0;
 
   const [couponInput, setCouponInput] = useState(couponCode ?? "");
-  const [giftInput, setGiftInput] = useState(giftCardCode ?? "");
+  const [giftInput, setGiftInput] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
   useEffect(() => {
@@ -74,18 +74,24 @@ export function CartView() {
   }
 
   async function applyGiftCard() {
+    const code = giftInput.trim().toUpperCase();
+    if (!code) return;
+    if (giftCards.some(c => c.code === code)) { alert("This gift card is already applied."); return; }
     try {
       const res = await fetch("/api/gift-cards/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: giftInput }),
+        body: JSON.stringify({ code }),
       });
       if (res.ok) {
         const { balance } = await res.json();
-        // Cap to pre-gift-card total so card isn't over-charged
+        // Cap to what the order still owes after cards already applied
         const preGiftTotal = Math.max(0, subtotal - couponDiscount - bundleDiscount - rewardsDiscount + tax);
-        const appliedAmount = Math.min(balance, preGiftTotal);
-        setGiftCard(giftInput, Math.round(appliedAmount * 100) / 100);
+        const remainingOwed = Math.max(0, preGiftTotal - giftCardAmount);
+        if (remainingOwed <= 0) { alert("Your order is already fully covered by the applied gift cards."); return; }
+        const appliedAmount = Math.min(balance, remainingOwed);
+        addGiftCard(code, Math.round(appliedAmount * 100) / 100);
+        setGiftInput("");
       } else {
         alert("Invalid or empty gift card.");
       }

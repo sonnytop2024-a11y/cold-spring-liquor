@@ -36,6 +36,8 @@ export interface MockOrder {
   rewardsPointsToRedeem?: number;
   giftCardCode?: string;
   giftCardAmount?: number;
+  // Per-card breakdown when multiple gift cards are stacked on one order
+  giftCards?: { code: string; amount: number }[];
   paymentMethod?: string;
   stripePaymentIntentId?: string;
   stripeRefundId?: string;

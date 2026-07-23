@@ -97,21 +97,28 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       }
     }
 
-    // 2. Restore gift card balance
-    const gcCode = order.giftCardCode;
-    const gcAmount = order.giftCardAmount ?? 0;
-    if (gcCode && gcAmount > 0) {
-      const card = await dbGetGiftCard(gcCode);
-      if (card) {
-        const newBalance = +(card.remainingBalance + gcAmount).toFixed(2);
-        await dbSaveGiftCard({
-          ...card,
-          remainingBalance: newBalance,
-          status: newBalance >= card.originalAmount ? "active" : "partial",
-        });
-        patch.giftCardRestored = gcAmount;
-      }
+    // 2. Restore gift card balance(s) — orders can carry several stacked cards
+    // (order.giftCards breakdown); legacy orders have a single code/amount.
+    const gcEntries: { code: string; amount: number }[] =
+      Array.isArray(order.giftCards) && order.giftCards.length > 0
+        ? order.giftCards
+        : (order.giftCardCode && (order.giftCardAmount ?? 0) > 0
+          ? [{ code: order.giftCardCode, amount: order.giftCardAmount ?? 0 }]
+          : []);
+    let totalRestored = 0;
+    for (const entry of gcEntries) {
+      if (!entry?.code || !(entry.amount > 0)) continue;
+      const card = await dbGetGiftCard(entry.code);
+      if (!card) continue;
+      const newBalance = +(card.remainingBalance + entry.amount).toFixed(2);
+      await dbSaveGiftCard({
+        ...card,
+        remainingBalance: newBalance,
+        status: newBalance >= card.originalAmount ? "active" : "partial",
+      });
+      totalRestored = +(totalRestored + entry.amount).toFixed(2);
     }
+    if (totalRestored > 0) patch.giftCardRestored = totalRestored;
   }
 
   const updated = await dbUpdateOrder(params.id, patch as any);

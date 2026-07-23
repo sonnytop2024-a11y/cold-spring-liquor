@@ -2,7 +2,7 @@
 import { store, createOrderNumber } from "../app/api/_mock/store";
 import { TAX_RATE } from "../app/api/_mock/data";
 import { getDeliveryTiming } from "./deliveryTiming";
-import { dbGetUserById, dbSaveUser, dbCreateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct, dbGetSettings, dbOverlayCurrentProductImages } from "./db";
+import { dbGetUserById, dbSaveUser, dbCreateOrder, dbUpdateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct, dbGetSettings, dbOverlayCurrentProductImages } from "./db";
 import { notifyNewOrder } from "./notify";
 import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
@@ -27,6 +27,7 @@ export interface OrderInput {
   rewardsPointsToRedeem?: number;
   giftCardCode?: string | null;
   giftCardAmount?: number;
+  giftCards?: { code: string; amount: number }[];
   customerId?: string | null;
   paymentMethod?: string;
   [key: string]: any;
@@ -57,7 +58,15 @@ export async function processOrder(
     rewardsPointsToRedeem = 0,
     giftCardCode,
     giftCardAmount = 0,
+    giftCards,
   } = body;
+
+  // Multiple gift cards can be stacked on one order. Older clients send a single
+  // code/amount — normalize both shapes into one list for deduction below.
+  const giftCardList: { code: string; amount: number }[] =
+    Array.isArray(giftCards) && giftCards.length > 0
+      ? giftCards.filter(c => c && typeof c.code === "string" && c.code)
+      : (giftCardCode && giftCardAmount > 0 ? [{ code: giftCardCode, amount: giftCardAmount }] : []);
 
   const userId = sessionToken ? verifySessionToken(sessionToken) : null;
   const sessionUser = userId ? await dbGetUserById(userId) : null;
@@ -177,6 +186,7 @@ export async function processOrder(
     rewardsPointsToRedeem,
     giftCardCode: giftCardCode ?? undefined,
     giftCardAmount,
+    giftCards: giftCardList.length > 0 ? giftCardList : undefined,
     paymentMethod: body.paymentMethod ?? "stripe",
     stripePaymentIntentId: body.stripePaymentIntentId ?? undefined,
     paypalOrderId: body.paypalOrderId ?? undefined,
@@ -238,17 +248,31 @@ export async function processOrder(
 
   if (couponCode) store.incrementCouponUsage(couponCode);
 
-  if (giftCardCode && giftCardAmount > 0) {
-    try {
-      const card = await dbGetGiftCard(giftCardCode);
-      if (card) {
-        // Only deduct what was actually charged (order could be < gift card balance)
-        const totalBeforeGift = Math.round((subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - pickupDiscount + tax) * 100) / 100;
-        const actualDeduction = Math.min(giftCardAmount, Math.max(0, totalBeforeGift));
+  if (giftCardList.length > 0) {
+    // Only deduct what was actually charged (order could be < combined balance).
+    // Cards are drained in the order applied; each deduction is capped by the
+    // card's own remaining balance AND what the order still owes.
+    let remainingCharge = Math.round((subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - pickupDiscount + tax) * 100) / 100;
+    const actualDeductions: { code: string; amount: number }[] = [];
+    for (const entry of giftCardList) {
+      if (remainingCharge <= 0) break;
+      try {
+        const card = await dbGetGiftCard(entry.code);
+        if (!card) continue;
+        const actualDeduction = Math.round(Math.min(entry.amount, card.remainingBalance, Math.max(0, remainingCharge)) * 100) / 100;
+        if (actualDeduction <= 0) continue;
         const newBalance = Math.round(Math.max(0, card.remainingBalance - actualDeduction) * 100) / 100;
         await dbSaveGiftCard({ ...card, remainingBalance: newBalance, status: newBalance <= 0 ? "redeemed" : "partial" });
-      }
-    } catch {}
+        actualDeductions.push({ code: entry.code, amount: actualDeduction });
+        remainingCharge = Math.round((remainingCharge - actualDeduction) * 100) / 100;
+      } catch {}
+    }
+    // Record what was really deducted per card so a refund restores exactly that
+    // (server caps can differ from the client-sent amounts if a balance changed)
+    if (JSON.stringify(actualDeductions) !== JSON.stringify(giftCardList)) {
+      order.giftCards = actualDeductions.length > 0 ? actualDeductions : undefined;
+      await dbUpdateOrder(order.id, { giftCards: order.giftCards }).catch(() => {});
+    }
   }
 
   if (sessionUser) {

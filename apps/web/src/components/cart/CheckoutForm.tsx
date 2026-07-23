@@ -482,7 +482,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   useEffect(() => {
     if (deliveryDisabled && mode === "delivery") setFulfillmentMode("pickup");
   }, [deliveryDisabled, mode, setFulfillmentMode]);
-  const { items, clearCart, removeItem, rewardsPointsToRedeem, setRewardsRedeem, giftCardCode, giftCardAmount, setGiftCard } = useCartStore();
+  const { items, clearCart, removeItem, rewardsPointsToRedeem, setRewardsRedeem, giftCards, giftCardCode, giftCardAmount, addGiftCard, removeGiftCard } = useCartStore();
   const pickupOnlyConflictItems = items.filter(i => i.product.pickupOnly && !isPickup);
   const { user, isLoggedIn } = useAuthStore();
   const router = useRouter();
@@ -548,7 +548,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const { setPromo, clearPromo } = useCheckoutStore();
 
   // Gift card
-  const [giftInput, setGiftInput] = useState(giftCardCode ?? "");
+  const [giftInput, setGiftInput] = useState("");
   const [giftError, setGiftError] = useState("");
   const [applyingGift, setApplyingGift] = useState(false);
 
@@ -699,6 +699,11 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   async function applyGiftCard() {
     const code = giftInput.trim().toUpperCase();
     if (!code) return;
+    if (giftCards.some(c => c.code === code)) { setGiftError("This gift card is already applied"); return; }
+    // Cap to what the order still owes after the cards already applied
+    const preGiftTotal = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount + tax);
+    const remainingOwed = Math.round(Math.max(0, preGiftTotal - giftCardAmount) * 100) / 100;
+    if (remainingOwed <= 0) { setGiftError("Your order is already fully covered by the applied gift cards"); return; }
     setApplyingGift(true); setGiftError("");
     try {
       const res = await fetch("/api/gift-cards/validate", {
@@ -707,12 +712,11 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         body: JSON.stringify({ code }),
       });
       const data = await res.json();
-      if (!res.ok || !data.valid) { setGiftError("Invalid or already used gift card code"); setGiftCard(null, 0); }
+      if (!res.ok || !data.valid) { setGiftError("Invalid or already used gift card code"); }
       else {
-        // Cap to the pre-gift-card order total so we don't over-apply
-        const preGiftTotal = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount + tax);
-        const appliedAmount = Math.min(data.balance, preGiftTotal);
-        setGiftCard(code, Math.round(appliedAmount * 100) / 100);
+        const appliedAmount = Math.min(data.balance, remainingOwed);
+        addGiftCard(code, Math.round(appliedAmount * 100) / 100);
+        setGiftInput("");
       }
     } catch { setGiftError("Could not validate gift card. Please try again."); }
     finally { setApplyingGift(false); }
@@ -756,6 +760,8 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       rewardsPointsToRedeem,
       giftCardCode,
       giftCardAmount: effectiveGiftCard,
+      // Per-card breakdown — the server deducts each card's balance individually
+      giftCards,
     };
   }
 
@@ -1374,36 +1380,35 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             </div>
           </div>
         )}
-        {/* Gift Card */}
-        <div className="mt-3">
-          {giftCardAmount > 0 ? (
-            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+        {/* Gift Cards — customers can stack several on one order */}
+        <div className="mt-3 space-y-2">
+          {giftCards.map((card) => (
+            <div key={card.code} className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
               <Gift size={15} className="text-green-600 shrink-0" />
               <div className="flex-1">
                 <p className="font-bold text-green-700 text-sm">Gift card applied!</p>
-                <p className="text-xs text-green-600">{giftCardCode} · saving {formatCurrency(giftCardAmount)}</p>
+                <p className="text-xs text-green-600">{card.code} · saving {formatCurrency(card.amount)}</p>
               </div>
-              <button type="button" onClick={() => { setGiftCard(null, 0); setGiftInput(""); }} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
+              <button type="button" onClick={() => removeGiftCard(card.code)} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
             </div>
-          ) : (
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-2">Have a gift card?</p>
-              <div className="flex gap-2">
-                <input
-                  value={giftInput}
-                  onChange={e => { setGiftInput(e.target.value.toUpperCase()); setGiftError(""); }}
-                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyGiftCard())}
-                  placeholder="GIFT-XXXX-XXXX"
-                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 font-mono placeholder:font-sans"
-                />
-                <button type="button" onClick={applyGiftCard} disabled={applyingGift || !giftInput.trim()}
-                  className="bg-gray-800 hover:bg-gray-900 disabled:opacity-40 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors">
-                  {applyingGift ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
-                </button>
-              </div>
-              {giftError && <p className="text-red-500 text-xs mt-2">{giftError}</p>}
+          ))}
+          <div>
+            <p className="text-xs text-gray-500 font-medium mb-2">{giftCards.length > 0 ? "Have another gift card?" : "Have a gift card?"}</p>
+            <div className="flex gap-2">
+              <input
+                value={giftInput}
+                onChange={e => { setGiftInput(e.target.value.toUpperCase()); setGiftError(""); }}
+                onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyGiftCard())}
+                placeholder="GIFT-XXXX-XXXX"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 font-mono placeholder:font-sans"
+              />
+              <button type="button" onClick={applyGiftCard} disabled={applyingGift || !giftInput.trim()}
+                className="bg-gray-800 hover:bg-gray-900 disabled:opacity-40 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors">
+                {applyingGift ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
+              </button>
             </div>
-          )}
+            {giftError && <p className="text-red-500 text-xs mt-2">{giftError}</p>}
+          </div>
         </div>
 
         {isLoggedIn && bestEligibleTier > 0 && !rewardsDismissed && (
