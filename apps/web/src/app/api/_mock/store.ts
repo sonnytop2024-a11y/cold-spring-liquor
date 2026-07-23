@@ -61,6 +61,7 @@ export interface MockOrder {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  customerNotes?: string; // optional note left at checkout — shown to admin + driver
   customerId: string | null;
   driverId: string | null;
   deliveryType?: "same-day" | "next-morning";

@@ -20,6 +20,7 @@ export interface OrderInput {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  customerNotes?: string;
   couponDiscount?: number;
   couponCode?: string | null;
   rewardsDiscount?: number;
@@ -49,6 +50,7 @@ export async function processOrder(
     customerName,
     customerEmail,
     customerPhone,
+    customerNotes,
     couponDiscount = 0,
     couponCode,
     rewardsDiscount = 0,
@@ -193,6 +195,7 @@ export async function processOrder(
     customerName: sessionUser?.name || customerName || "Guest",
     customerEmail: sessionUser?.email || customerEmail || "",
     customerPhone: sessionUser?.phone || customerPhone || "",
+    customerNotes: customerNotes || undefined,
     customerId,
     driverId: null,
     distanceMiles,

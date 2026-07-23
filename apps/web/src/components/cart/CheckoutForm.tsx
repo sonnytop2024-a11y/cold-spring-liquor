@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star, Gift, Minus, Plus } from "lucide-react";
+import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star, Gift, Minus, Plus, StickyNote } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { useCheckoutStore } from "@/store/checkoutStore";
@@ -409,6 +409,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
 
+  // Optional note for the store — shown to admin + driver, never required
+  const [customerNotes, setCustomerNotes] = useState("");
+
   // Delivery address
   const [delivery, setDelivery] = useState<AddrForm>(BLANK_ADDR);
 
@@ -656,6 +659,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       customerName: name,
       customerEmail: email,
       customerPhone: phone,
+      customerNotes: customerNotes.trim() || undefined,
       couponCode: promoCode,
       couponDiscount: promoDiscount,
       rewardsDiscount,
@@ -743,7 +747,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   // ── Review screen for $0 orders (gift card covers full amount) ─────────────
   if (paymentStep === "review-free") {
     const rd = {
-      customerName: name, customerEmail: email, customerPhone: phone,
+      customerName: name, customerEmail: email, customerPhone: phone, customerNotes,
       deliveryAddress: delivery,
       items, subtotal, flashSavings, bundleDiscount, bundlePct,
       promoCode, promoDiscount, rewardsDiscount, rewardsPointsToRedeem,
@@ -799,6 +803,13 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             ))}
           </div>
         </div>
+
+        {rd.customerNotes && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-sm p-5">
+            <h3 className="font-bold text-sm text-amber-800 uppercase tracking-wide mb-1">📝 Note</h3>
+            <p className="text-sm text-amber-800 whitespace-pre-wrap">{rd.customerNotes}</p>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
           <div>
@@ -926,7 +937,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         total={total}
         orderPayload={orderPayload!}
         reviewData={{
-          customerName: name, customerEmail: email, customerPhone: phone,
+          customerName: name, customerEmail: email, customerPhone: phone, customerNotes,
           deliveryAddress: delivery,
           billingAddress: delivery,
           sameBilling: true,
@@ -1322,6 +1333,28 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         )}
       </div>
 
+      {/* 4. Note for the store */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-black shrink-0">4</div>
+          <StickyNote size={14} className="text-gray-400" />
+          <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Note</h2>
+          <span className="text-xs text-gray-400 ml-1">(optional)</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-2">Add a note for the store</p>
+        <textarea
+          value={customerNotes}
+          onChange={e => setCustomerNotes(e.target.value.slice(0, 200))}
+          maxLength={200}
+          rows={3}
+          placeholder={"e.g. Please leave at the front door.\ne.g. Don't ring the bell."}
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all resize-none"
+        />
+        <p className={`text-xs text-right mt-1.5 ${customerNotes.length >= 180 ? "text-brand-600 font-semibold" : "text-gray-400"}`}>
+          {customerNotes.length}/200
+        </p>
+      </div>
+
       {/* Order Totals accordion */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <button type="button" onClick={() => setShowSummary(s => !s)}
@@ -1432,6 +1465,7 @@ interface ReviewData {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  customerNotes?: string;
   deliveryAddress: { street: string; city: string; state: string; zip: string };
   billingAddress: { street: string; city: string; state: string; zip: string };
   sameBilling: boolean;
@@ -1642,6 +1676,13 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
               })}
             </div>
           </div>
+
+          {rd.customerNotes && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-sm p-5">
+              <h3 className="font-bold text-sm text-amber-800 uppercase tracking-wide mb-1">📝 Note</h3>
+              <p className="text-sm text-amber-800 whitespace-pre-wrap">{rd.customerNotes}</p>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div>

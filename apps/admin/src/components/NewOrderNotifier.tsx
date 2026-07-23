@@ -13,6 +13,7 @@ interface Order {
   status: string;
   customerName: string;
   customerPhone: string;
+  customerNotes?: string;
   deliveryAddress?: { street: string; city: string; state: string; zip?: string } | null;
   total: number;
   createdAt: string;
@@ -160,6 +161,11 @@ function OrderCard({ order, onDismiss }: { order: Order; onDismiss: () => void }
             <p className="text-gray-400">+{order.items.length - 2} more item{order.items.length - 2 > 1 ? "s" : ""}</p>
           )}
         </div>
+        {order.customerNotes && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-2.5 py-1.5 text-xs text-yellow-800">
+            📝 <strong>Note: </strong>{order.customerNotes}
+          </div>
+        )}
         <div className="flex gap-2 pt-1">
           <a href="/orders" onClick={onDismiss}
             className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold bg-brand-500 hover:bg-brand-600 text-white py-2.5 rounded-xl transition-colors">
@@ -427,6 +433,12 @@ export function NewOrderNotifier() {
                   </p>
                 )}
               </div>
+
+              {overlayOrder.customerNotes && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3.5 py-2.5 text-sm text-yellow-800">
+                  📝 <strong>Note: </strong>{overlayOrder.customerNotes}
+                </div>
+              )}
             </div>
 
             {/* Action buttons */}

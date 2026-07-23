@@ -9,6 +9,7 @@ interface ReviewData {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  customerNotes?: string;
   deliveryAddress: { street: string; city: string; state: string; zip: string };
   billingAddress: { street: string; city: string; state: string; zip: string };
   sameBilling: boolean;
@@ -172,6 +173,14 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onSuccess, 
             ))}
           </div>
         </div>
+
+        {/* Note */}
+        {rd.customerNotes && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-sm p-5">
+            <h3 className="font-bold text-sm text-amber-800 uppercase tracking-wide mb-1">📝 Note</h3>
+            <p className="text-sm text-amber-800 whitespace-pre-wrap">{rd.customerNotes}</p>
+          </div>
+        )}
 
         {/* Contact */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">

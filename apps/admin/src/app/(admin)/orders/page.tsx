@@ -220,6 +220,13 @@ function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
             </div>
           </div>
 
+          {order.customerNotes && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3.5">
+              <p className="text-xs font-semibold text-yellow-700 uppercase mb-1">📝 Note</p>
+              <p className="text-sm text-yellow-800 whitespace-pre-wrap">{order.customerNotes}</p>
+            </div>
+          )}
+
           {order.items?.some((it: any) => it.referenceImageUrl || it.verificationNote) && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5">
               <div className="flex items-center gap-1.5 mb-2.5">
@@ -705,6 +712,11 @@ export default function OrdersPage() {
               {order.driverId && (
                 <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">
                   🚗 {DRIVERS.find((d: any) => d.id === order.driverId)?.name ?? order.driverId}
+                </span>
+              )}
+              {order.customerNotes && (
+                <span className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded-full font-medium" title={order.customerNotes}>
+                  📝 Note
                 </span>
               )}
               {order.refundType && order.refundType !== "none" && (
