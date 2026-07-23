@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, CreditCard, Loader2, Tag, CheckCircle, ChevronDown, ChevronUp, User, CreditCard as BillingIcon, Clock, AlertTriangle, RefreshCw, Truck, Star, Gift, Minus, Plus } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
@@ -283,12 +284,24 @@ function ThankYouPopup({
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 30);
-    return () => clearTimeout(t);
+    // The customer just clicked the pay button at the bottom of a long page —
+    // bring the view back to the top and freeze background scroll so the
+    // popup is front and center the moment it appears.
+    window.scrollTo({ top: 0 });
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      clearTimeout(t);
+      document.body.style.overflow = prevOverflow;
+    };
   }, []);
 
   const firstName = customerName.split(" ")[0] || customerName;
 
-  return (
+  // Portal to <body>: an ancestor with a CSS transform/filter turns fixed
+  // positioning into container-relative, which left this popup sitting at the
+  // top of the page instead of overlaying the viewport.
+  return createPortal(
     <div
       className={`fixed inset-0 z-[200] flex items-center justify-center p-4 transition-opacity duration-500 ${
         visible ? "opacity-100" : "opacity-0"
@@ -430,7 +443,8 @@ function ThankYouPopup({
           {pickup && <p className="text-center text-[11px] text-gray-400 -mt-2">We will hold your order for 7 days post pickup date</p>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
