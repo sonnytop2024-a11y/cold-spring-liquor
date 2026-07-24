@@ -1643,6 +1643,30 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
         setPaying(false);
         return;
       }
+
+      // Dry-run the order (stock, pickup window, min order, address) BEFORE
+      // charging the card — a rejection here costs the customer nothing.
+      // Speed guard: ~0.3s typically, hard-capped at 4s; on timeout or any
+      // validator failure it fails open (payment proceeds) because
+      // /api/orders auto-refunds if the real order creation fails after the
+      // charge. This step can only ever save the customer, never block them.
+      try {
+        const chk = await fetch("/api/orders/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(orderPayload),
+          signal: AbortSignal.timeout(4000),
+        });
+        if (!chk.ok) {
+          const j = await chk.json().catch(() => ({} as any));
+          if (j?.error) {
+            setPayError(j.error);
+            setPaying(false);
+            return;
+          }
+        }
+      } catch {}
+
       await elements.fetchUpdates();
 
       // Stripe requires elements.submit() immediately before confirmPayment, before any async work

@@ -79,10 +79,17 @@ export async function processOrder(
   const customerId = sessionUser?.id ?? body.customerId ?? null;
 
   const enrichedItems = await Promise.all(items.map(async (i: any) => {
-    const product = await dbGetProduct(i.productId);
+    let product = await dbGetProduct(i.productId);
+    if (!product) {
+      // One retry after a beat — a transient DB blip here used to read as
+      // "stock 0" and reject a fully valid order as out of stock.
+      await new Promise(res => setTimeout(res, 400));
+      product = await dbGetProduct(i.productId);
+    }
     return {
+      found: !!product,
       productId: i.productId,
-      name: product?.name ?? i.productId,
+      name: product?.name ?? i.name ?? i.productId,
       stockQty: product?.stockQty ?? 0,
       price: i.price,
       salePrice: null,
@@ -99,6 +106,15 @@ export async function processOrder(
       volume: product?.volume ?? "",
     };
   }));
+
+  // A failed product lookup is NOT the same as sold out — say so honestly
+  // instead of the misleading "out of stock" that sent a real incident
+  // (2026-07-24, Derek/PayPal) down the wrong trail for two days.
+  const unverified = enrichedItems.filter(i => !i.found);
+  if (unverified.length > 0) {
+    const list = unverified.map(i => i.name).join(", ");
+    return { error: `We couldn't verify availability for: ${list}. Please try again in a moment — if it keeps happening, remove the item from your cart and add it back from the store.`, status: 503 };
+  }
 
   // Reject if any item's requested quantity exceeds current stock — this is
   // the authoritative check; client-side qty caps are only a UX nicety and

@@ -80,7 +80,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Create order using shared logic (points, email, notifications, gift card)
-    const result = await processOrder({ ...orderPayload, paymentMethod: "paypal", paypalOrderId }, sessionToken);
+    // A crash here must hit the same refund path as a rejection — money has
+    // already been captured either way.
+    let result;
+    try {
+      result = await processOrder({ ...orderPayload, paymentMethod: "paypal", paypalOrderId }, sessionToken);
+    } catch (err: any) {
+      console.error("[paypal] processOrder crashed:", err?.message ?? err);
+      result = { error: "Something went wrong while creating your order.", status: 500 as number };
+    }
 
     if (result.error) {
       // Money was captured but the order couldn't be created (e.g. the last
