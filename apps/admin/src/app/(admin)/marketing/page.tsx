@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Tag, Edit2, Trash2, Loader2, X, Check,
   ToggleLeft, ToggleRight, AlertTriangle, Zap, Package, Search, ChevronRight,
-  Image as ImageIcon, GripVertical, ExternalLink,
+  Image as ImageIcon, GripVertical, ExternalLink, ChevronUp, ChevronDown,
 } from "lucide-react";
 import { API } from "@/lib/api";
 
@@ -735,6 +735,18 @@ function FlashDealsTab() {
     setDragId(null); setDragOverId(null);
   }
 
+  // Arrow-button reorder — HTML5 drag doesn't work on touch screens, so
+  // mobile gets one-tap up/down moves. Cache is reordered optimistically so
+  // the row jumps immediately instead of waiting on the server roundtrip.
+  function moveDeal(idx: number, dir: -1 | 1) {
+    const to = idx + dir;
+    if (to < 0 || to >= deals.length) return;
+    const reordered = [...deals];
+    [reordered[idx], reordered[to]] = [reordered[to], reordered[idx]];
+    qc.setQueryData(["admin-flash-deals"], reordered);
+    reorderM.mutate(reordered.map(d => d.id));
+  }
+
   const now = new Date();
   const activeDeals = deals.filter(d => d.active && (!d.endsAt || new Date(d.endsAt) > now));
 
@@ -766,7 +778,7 @@ function FlashDealsTab() {
 
       <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex gap-2 text-xs text-yellow-700">
         <GripVertical size={14} className="mt-0.5 shrink-0" />
-        <span>Drag deals to reorder. The first live deal appears first in the Flash Deals carousel on the website.</span>
+        <span>Tap the ▲▼ arrows (or drag on desktop) to reorder. The first live deal appears first in the Flash Deals carousel on the website.</span>
       </div>
 
       <div className="space-y-2">
@@ -793,9 +805,21 @@ function FlashDealsTab() {
               onDragEnd={() => { setDragId(null); setDragOverId(null); }}
               className={`bg-white rounded-xl border p-4 flex items-center gap-3 transition-all ${expired ? "opacity-70" : ""} ${isDragOver ? "border-yellow-400 bg-yellow-50 scale-[1.01]" : ""} ${dragId === d.id ? "opacity-50" : ""}`}
             >
-              {/* Drag handle */}
-              <div className="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 touch-none">
-                <GripVertical size={18} />
+              {/* Reorder: arrow buttons (work everywhere, incl. touch) + drag handle */}
+              <div className="shrink-0 flex flex-col items-center">
+                <button onClick={() => moveDeal(idx, -1)} disabled={idx === 0}
+                  aria-label="Move up"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 active:bg-yellow-100 disabled:opacity-25 disabled:pointer-events-none transition-colors">
+                  <ChevronUp size={17} />
+                </button>
+                <div className="cursor-grab text-gray-300 hover:text-gray-500 touch-none">
+                  <GripVertical size={15} />
+                </div>
+                <button onClick={() => moveDeal(idx, 1)} disabled={idx === deals.length - 1}
+                  aria-label="Move down"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 active:bg-yellow-100 disabled:opacity-25 disabled:pointer-events-none transition-colors">
+                  <ChevronDown size={17} />
+                </button>
               </div>
 
               {/* Sort # */}
@@ -1214,6 +1238,18 @@ function BannersTab() {
     setDragId(null); setDragOverId(null);
   }
 
+  // Arrow-button reorder — HTML5 drag doesn't work on touch screens, so
+  // mobile gets one-tap up/down moves. Cache is reordered optimistically so
+  // the row jumps immediately instead of waiting on the server roundtrip.
+  function moveBanner(idx: number, dir: -1 | 1) {
+    const to = idx + dir;
+    if (to < 0 || to >= banners.length) return;
+    const reordered = [...banners];
+    [reordered[idx], reordered[to]] = [reordered[to], reordered[idx]];
+    qc.setQueryData(["admin-banners"], reordered);
+    reorderM.mutate(reordered.map(b => b.id));
+  }
+
   const activeBanners = banners.filter(b => b.active && (!b.endDate || new Date(b.endDate) > new Date()));
 
   return (
@@ -1231,7 +1267,7 @@ function BannersTab() {
 
       <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex gap-2 text-xs text-indigo-700">
         <GripVertical size={14} className="mt-0.5 shrink-0" />
-        <span>Drag banners to reorder. The first active banner appears first in the carousel.</span>
+        <span>Tap the ▲▼ arrows (or drag on desktop) to reorder. The first active banner appears first in the carousel.</span>
       </div>
 
       <div className="space-y-2">
@@ -1256,9 +1292,21 @@ function BannersTab() {
               onDragEnd={() => { setDragId(null); setDragOverId(null); }}
               className={`bg-white rounded-xl border p-3 flex items-center gap-3 transition-all ${isDragOver ? "border-indigo-400 bg-indigo-50 scale-[1.01]" : ""} ${dragId === b.id ? "opacity-50" : ""}`}
             >
-              {/* Drag handle */}
-              <div className="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 touch-none">
-                <GripVertical size={18} />
+              {/* Reorder: arrow buttons (work everywhere, incl. touch) + drag handle */}
+              <div className="shrink-0 flex flex-col items-center">
+                <button onClick={() => moveBanner(idx, -1)} disabled={idx === 0}
+                  aria-label="Move up"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100 disabled:opacity-25 disabled:pointer-events-none transition-colors">
+                  <ChevronUp size={17} />
+                </button>
+                <div className="cursor-grab text-gray-300 hover:text-gray-500 touch-none">
+                  <GripVertical size={15} />
+                </div>
+                <button onClick={() => moveBanner(idx, 1)} disabled={idx === banners.length - 1}
+                  aria-label="Move down"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100 disabled:opacity-25 disabled:pointer-events-none transition-colors">
+                  <ChevronDown size={17} />
+                </button>
               </div>
 
               {/* Sort # */}
