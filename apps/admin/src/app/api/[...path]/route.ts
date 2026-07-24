@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminSession, ADMIN_SESSION_COOKIE, ADMIN_SESSION_SECRET_FALLBACK } from "@/lib/adminSession";
 
 // Server-side proxy: forwards all /api/* calls from admin to the web app.
 // Runs server-side so there is no CORS issue — browser always calls the admin domain.
@@ -9,6 +10,16 @@ const WEB_URL = (process.env.WEB_API_URL ?? "https://www.coldspringliquor.com").
 type Ctx = { params: { path: string[] } };
 
 async function proxy(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
+  // Gate the data proxy on the same login session as the UI — otherwise
+  // someone who knows the admin URL could hit /api/admin/* directly, bypassing
+  // the login page entirely. (The login/logout routes are separate specific
+  // handlers and never reach this catch-all.)
+  const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  const secret = process.env.ADMIN_SESSION_SECRET ?? ADMIN_SESSION_SECRET_FALLBACK;
+  if (!(await verifyAdminSession(token, secret))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const destination = `${WEB_URL}/api/${ctx.params.path.join("/")}${req.nextUrl.search}`;
 
   // Build headers as plain Record to avoid HeadersInit union issues

@@ -1,10 +1,21 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { NewOrderNotifier } from "@/components/NewOrderNotifier";
 import { PushRegistrar } from "@/components/PushRegistrar";
+import { verifyAdminSession, ADMIN_SESSION_COOKIE, ADMIN_SESSION_SECRET_FALLBACK } from "@/lib/adminSession";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+// Every admin page renders through this layout — verify the login session
+// here so an unauthenticated visitor is bounced to /login before any admin
+// UI or data loads. The /login page lives outside this route group, so it
+// stays reachable.
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const token = cookies().get(ADMIN_SESSION_COOKIE)?.value;
+  const secret = process.env.ADMIN_SESSION_SECRET ?? ADMIN_SESSION_SECRET_FALLBACK;
+  if (!(await verifyAdminSession(token, secret))) redirect("/login");
+
   return (
     <div className="flex h-screen overflow-hidden">
       <AdminSidebar />

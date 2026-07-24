@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, User, X, ShoppingBag, Clock, CheckCircle, Truck } from "lucide-react";
+import { Bell, User, X, ShoppingBag, Clock, CheckCircle, Truck, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 
@@ -79,6 +79,14 @@ export function AdminHeader() {
   }
 
   const newCount = orders.filter(o => o.status === "pending").length;
+
+  const [loggingOut, setLoggingOut] = useState(false);
+  async function handleLogout() {
+    setLoggingOut(true);
+    try { await fetch("/api/auth/logout", { method: "POST" }); } catch {}
+    // Full navigation so the gated layout re-checks and lands on /login
+    window.location.href = "/login";
+  }
 
   return (
     <header className="h-14 bg-white border-b flex items-center justify-between px-4 shrink-0 relative z-30">
@@ -172,6 +180,16 @@ export function AdminHeader() {
           </div>
           <span className="hidden sm:block">Admin</span>
         </div>
+
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          title="Log out"
+          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-red-600 hover:bg-red-50 px-2.5 py-2 rounded-lg transition-colors disabled:opacity-50"
+        >
+          <LogOut size={16} />
+          <span className="hidden sm:block">Log out</span>
+        </button>
       </div>
     </header>
   );
