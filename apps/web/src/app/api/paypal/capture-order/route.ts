@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processOrder } from "@/lib/processOrder";
+import { sendSms } from "@/lib/sms";
+
+const OWNER_PHONE = "5127202489";
 
 const BASE =
   process.env.PAYPAL_ENV === "sandbox"
@@ -30,10 +33,25 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1. Get access token
+    const sessionToken = req.cookies.get("csl-session")?.value ?? null;
+
+    // 1. Validate the order BEFORE taking money — stock, min order, pickup
+    // window, delivery address/radius. A rejection here costs the customer
+    // nothing. (Previously validation only ran after capture: an out-of-stock
+    // item meant the customer was charged with no order created.)
+    const precheck = await processOrder(
+      { ...orderPayload, paymentMethod: "paypal", paypalOrderId },
+      sessionToken,
+      { validateOnly: true },
+    );
+    if (precheck.error) {
+      return NextResponse.json({ error: precheck.error }, { status: precheck.status ?? 400 });
+    }
+
+    // 2. Get access token
     const token = await getAccessToken();
 
-    // 2. Capture PayPal payment
+    // 3. Capture PayPal payment
     const captureRes = await fetch(`${BASE}/v2/checkout/orders/${paypalOrderId}/capture`, {
       method: "POST",
       headers: {
@@ -61,14 +79,48 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // 3. Create order using shared logic (points, email, notifications, gift card)
-    const sessionToken = req.cookies.get("csl-session")?.value ?? null;
+    // 4. Create order using shared logic (points, email, notifications, gift card)
     const result = await processOrder({ ...orderPayload, paymentMethod: "paypal", paypalOrderId }, sessionToken);
 
-    if (result.error) return NextResponse.json({ error: result.error }, { status: result.status ?? 400 });
+    if (result.error) {
+      // Money was captured but the order couldn't be created (e.g. the last
+      // unit sold in the seconds since the precheck). Refund immediately so
+      // the customer is never charged for nothing.
+      const refunded = await refundCapture(token, captureUnit?.id);
+      console.error("[paypal] order failed AFTER capture:", result.error, "| refunded:", refunded, "| capture:", captureUnit?.id);
+      sendSms(
+        OWNER_PHONE,
+        refunded
+          ? `⚠️ PayPal order failed after payment (auto-refunded): ${result.error}`
+          : `🚨 PayPal order failed after payment and AUTO-REFUND FAILED — refund manually in PayPal! Capture ${captureUnit?.id}. Reason: ${result.error}`,
+      ).catch(() => {});
+      return NextResponse.json({
+        error: refunded
+          ? `${result.error} Your PayPal payment has been refunded in full — you have not been charged.`
+          : `${result.error} Please contact us at (512) 337-7051 — we will refund your PayPal payment right away.`,
+      }, { status: result.status ?? 400 });
+    }
     return NextResponse.json(result.order, { status: 201 });
   } catch (err: any) {
     console.error("[paypal] capture-order error:", err?.message ?? err);
     return NextResponse.json({ error: err?.message ?? "Failed to capture payment" }, { status: 500 });
+  }
+}
+
+// Full refund of a capture — returns true when PayPal confirms the refund
+async function refundCapture(token: string, captureId?: string): Promise<boolean> {
+  if (!captureId) return false;
+  try {
+    const res = await fetch(`${BASE}/v2/payments/captures/${captureId}/refund`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: "{}",
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && (data.status === "COMPLETED" || data.status === "PENDING");
+  } catch (err) {
+    console.error("[paypal] refund failed:", err);
+    return false;
   }
 }

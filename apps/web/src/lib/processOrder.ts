@@ -42,6 +42,12 @@ export interface ProcessOrderResult {
 export async function processOrder(
   body: OrderInput,
   sessionToken?: string | null,
+  // validateOnly: run every rejection check (stock, min order, pickup window,
+  // delivery address/radius) and stop before creating the order or touching
+  // any data. Lets payment routes verify the order will succeed BEFORE
+  // capturing money — a PayPal capture was taken for an out-of-stock item
+  // once and the customer paid with no order created.
+  opts?: { validateOnly?: boolean },
 ): Promise<ProcessOrderResult> {
   const {
     items,
@@ -168,6 +174,10 @@ export async function processOrder(
       };
     }
   }
+
+  // All rejection checks passed — a validate-only call stops here, before the
+  // order is created or anything (stock, gift cards, points) is written.
+  if (opts?.validateOnly) return {};
 
   const nowDate = new Date();
   const nowStr = nowDate.toISOString();
