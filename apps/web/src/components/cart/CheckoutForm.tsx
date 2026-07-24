@@ -25,7 +25,7 @@ import { WhyCustomersTrustUs } from "./WhyCustomersTrustUs";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-const QUICK_CODES = ["WELCOME10", "SUMMER15", "CSL5"];
+const QUICK_CODES = ["WELCOME10"];
 const TAX = 0.0825;
 
 interface AddrForm { street: string; city: string; state: string; zip: string }

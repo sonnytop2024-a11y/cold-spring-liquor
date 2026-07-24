@@ -32,7 +32,7 @@ const PERKS = [
   {
     emoji: "🎟️",
     label: "Promo Codes",
-    desc: "WELCOME10, SUMMER15, PARTY25 & more at checkout.",
+    desc: "Use code WELCOME10 for $10 off at checkout.",
     href: "/checkout",
     color: "#f97316",
   },
