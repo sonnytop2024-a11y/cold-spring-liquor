@@ -6,12 +6,15 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB raw input limit
 const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const BUCKET = "csl-images";
 
-// Product images: 800×800 square, white background, bottle centered
+// Product images: 800×800 square, white background, WHOLE bottle centered.
+// fit "contain" (not "cover") so tall bottles are never cropped top/bottom —
+// the trimmed bottle fits inside the square with white padding on the sides.
+// Only affects newly uploaded images; already-stored images are untouched.
 async function processProductImage(buffer: ArrayBuffer): Promise<Buffer> {
   const input = Buffer.from(buffer);
   return sharp(input)
     .trim({ background: "#FFFFFF", threshold: 15 })
-    .resize(800, 800, { fit: "cover", position: "centre" })
+    .resize(800, 800, { fit: "contain", background: { r: 255, g: 255, b: 255 } })
     .flatten({ background: { r: 255, g: 255, b: 255 } })
     .toFormat("webp", { quality: 85, effort: 4 })
     .toBuffer();
