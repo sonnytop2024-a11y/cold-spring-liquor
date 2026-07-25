@@ -26,12 +26,12 @@ async function processBannerImage(buffer: ArrayBuffer): Promise<Buffer> {
     .toBuffer();
 }
 
-// Category card photos: landscape 7:5 to match the card frame on /categories,
-// cover-cropped and centered so any source image fills the tile cleanly.
+// Category card photos: keep the WHOLE image (no crop) so the tile can show it
+// in full with a blurred fill behind. Fit within 1000×1000, preserve aspect.
 async function processCategoryImage(buffer: ArrayBuffer): Promise<Buffer> {
   const input = Buffer.from(buffer);
   return sharp(input)
-    .resize(700, 500, { fit: "cover", position: "centre" })
+    .resize(1000, 1000, { fit: "inside", withoutEnlargement: true })
     .toFormat("webp", { quality: 85, effort: 4 })
     .toBuffer();
 }

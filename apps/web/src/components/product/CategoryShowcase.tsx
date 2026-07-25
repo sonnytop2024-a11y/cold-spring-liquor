@@ -44,12 +44,19 @@ function CategoryCard({ value, label, emoji, imageUrl }: Category) {
   return (
     <Link href={`/products?category=${encodeURIComponent(value)}`}
       className="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 active:scale-[.98] transition-all">
-      {/* Photo — icon bubble is part of the artwork */}
-      <div className="relative w-full aspect-[7/5] bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Photo — whole image shown in full; blurred copy fills the empty sides
+          so nothing is cropped and there are no flat empty bars */}
+      <div className="relative w-full aspect-[7/5] overflow-hidden bg-gray-100">
         {!imgFailed ? (
-          <Image src={src} alt={label} fill unoptimized
-            className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
-            onError={() => setImgFailed(true)} />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt="" aria-hidden
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-80" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={label}
+              className="absolute inset-0 w-full h-full object-contain group-hover:scale-[1.03] transition-transform duration-300"
+              onError={() => setImgFailed(true)} />
+          </>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-5xl">{emoji}</div>
         )}
