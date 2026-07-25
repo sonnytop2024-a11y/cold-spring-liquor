@@ -219,12 +219,8 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
           {uploading ? (
             <Loader2 size={16} className="animate-spin text-orange-500" />
           ) : !thumbFailed ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumbSrc} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-md" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumbSrc} alt={cat.label} className="absolute inset-0 w-full h-full object-contain" onError={() => setThumbFailed(true)} />
-            </>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbSrc} alt={cat.label} className="w-full h-full object-cover" onError={() => setThumbFailed(true)} />
           ) : (
             <span className="text-xl">{cat.emoji}</span>
           )}
