@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Check, X, ChevronUp, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, ChevronUp, ChevronDown, Eye, EyeOff, Camera, Loader2 } from "lucide-react";
 import { API } from "@/lib/api";
 
 interface Category {
@@ -12,9 +12,16 @@ interface Category {
   emoji: string;
   sortOrder: number;
   active: boolean;
+  imageUrl?: string;
 }
 
 const EMOJI_OPTIONS = ["🥃","🍸","🌵","🍹","🌿","🍷","🍾","🍺","🥂","🧃","🥤","🌸","💎","📦","⭐","🔥","✨","🎯","🏆","🍊"];
+
+// Storage base is public (exposed in every image URL on the live site), so a
+// hardcoded fallback is safe when the env var isn't present in the admin build.
+const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fmgbfzhosuqefsthyuoq.supabase.co";
+// Default artwork the website falls back to when no custom photo is set.
+const defaultCatImg = (value: string) => `${SUPA}/storage/v1/object/public/csl-images/categories/${value}.webp`;
 
 function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -104,6 +111,38 @@ function CatRow({ cat, isFirst, isLast, onMove }: {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(cat.label);
   const [emoji, setEmoji] = useState(cat.emoji);
+  const [uploading, setUploading] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const thumbSrc = cat.imageUrl || defaultCatImg(cat.value);
+
+  async function saveImage(imageUrl: string) {
+    await fetch(`${API}/admin/categories/${cat.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl }),
+    });
+    qc.invalidateQueries({ queryKey: ["categories"] });
+  }
+
+  async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`${API}/admin/upload?folder=categories`, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || "Upload failed");
+      await saveImage(json.url);
+      setThumbFailed(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   const patch = useMutation({
     mutationFn: async (fields: Partial<Category>) => {
@@ -145,10 +184,40 @@ function CatRow({ cat, isFirst, isLast, onMove }: {
         <button onClick={() => onMove("up")} disabled={isFirst} className="text-gray-300 hover:text-gray-500 disabled:invisible leading-none"><ChevronUp size={12} /></button>
         <button onClick={() => onMove("down")} disabled={isLast} className="text-gray-300 hover:text-gray-500 disabled:invisible leading-none"><ChevronDown size={12} /></button>
       </div>
-      <span className="text-xl w-7 text-center shrink-0">{cat.emoji}</span>
+      {/* Category photo — tap to upload/replace (always-visible camera badge) */}
+      <div className="shrink-0">
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImagePick} />
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+          title={cat.imageUrl ? "Change photo" : "Upload photo"}
+          className="relative w-14 h-10 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center active:scale-95 transition-transform">
+          {uploading ? (
+            <Loader2 size={15} className="animate-spin text-orange-500" />
+          ) : !thumbFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbSrc} alt={cat.label} className="w-full h-full object-cover" onError={() => setThumbFailed(true)} />
+          ) : (
+            <span className="text-lg">{cat.emoji}</span>
+          )}
+          {!uploading && (
+            <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-orange-500 border border-white flex items-center justify-center shadow-sm">
+              <Camera size={9} className="text-white" />
+            </span>
+          )}
+        </button>
+      </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-800 text-sm truncate">{cat.label}</p>
         <p className="text-[10px] text-gray-400 font-mono">{cat.value}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+            className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-600 hover:text-orange-700 disabled:opacity-50">
+            <Camera size={10} /> {cat.imageUrl ? "Change photo" : "Add photo"}
+          </button>
+          {cat.imageUrl && (
+            <button type="button" onClick={() => saveImage("")}
+              className="text-[10px] text-gray-400 hover:text-red-500 underline">Remove</button>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
         <button onClick={() => patch.mutate({ active: !cat.active })} title={cat.active ? "Hide" : "Show"}
@@ -248,7 +317,7 @@ export function CategoriesModal({ onClose }: { onClose: () => void }) {
                   onMove={dir => move(cat.id, dir)} />
               ))}
               <p className="text-[11px] text-gray-400 text-center mt-3">
-                ↑↓ reorder · 👁 show/hide on website
+                Tap a photo to upload/change · ↑↓ reorder · 👁 show/hide
               </p>
             </>
           )}
