@@ -26,6 +26,16 @@ async function processBannerImage(buffer: ArrayBuffer): Promise<Buffer> {
     .toBuffer();
 }
 
+// Category card photos: landscape 7:5 to match the card frame on /categories,
+// cover-cropped and centered so any source image fills the tile cleanly.
+async function processCategoryImage(buffer: ArrayBuffer): Promise<Buffer> {
+  const input = Buffer.from(buffer);
+  return sharp(input)
+    .resize(700, 500, { fit: "cover", position: "centre" })
+    .toFormat("webp", { quality: 85, effort: 4 })
+    .toBuffer();
+}
+
 // Hero showcase bottle images: auto-crop the empty border around the bottle
 // (transparent or white, whichever the source uses), fit inside 400×400 with
 // no forced crop, and keep the alpha channel so the bottle floats on the
@@ -71,7 +81,9 @@ try {
       ? await processBannerImage(rawBytes)
       : folder === "showcase"
         ? await processShowcaseImage(rawBytes)
-        : await processProductImage(rawBytes);
+        : folder === "categories"
+          ? await processCategoryImage(rawBytes)
+          : await processProductImage(rawBytes);
 
     const safeName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
 

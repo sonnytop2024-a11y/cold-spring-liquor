@@ -13,13 +13,15 @@ const body = await req.json();
     return NextResponse.json({ ok: true });
   }
 
-  const { label, emoji, active, sortOrder, value } = body;
+  const { label, emoji, active, sortOrder, value, imageUrl } = body;
   const updated = await dbUpdateCategory(id, {
     ...(label !== undefined && { label: label.trim() }),
     ...(emoji !== undefined && { emoji: emoji.trim() }),
     ...(active !== undefined && { active }),
     ...(sortOrder !== undefined && { sortOrder }),
     ...(value !== undefined && { value: value.toLowerCase().trim() }),
+    // null/"" clears the custom photo → web falls back to default artwork
+    ...(imageUrl !== undefined && { imageUrl: imageUrl || undefined }),
   });
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(updated);

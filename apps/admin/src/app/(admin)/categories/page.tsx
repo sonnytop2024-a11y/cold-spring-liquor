@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Check, X, GripVertical, ChevronUp, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, GripVertical, ChevronUp, ChevronDown, Eye, EyeOff, ImagePlus, Loader2 } from "lucide-react";
 import { API } from "@/lib/api";
 
 interface Category {
@@ -12,9 +12,17 @@ interface Category {
   emoji: string;
   sortOrder: number;
   active: boolean;
+  imageUrl?: string;
 }
 
 const EMOJI_SUGGESTIONS = ["🥃","🍸","🌵","🍹","🌿","🍷","🍾","🍺","🥂","🧃","🥤","🌸","💎","📦","⭐","🔥","✨","🎯","🏆","🍊"];
+
+// Storage base is public (every product/category image URL on the live site
+// exposes it), so a hardcoded fallback is safe if the env var isn't present.
+const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fmgbfzhosuqefsthyuoq.supabase.co";
+// The default artwork the website falls back to when no custom photo is set —
+// same path CategoryShowcase reads, so the admin thumbnail mirrors the live tile.
+const defaultCatImg = (value: string) => `${SUPA}/storage/v1/object/public/csl-images/categories/${value}.webp`;
 
 function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -106,6 +114,40 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
   const [label, setLabel] = useState(cat.label);
   const [emoji, setEmoji] = useState(cat.emoji);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  // What the live tile actually shows: custom upload → default artwork → emoji
+  const thumbSrc = cat.imageUrl || defaultCatImg(cat.value);
+
+  async function saveImage(imageUrl: string) {
+    await fetch(`${API}/admin/categories/${cat.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl }),
+    });
+    qc.invalidateQueries({ queryKey: ["categories"] });
+  }
+
+  async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`${API}/admin/upload?folder=categories`, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || "Upload failed");
+      await saveImage(json.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   const patch = useMutation({
     mutationFn: async (fields: Partial<Category>) => {
@@ -163,10 +205,39 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
         </button>
       </div>
 
-      <span className="text-2xl w-8 text-center shrink-0">{cat.emoji}</span>
+      {/* Category photo — click to upload/replace */}
+      <div className="shrink-0">
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImagePick} />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          title={cat.imageUrl ? "Change photo" : "Upload photo"}
+          className="group relative w-16 h-11 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center hover:border-orange-400 transition-colors"
+        >
+          {uploading ? (
+            <Loader2 size={16} className="animate-spin text-orange-500" />
+          ) : !thumbFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbSrc} alt={cat.label} className="w-full h-full object-cover" onError={() => setThumbFailed(true)} />
+          ) : (
+            <span className="text-xl">{cat.emoji}</span>
+          )}
+          <span className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+            <ImagePlus size={15} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          </span>
+        </button>
+      </div>
+
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-800 text-sm">{cat.label}</p>
         <p className="text-xs text-gray-400 font-mono">{cat.value}</p>
+        {cat.imageUrl && (
+          <button type="button" onClick={() => saveImage("")}
+            className="text-[11px] text-gray-400 hover:text-red-500 underline mt-0.5">
+            Remove photo
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
@@ -284,7 +355,7 @@ export default function CategoriesPage() {
             />
           ))}
           <p className="text-xs text-gray-400 text-center mt-4">
-            Use ↑↓ to reorder · Toggle 👁 to show/hide on website without deleting
+            Tap the photo to upload/change a category image · ↑↓ to reorder · 👁 to show/hide
           </p>
         </div>
       )}

@@ -10,6 +10,7 @@ interface Category {
   value: string;
   label: string;
   emoji: string;
+  imageUrl?: string;
 }
 
 const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -35,15 +36,18 @@ const DESCRIPTIONS: Record<string, string> = {
   other:     "Other Spirits & More",
 };
 
-function CategoryCard({ value, label, emoji }: Category) {
+function CategoryCard({ value, label, emoji, imageUrl }: Category) {
   const [imgFailed, setImgFailed] = useState(false);
+  // Admin-uploaded photo wins; otherwise the default artwork at the fixed
+  // storage path; emoji is the last-resort fallback if neither loads.
+  const src = imageUrl || catImg(value);
   return (
     <Link href={`/products?category=${encodeURIComponent(value)}`}
       className="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 active:scale-[.98] transition-all">
       {/* Photo — icon bubble is part of the artwork */}
       <div className="relative w-full aspect-[7/5] bg-gradient-to-br from-gray-50 to-gray-100">
         {!imgFailed ? (
-          <Image src={catImg(value)} alt={label} fill unoptimized
+          <Image src={src} alt={label} fill unoptimized
             className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
             onError={() => setImgFailed(true)} />
         ) : (

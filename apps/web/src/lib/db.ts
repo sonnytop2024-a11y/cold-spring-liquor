@@ -659,6 +659,7 @@ export interface Category {
   emoji: string;    // e.g. "🥃"
   sortOrder: number;
   active: boolean;
+  imageUrl?: string; // admin-uploaded card photo (overrides the default artwork)
 }
 
 const DEFAULT_CATEGORIES: Category[] = [
