@@ -1229,13 +1229,23 @@ export default function InventoryPage() {
     placeholderData: (prev) => prev,
   });
 
-  const { data: dynamicCats } = useQuery<{ value: string; label: string; emoji: string }[]>({
+  // Shares the ["categories"] cache with CategoriesModal, so the queryFn MUST
+  // return the RAW category objects (same shape the modal reads/writes) —
+  // transforming here would overwrite the shared cache with a stripped shape,
+  // wiping `active`/`id`/`imageUrl` and breaking the modal. The dropdown-label
+  // transform happens per-observer via `select`, which never touches the cache.
+  const { data: dynamicCats } = useQuery<
+    { value: string; label: string; emoji?: string }[],
+    Error,
+    { value: string; label: string; emoji: string }[]
+  >({
     queryKey: ["categories"],
     queryFn: async () => {
       const res = await fetch(`${API}/admin/categories`);
       const data = await res.json();
-      return Array.isArray(data) ? data.map((c: { value: string; label: string; emoji?: string }) => ({ value: c.value, label: `${c.emoji || ""} ${c.label}`.trim(), emoji: c.emoji || "" })) : [];
+      return Array.isArray(data) ? data : [];
     },
+    select: (data) => data.map((c) => ({ value: c.value, label: `${c.emoji || ""} ${c.label}`.trim(), emoji: c.emoji || "" })),
     staleTime: 60_000,
   });
   const CATEGORIES = dynamicCats && dynamicCats.length > 0 ? dynamicCats : CATEGORIES_FALLBACK;
