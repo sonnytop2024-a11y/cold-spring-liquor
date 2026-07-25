@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Check, X, GripVertical, ChevronUp, ChevronDown, Eye, EyeOff, ImagePlus, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, GripVertical, ChevronUp, ChevronDown, Eye, EyeOff, Camera, Loader2 } from "lucide-react";
 import { API } from "@/lib/api";
 
 interface Category {
@@ -205,7 +205,8 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
         </button>
       </div>
 
-      {/* Category photo — click to upload/replace */}
+      {/* Category photo — tap to upload/replace (always-visible camera badge so
+          the control is obvious on touch, where there's no hover) */}
       <div className="shrink-0">
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImagePick} />
         <button
@@ -213,7 +214,7 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           title={cat.imageUrl ? "Change photo" : "Upload photo"}
-          className="group relative w-16 h-11 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center hover:border-orange-400 transition-colors"
+          className="relative w-16 h-11 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center active:scale-95 transition-transform"
         >
           {uploading ? (
             <Loader2 size={16} className="animate-spin text-orange-500" />
@@ -223,21 +224,30 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
           ) : (
             <span className="text-xl">{cat.emoji}</span>
           )}
-          <span className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
-            <ImagePlus size={15} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-          </span>
+          {/* Always-visible camera badge, bottom-right corner */}
+          {!uploading && (
+            <span className="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-orange-500 border-2 border-white flex items-center justify-center shadow-sm">
+              <Camera size={10} className="text-white" />
+            </span>
+          )}
         </button>
       </div>
 
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-800 text-sm">{cat.label}</p>
         <p className="text-xs text-gray-400 font-mono">{cat.value}</p>
-        {cat.imageUrl && (
-          <button type="button" onClick={() => saveImage("")}
-            className="text-[11px] text-gray-400 hover:text-red-500 underline mt-0.5">
-            Remove photo
+        <div className="flex items-center gap-2 mt-1">
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 hover:text-orange-700 disabled:opacity-50">
+            <Camera size={11} /> {cat.imageUrl ? "Change photo" : "Add photo"}
           </button>
-        )}
+          {cat.imageUrl && (
+            <button type="button" onClick={() => saveImage("")}
+              className="text-[11px] text-gray-400 hover:text-red-500 underline">
+              Remove
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
