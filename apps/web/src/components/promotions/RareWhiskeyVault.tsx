@@ -283,6 +283,7 @@ function InfoCell({
 }) {
   const addItem = useCartStore((st) => st.addItem);
   const soldOut = item.stock <= 0;
+  const onSale = item.product.salePrice != null && item.product.salePrice < item.product.price;
   const [state, setState] = useState<"idle" | "adding" | "added">("idle");
 
   const handleAdd = () => {
@@ -311,7 +312,14 @@ function InfoCell({
       >
         {item.name}
       </h3>
-      <p className="product-price">{formatCurrency(item.price)}</p>
+      {/* On-sale items show the regular price struck through above the sale
+          price (anh Sơn, 26/07). The slot is always rendered — empty when not
+          on sale — so the big price line stays on the same baseline in every
+          column. item.price from the feed is already salePrice ?? price. */}
+      <p className="price-compare">
+        {onSale && <s>{formatCurrency(item.product.price)}</s>}
+      </p>
+      <p className={`product-price${onSale ? " is-sale" : ""}`}>{formatCurrency(item.price)}</p>
 
       <div className="qty-control" aria-label={`Choose quantity for ${item.name}`}>
         <button
@@ -720,7 +728,13 @@ const vaultCSS = `/* ===========================================================
    (not 2) since the name now carries the size too, e.g. "Eagle Rare, 750mL"
    (anh Sơn, 26/07 — no separate size line, size lives in the product name). */
 .rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: calc(6.5px * var(--name-scale, 1)); font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
-.rwv .product-price { margin: 4px 0 7px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1; height: 18px; font-variant-numeric: tabular-nums; }
+/* regular price, struck through, shown only for on-sale items — the slot is
+   always in the layout so every column's big price shares one baseline */
+.rwv .price-compare { margin: 3px 0 0; height: 9px; color: #8d7b62; font-size: 8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.rwv .price-compare s { text-decoration: line-through; }
+.rwv .product-price { margin: 2px 0 7px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1; height: 18px; font-variant-numeric: tabular-nums; }
+/* same amber as the Flash Deals sale price, so "deal" reads consistently */
+.rwv .product-price.is-sale { color: #FF9F0A; }
 
 .rwv .qty-control { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; min-height: 20px; border: 1px solid #4a4a4a; border-radius: 5px; overflow: hidden; background: #090909; }
 .rwv .qty-control button, .rwv .qty-control output { border: 0; color: #d8d8d8; background: transparent; display: grid; place-items: center; font: inherit; }
@@ -749,7 +763,8 @@ const vaultCSS = `/* ===========================================================
     .rwv .niche-badge { width: 44px; height: 44px; font-size: 8px; }
     .rwv .info-cell { padding: 18px 12px 22px; }
     .rwv .product-name { font-size: calc(10.5px * var(--name-scale, 1)); height: 38px; }
-    .rwv .product-price { font-size: 27px; height: 28px; margin: 8px 0 12px; }
+    .rwv .price-compare { margin: 6px 0 0; height: 14px; font-size: 13px; }
+    .rwv .product-price { font-size: 27px; height: 28px; margin: 2px 0 12px; }
     .rwv .qty-control { min-height: 32px; }
     .rwv .qty-control output { font-size: 13px; }
     .rwv .add-to-cart { height: 34px; font-size: 11px; }
