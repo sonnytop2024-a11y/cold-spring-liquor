@@ -658,7 +658,11 @@ const vaultCSS = `/* ===========================================================
     .rwv .add-to-cart { height: 34px; font-size: 11px; }
 }
 @media (max-width: 430px) {
-    .rwv .rare-vault { border-radius: 14px; margin-inline: 4px; }
+    /* Cancel the page's normal 16px side padding for just this section so
+       the cabinet reads almost edge-to-edge on a phone (anh Sơn, 26/07) —
+       every other section keeps its usual container-main margins. */
+    .rwv .container-main { padding-left: 4px; padding-right: 4px; }
+    .rwv .rare-vault { border-radius: 10px; margin-inline: 0; }
     /* pagination arrows only felt oversized on phones — desktop is unchanged */
     .rwv .vault-arrow { width: 27px; height: 27px; font-size: 17px; }
 }
