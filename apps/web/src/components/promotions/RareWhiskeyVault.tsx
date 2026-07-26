@@ -607,7 +607,8 @@ const vaultCSS = `/* ===========================================================
 
 
 @media (min-width: 700px) {
-    .rwv .niche-badge { width: 22px; height: 22px; font-size: 4px; }
+    /* desktop keeps the original size — it only looked oversized on mobile */
+    .rwv .niche-badge { width: 44px; height: 44px; font-size: 8px; }
     .rwv .info-cell { padding: 18px 12px 22px; }
     .rwv .product-name { font-size: 10.5px; height: 38px; }
     .rwv .product-price { font-size: 27px; height: 28px; margin: 8px 0 12px; }
