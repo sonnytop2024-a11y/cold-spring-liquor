@@ -324,6 +324,22 @@ export function RareWhiskeyVault() {
     refetchOnWindowFocus: false,
   });
 
+  // Remembers whether the vault actually showed anything on this browser's
+  // last visit, so the loading skeleton only appears when we have reason to
+  // expect real content. Without this, every reload — including while the
+  // vault is switched off in admin — briefly flashed an empty placeholder
+  // box before collapsing to nothing, which read as its own glitch (anh Sơn,
+  // 26/07). First-ever visit defaults to no skeleton (matches the original
+  // "renders nothing while off" contract); it self-corrects once data loads.
+  const [expectVisible] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem("rwv_last_visible") === "1";
+    } catch {
+      return false;
+    }
+  });
+
   const [qtyMap, setQtyMap] = useState<Record<string, number>>({});
   const [page, setPage] = useState(0);
   const [fading, setFading] = useState(false);
@@ -341,15 +357,25 @@ export function RareWhiskeyVault() {
 
   const products = data?.products ?? [];
   const pageCount = Math.max(1, Math.ceil(products.length / NICHE_COUNT));
+  const visible = !!data && data.settings.enabled && products.length > 0;
 
   useEffect(() => {
     setPage((prev) => Math.min(prev, pageCount - 1));
   }, [pageCount]);
 
-  // Still fetching (only reachable if SSR's initialData wasn't provided) —
-  // reserve the cabinet's footprint so Hero Section doesn't jump once the
-  // real content lands, instead of rendering nothing then popping in.
+  useEffect(() => {
+    if (isLoading) return;
+    try {
+      sessionStorage.setItem("rwv_last_visible", visible ? "1" : "0");
+    } catch {
+      // storage blocked (private mode etc.) — just skip remembering it
+    }
+  }, [isLoading, visible]);
+
+  // Still fetching — only reserve the cabinet's footprint if last visit
+  // actually showed something; otherwise stay invisible like before.
   if (isLoading) {
+    if (!expectVisible) return null;
     return (
       <section className="bg-[#050505] py-4 rwv">
         <style dangerouslySetInnerHTML={{ __html: vaultCSS }} />
@@ -361,7 +387,7 @@ export function RareWhiskeyVault() {
   }
 
   // Admin switched the section off, or nothing to display → render nothing.
-  if (!data || !data.settings.enabled || products.length === 0) return null;
+  if (!visible) return null;
 
   const goToPage = (next: number) => {
     if (next === page || fading) return;
