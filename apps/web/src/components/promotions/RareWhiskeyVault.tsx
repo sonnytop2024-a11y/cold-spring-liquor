@@ -550,12 +550,23 @@ const vaultCSS = `/* ===========================================================
 /* badge sits in the niche's top-right corner, clear of the bottle */
 .rwv .niche-badge { position: absolute; top: 25%; width: 30px; height: 30px; transform: translateX(-50%); display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; color: var(--gold-light); background: rgba(10,6,2,.94); font-size: 6px; font-weight: 800; line-height: 1.05; text-align: center; text-transform: uppercase; z-index: 8; }
 
-/* info columns line up with the photo's actual niche widths and read as a
-     continuation of the cabinet, not a separate black strip below it */
-.rwv .info-row { position: relative; display: flex; align-items: stretch; padding: 0 7.06% 0 5.99%;
+/* Info columns are NOT evenly split — the cabinet photo's 5 niches aren't
+   evenly spaced (NICHE_CENTERS above), so each column's width is set to put
+   its center exactly under its own niche/bottle, not under an equal-fifths
+   grid (which drifted up to ~6px off on the middle 3 niches). Boundaries are
+   the midpoints between adjacent niche centers; see NICHE_CENTERS. */
+.rwv .info-row { position: relative; display: flex; align-items: stretch; padding: 0 7.265% 0 6.04%;
     background: linear-gradient(180deg, #1c130b 0%, #120c07 60%, #0c0805 100%); }
-.rwv .info-cell { flex: 0 0 20%; width: 20%; display: flex; flex-direction: column; padding: 10px 5px 12px; text-align: center;
+.rwv .info-cell { flex: 0 0 20%; display: flex; flex-direction: column; padding: 10px 5px 12px; text-align: center;
     border-left: 1px solid rgba(126,84,42,.38); min-width: 0; }
+/* flex-basis % resolves against info-row's content box (after its own
+   padding is subtracted), so these are the target widths re-expressed
+   relative to that inner box, not to the full cabinet width */
+.rwv .info-cell:nth-child(1) { flex-basis: 19.93%; }
+.rwv .info-cell:nth-child(2) { flex-basis: 20.33%; }
+.rwv .info-cell:nth-child(3) { flex-basis: 20.35%; }
+.rwv .info-cell:nth-child(4) { flex-basis: 19.80%; }
+.rwv .info-cell:nth-child(5) { flex-basis: 19.60%; }
 .rwv .info-cell:first-child { border-left: none; }
 
 /* fixed-height text slots keep every column's rows on the same baseline */
