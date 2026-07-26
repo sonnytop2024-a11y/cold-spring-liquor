@@ -233,11 +233,9 @@ function InfoCell({
   return (
     <div className="info-cell">
       <h3 className="product-name">{item.name}</h3>
-      <p className="product-meta">
-        {item.volume}
-        {item.volume ? " · " : ""}
-        {soldOut ? <span className="oos">Sold Out</span> : `Only ${item.stock} left`}
-      </p>
+      {/* Stock count already shows in the niche badge above — repeating it
+          here just crowded the column and got clipped on narrow screens. */}
+      <p className="product-meta">{soldOut ? <span className="oos">Sold Out</span> : item.volume}</p>
       <p className="product-price">{formatCurrency(item.price)}</p>
 
       <div className="qty-control" aria-label={`Choose quantity for ${item.name}`}>
@@ -557,8 +555,8 @@ const vaultCSS = `/* ===========================================================
    the midpoints between adjacent niche centers; see NICHE_CENTERS. */
 .rwv .info-row { position: relative; display: flex; align-items: stretch; padding: 0 7.265% 0 6.04%;
     background: linear-gradient(180deg, #1c130b 0%, #120c07 60%, #0c0805 100%); }
-.rwv .info-cell { flex: 0 0 20%; display: flex; flex-direction: column; padding: 10px 5px 12px; text-align: center;
-    border-left: 1px solid rgba(126,84,42,.38); min-width: 0; }
+.rwv .info-cell { flex: 0 0 20%; display: flex; flex-direction: column; padding: 9px 4px 9px; text-align: center;
+    border-left: 1px solid rgba(126,84,42,.3); min-width: 0; }
 /* flex-basis % resolves against info-row's content box (after its own
    padding is subtracted), so these are the target widths re-expressed
    relative to that inner box, not to the full cabinet width */
@@ -569,20 +567,26 @@ const vaultCSS = `/* ===========================================================
 .rwv .info-cell:nth-child(5) { flex-basis: 19.60%; }
 .rwv .info-cell:first-child { border-left: none; }
 
-/* fixed-height text slots keep every column's rows on the same baseline */
-.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 11px; font-weight: 600; line-height: 1.25; height: 28px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.rwv .product-meta { margin: 4px 0 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #b7a68e; font-size: 7.5px; font-weight: 600; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; height: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* Fixed-height text slots keep every column's rows on the same baseline.
+   Plain wrapping (not -webkit-line-clamp) — clamp combined with centered
+   text clipped words mid-character on narrow columns instead of wrapping
+   cleanly at the space ("Woodford Reserve" rendered as "Woodfor/Reserve"). */
+/* 9.5px (not 10px) so 8-letter single-word names like "Woodford" fit one
+   line at this column width — hyphens/break-word stay as a safety net for
+   anything longer, but shouldn't normally trigger */
+.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 9.5px; font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+.rwv .product-meta { margin: 3px 0 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #8f7c62; font-size: 8px; font-weight: 600; line-height: 1.2; letter-spacing: .06em; text-transform: uppercase; height: 10px; }
 .rwv .product-meta .oos { color: #e06a5a; }
-.rwv .product-price { margin: 3px 0 8px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 19px; font-weight: 700; line-height: 1; height: 20px; }
+.rwv .product-price { margin: 2px 0 7px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1; height: 18px; font-variant-numeric: tabular-nums; }
 
-.rwv .qty-control { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; min-height: 24px; border: 1px solid #737373; border-radius: 6px; overflow: hidden; background: #090909; }
-.rwv .qty-control button, .rwv .qty-control output { border: 0; color: #fff; background: transparent; display: grid; place-items: center; font: inherit; }
-.rwv .qty-control button { cursor: pointer; font-size: 13px; }
+.rwv .qty-control { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; min-height: 20px; border: 1px solid #4a4a4a; border-radius: 5px; overflow: hidden; background: #090909; }
+.rwv .qty-control button, .rwv .qty-control output { border: 0; color: #d8d8d8; background: transparent; display: grid; place-items: center; font: inherit; }
+.rwv .qty-control button { cursor: pointer; font-size: 11px; }
 .rwv .qty-control button:hover:not(:disabled) { background: rgba(255,255,255,.08); }
 .rwv .qty-control button:disabled { opacity: .28; cursor: not-allowed; }
-.rwv .qty-control output { font-size: 10px; }
+.rwv .qty-control output { font-size: 9px; font-variant-numeric: tabular-nums; }
 
-.rwv .add-to-cart { width: 100%; height: 26px; margin-top: 5px; border: 1px solid #ff7d39; border-radius: 6px; color: #fff; background: linear-gradient(#ff681a, #d94300); box-shadow: inset 0 1px rgba(255,255,255,.18); font-family: "Poppins", Inter, Arial, sans-serif; font-weight: 600; font-size: clamp(6.5px, 1.85vw, 9px); letter-spacing: -.01em; cursor: pointer; padding: 0 2px; white-space: nowrap; }
+.rwv .add-to-cart { width: 100%; height: 22px; margin-top: 4px; border: none; border-radius: 5px; color: #fff; background: #d9560f; font-family: "Poppins", Inter, Arial, sans-serif; font-weight: 600; font-size: clamp(6.5px, 1.85vw, 8.5px); letter-spacing: -.01em; cursor: pointer; padding: 0 2px; white-space: nowrap; }
 
 
 .rwv .add-to-cart:hover:not(:disabled) { filter: brightness(1.08); }
