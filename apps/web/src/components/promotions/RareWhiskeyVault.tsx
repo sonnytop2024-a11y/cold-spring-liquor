@@ -21,8 +21,12 @@ import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
 
 const NICHE_COUNT = 5;
-// Measured from /vault/cabinet.jpg via the lamp centres (see handoff README)
-const NICHE_CENTERS = [14.68, 31.96, 49.92, 67.25, 84.24];
+// Measured from /vault/cabinet.jpg via the lamp centres (see handoff README).
+// Niche 5 is 85.17 (not the shelf-floor centre 84.24): the photo has slight
+// perspective, so in the edge niches the lamp and the floor centre don't line
+// up — the eye judges by the lamp, and at 84.24 the last bottle read as
+// shifted left in its compartment (anh Sơn, 26/07).
+const NICHE_CENTERS = [14.68, 31.96, 49.92, 67.25, 85.17];
 
 interface VaultProduct {
   id: string;
@@ -690,18 +694,20 @@ const vaultCSS = `/* ===========================================================
    its center exactly under its own niche/bottle, not under an equal-fifths
    grid (which drifted up to ~6px off on the middle 3 niches). Boundaries are
    the midpoints between adjacent niche centers; see NICHE_CENTERS. */
-.rwv .info-row { position: relative; display: flex; align-items: stretch; padding: 0 7.265% 0 6.04%;
+.rwv .info-row { position: relative; display: flex; align-items: stretch; padding: 0 5.41% 0 6.04%;
     background: linear-gradient(180deg, #1c130b 0%, #120c07 60%, #0c0805 100%); }
 .rwv .info-cell { flex: 0 0 20%; display: flex; flex-direction: column; padding: 9px 4px 9px; text-align: center;
     border-left: 1px solid rgba(126,84,42,.3); min-width: 0; }
 /* flex-basis % resolves against info-row's content box (after its own
    padding is subtracted), so these are the target widths re-expressed
-   relative to that inner box, not to the full cabinet width */
-.rwv .info-cell:nth-child(1) { flex-basis: 19.93%; }
-.rwv .info-cell:nth-child(2) { flex-basis: 20.33%; }
-.rwv .info-cell:nth-child(3) { flex-basis: 20.35%; }
-.rwv .info-cell:nth-child(4) { flex-basis: 19.80%; }
-.rwv .info-cell:nth-child(5) { flex-basis: 19.60%; }
+   relative to that inner box, not to the full cabinet width. Cells 1-4 keep
+   the same absolute positions as before; cell 5 (and the right padding) were
+   re-solved for the corrected niche-5 centre of 85.17 (see NICHE_CENTERS). */
+.rwv .info-cell:nth-child(1) { flex-basis: 19.51%; }
+.rwv .info-cell:nth-child(2) { flex-basis: 19.90%; }
+.rwv .info-cell:nth-child(3) { flex-basis: 19.92%; }
+.rwv .info-cell:nth-child(4) { flex-basis: 19.39%; }
+.rwv .info-cell:nth-child(5) { flex-basis: 21.28%; }
 .rwv .info-cell:first-child { border-left: none; }
 
 /* Fixed-height text slots keep every column's rows on the same baseline.
