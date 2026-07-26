@@ -622,6 +622,12 @@ const vaultCSS = `/* ===========================================================
 
 /* component-level extras (not part of the handoff cabinet css) */
 .rwv * { box-sizing: border-box; }
+/* Mobile Safari auto-boosts very small text for legibility (text-size-adjust)
+   — that's almost certainly why the niche-badge still looked "big" on a real
+   iPhone after the CSS was shrunk to 3px: desktop Chrome (used for our
+   staging screenshots) doesn't apply that boost, so it looked right there
+   but not on-device. Locking it to 100% makes the actual px value stick. */
+.rwv { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .rwv .vault-toast { position: fixed; left: 50%; bottom: 24px; z-index: 99; max-width: calc(100vw - 32px);
   padding: 12px 18px; border: 1px solid rgba(255,255,255,.15); border-radius: 999px; color: #fff;
   background: rgba(20,20,20,.94); box-shadow: 0 10px 30px rgba(0,0,0,.4); opacity: 0; pointer-events: none;
