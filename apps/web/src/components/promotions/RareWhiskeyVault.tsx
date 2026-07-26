@@ -723,11 +723,14 @@ const vaultCSS = `/* ===========================================================
    text clipped words mid-character on narrow columns instead of wrapping
    cleanly at the space ("Woodford Reserve" rendered as "Woodfor/Reserve"). */
 /* 9.5px (not 10px) so 8-letter single-word names like "Woodford" fit one
-   line at this column width — hyphens/break-word stay as a safety net for
-   anything longer, but shouldn't normally trigger. Height allows 3 lines
-   (not 2) since the name now carries the size too, e.g. "Eagle Rare, 750mL"
-   (anh Sơn, 26/07 — no separate size line, size lives in the product name). */
-.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: calc(6.5px * var(--name-scale, 1)); font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+   line at this column width. Height allows 3 lines (not 2) since the name
+   now carries the size too, e.g. "Eagle Rare, 750mL" (anh Sơn, 26/07 — no
+   separate size line, size lives in the product name).
+   NO hyphens:auto — iOS Safari used it to split words that fit fine on the
+   next line ("Bar-rel", "SIN-GLE"; anh Sơn, 26/07). Wrap at spaces only;
+   break-word stays as the last resort for a single word wider than the
+   column, which nameFontScale should normally prevent. */
+.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: calc(6.5px * var(--name-scale, 1)); font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; }
 /* regular price, struck through, shown only for on-sale items — the slot is
    always in the layout so every column's big price shares one baseline */
 .rwv .price-compare { margin: 3px 0 0; height: 9px; color: #8d7b62; font-size: 8px; line-height: 1; font-variant-numeric: tabular-nums; }
