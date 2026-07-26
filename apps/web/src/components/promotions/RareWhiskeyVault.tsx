@@ -56,11 +56,13 @@ async function fetchVault(): Promise<VaultFeed | null> {
    2. After clearing we crop to the opaque bounding box, so the bottle's base
       sits exactly on the shelf instead of floating on invisible padding. */
 const BG_WHITE_MIN = 232;
-// Processed once at this size then displayed at ~30-90px on screen — 480px
-// was doing 4x the pixel-crunching (flood fill + bbox scan) the final image
-// ever needed, and running that for 3 bottles right on page load was the
-// main-thread jank anh Sơn saw ("giật giật") right after the vault shipped.
-const BG_MAX_SIDE = 240;
+// Bottles now display noticeably bigger (full-width mobile cabinet, +30%
+// bottle frame) than when this was first tuned, and on a 3x-retina phone
+// 240px made every catalog-fallback bottle look visibly soft/blurry (anh
+// Sơn, 26/07). Raised back up — the earlier load-time jank this was meant
+// to fix is now handled by deferring + staggering the processing below
+// instead of by starving it of resolution.
+const BG_MAX_SIDE = 450;
 const bgRemovalCache = new Map<string, Promise<string | null>>();
 
 function removeWhiteBg(url: string): Promise<string | null> {
@@ -207,7 +209,9 @@ function NicheBottle({
   const stagger = { animationDelay: `${delaySec}s` };
   // Reuse the niche's existing stagger (0, 0.89s, 1.78s…) as a small ms delay
   // so 3+ bottles needing bg-removal don't all crunch pixels in the same frame.
-  const src = useBottleImage(item.image, item.needsBgRemoval, Math.round(delaySec * 120));
+  // Wider stagger than before since each image now has more pixels to
+  // process at the higher BG_MAX_SIDE — keeps bottles from crunching back-to-back.
+  const src = useBottleImage(item.image, item.needsBgRemoval, Math.round(delaySec * 170));
   return (
     <>
       <span className="niche-light" style={{ left: `${centerPct}%`, ...stagger }} aria-hidden="true" />
