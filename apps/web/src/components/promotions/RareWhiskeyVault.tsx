@@ -551,7 +551,7 @@ const vaultCSS = `/* ===========================================================
 .rwv .niche-shadow { position: absolute; bottom: 11.5%; width: 9%; height: 2.4%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse at center, rgba(0,0,0,.85) 0%, rgba(0,0,0,.45) 45%, rgba(0,0,0,0) 72%); pointer-events: none; z-index: 2; }
 
 /* badge sits in the niche's top-right corner, clear of the bottle */
-.rwv .niche-badge { position: absolute; top: 25%; width: 15px; height: 15px; transform: translateX(-50%); display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; color: var(--gold-light); background: rgba(10,6,2,.94); font-size: 3px; font-weight: 800; line-height: 1.05; text-align: center; text-transform: uppercase; z-index: 8; }
+.rwv .niche-badge { position: absolute; top: 25%; width: 19.5px; height: 19.5px; transform: translateX(-50%); display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; color: var(--gold-light); background: rgba(10,6,2,.94); font-size: 3.9px; font-weight: 800; line-height: 1.05; text-align: center; text-transform: uppercase; z-index: 8; }
 
 /* Info columns are NOT evenly split — the cabinet photo's 5 niches aren't
    evenly spaced (NICHE_CENTERS above), so each column's width is set to put
@@ -618,6 +618,8 @@ const vaultCSS = `/* ===========================================================
 }
 @media (max-width: 430px) {
     .rwv .rare-vault { border-radius: 14px; margin-inline: 4px; }
+    /* pagination arrows only felt oversized on phones — desktop is unchanged */
+    .rwv .vault-arrow { width: 27px; height: 27px; font-size: 17px; }
 }
 
 /* component-level extras (not part of the handoff cabinet css) */

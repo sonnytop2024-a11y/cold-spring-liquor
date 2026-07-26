@@ -81,7 +81,7 @@ export default function VaultPage() {
 
   if (isLoading || !data) {
     return (
-      <div className="flex items-center justify-center py-24 text-white/60">
+      <div className="flex items-center justify-center py-24 text-gray-400">
         <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading vault…
       </div>
     );
@@ -98,10 +98,10 @@ export default function VaultPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Wine className="w-7 h-7 text-amber-400" />
+          <Wine className="w-7 h-7 text-amber-500" />
           <div>
-            <h1 className="text-2xl font-bold text-white">Rare Whiskey Vault</h1>
-            <p className="text-sm text-white/50">
+            <h1 className="text-2xl font-bold text-gray-900">Rare Whiskey Vault</h1>
+            <p className="text-sm text-gray-500">
               Homepage cabinet — between the banner and the hero
             </p>
           </div>
@@ -110,7 +110,7 @@ export default function VaultPage() {
           href="https://coldspringliquor.com/#"
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-1.5 text-sm text-amber-300 hover:text-amber-200"
+          className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700"
         >
           View on site <ExternalLink className="w-4 h-4" />
         </a>
@@ -120,8 +120,8 @@ export default function VaultPage() {
       <div
         className={`rounded-lg border px-4 py-3 text-sm ${
           liveOnHomepage
-            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-            : "border-white/10 bg-white/5 text-white/60"
+            ? "border-green-200 bg-green-50 text-green-700"
+            : "border-gray-200 bg-gray-50 text-gray-500"
         }`}
       >
         {liveOnHomepage ? (
@@ -132,7 +132,7 @@ export default function VaultPage() {
       </div>
 
       {/* Toggles */}
-      <div className="rounded-xl border border-white/10 bg-white/5 divide-y divide-white/10">
+      <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
         <ToggleRow
           label="Show vault on homepage"
           hint="Master switch — off hides the whole section instantly"
@@ -154,21 +154,21 @@ export default function VaultPage() {
       </div>
 
       {/* Items */}
-      <div className="rounded-xl border border-white/10 bg-white/5">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <h2 className="font-semibold text-white">Bottles in the vault</h2>
-          <span className="text-xs text-white/50">
+      <div className="rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">Bottles in the vault</h2>
+          <span className="text-xs text-gray-400">
             Order here = order on the shelf (top = first niche)
           </span>
         </div>
 
         {data.items.length === 0 ? (
-          <div className="px-4 py-10 text-center text-white/50 text-sm">
+          <div className="px-4 py-10 text-center text-gray-400 text-sm">
             No bottles yet — add your first rare bottle below and the vault will
             appear on the homepage.
           </div>
         ) : (
-          <ul className="divide-y divide-white/10">
+          <ul className="divide-y divide-gray-100">
             {data.items.map((item, idx) => (
               <VaultRow
                 key={item.productId}
@@ -220,16 +220,16 @@ function ToggleRow({
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
     >
       <span>
-        <span className="block text-sm font-medium text-white">{label}</span>
-        <span className="block text-xs text-white/50">{hint}</span>
+        <span className="block text-sm font-medium text-gray-900">{label}</span>
+        <span className="block text-xs text-gray-400">{hint}</span>
       </span>
       {value ? (
-        <ToggleRight className="w-8 h-8 text-emerald-400 shrink-0" />
+        <ToggleRight className="w-8 h-8 text-green-500 shrink-0" />
       ) : (
-        <ToggleLeft className="w-8 h-8 text-white/30 shrink-0" />
+        <ToggleLeft className="w-8 h-8 text-gray-300 shrink-0" />
       )}
     </button>
   );
@@ -278,7 +278,7 @@ function VaultRow({
   return (
     <li className="flex items-center gap-3 px-4 py-3">
       {/* thumb — dark backdrop mimics the cabinet so transparent photos read right */}
-      <div className="w-12 h-16 rounded bg-[#1b0f08] border border-white/10 flex items-end justify-center overflow-hidden shrink-0">
+      <div className="w-12 h-16 rounded bg-[#1b0f08] border border-gray-200 flex items-end justify-center overflow-hidden shrink-0">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={thumb} alt="" className="max-w-full max-h-full object-contain" />
@@ -288,21 +288,21 @@ function VaultRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-white truncate">
+        <p className="text-sm font-medium text-gray-900 truncate">
           {item.brand ? `${item.brand} — ` : ""}{item.name}
         </p>
-        <p className="text-xs text-white/50 flex items-center gap-2 flex-wrap">
+        <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
           {item.price != null && <span>${item.price.toFixed(2)}</span>}
           {item.stockQty <= 0 ? (
-            <span className="text-red-400 font-semibold">SOLD OUT</span>
+            <span className="text-red-600 font-semibold">SOLD OUT</span>
           ) : (
             <span>{item.stockQty} left</span>
           )}
           {!item.productActive && (
-            <span className="text-red-400 font-semibold">product inactive — not shown</span>
+            <span className="text-red-600 font-semibold">product inactive — not shown</span>
           )}
           {!item.imageUrl && (
-            <span className="inline-flex items-center gap-1 text-amber-400">
+            <span className="inline-flex items-center gap-1 text-amber-600">
               <AlertTriangle className="w-3 h-3" /> needs transparent bottle photo
             </span>
           )}
@@ -322,7 +322,7 @@ function VaultRow({
         title="Upload transparent bottle photo (PNG/WebP)"
         disabled={uploading}
         onClick={() => fileRef.current?.click()}
-        className="p-2 rounded hover:bg-white/10 text-white/60 hover:text-white disabled:opacity-40"
+        className="p-2 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-40"
       >
         {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
       </button>
@@ -331,7 +331,7 @@ function VaultRow({
           type="button"
           title="Clear bottle photo (fall back to catalog image)"
           onClick={() => onImage(null)}
-          className="p-2 rounded hover:bg-white/10 text-white/40 hover:text-white"
+          className="p-2 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-700"
         >
           <X className="w-4 h-4" />
         </button>
@@ -346,9 +346,9 @@ function VaultRow({
         className="p-1"
       >
         {item.visible ? (
-          <ToggleRight className="w-7 h-7 text-emerald-400" />
+          <ToggleRight className="w-7 h-7 text-green-500" />
         ) : (
-          <ToggleLeft className="w-7 h-7 text-white/30" />
+          <ToggleLeft className="w-7 h-7 text-gray-300" />
         )}
       </button>
 
@@ -358,7 +358,7 @@ function VaultRow({
           type="button"
           disabled={first || busy}
           onClick={() => onMove(-1)}
-          className="p-0.5 rounded hover:bg-white/10 text-white/60 disabled:opacity-25"
+          className="p-0.5 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-25"
           aria-label="Move up"
         >
           <ChevronUp className="w-4 h-4" />
@@ -367,7 +367,7 @@ function VaultRow({
           type="button"
           disabled={last || busy}
           onClick={() => onMove(1)}
-          className="p-0.5 rounded hover:bg-white/10 text-white/60 disabled:opacity-25"
+          className="p-0.5 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-25"
           aria-label="Move down"
         >
           <ChevronDown className="w-4 h-4" />
@@ -379,7 +379,7 @@ function VaultRow({
         title="Remove from vault"
         disabled={busy}
         onClick={onRemove}
-        className="p-2 rounded hover:bg-red-500/20 text-white/40 hover:text-red-400"
+        className="p-2 rounded hover:bg-red-50 text-gray-300 hover:text-red-600"
       >
         <Trash2 className="w-4 h-4" />
       </button>
@@ -412,49 +412,49 @@ function AddProduct({
   const results = (data ?? []).filter((p) => !existingIds.includes(p.id));
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5">
-      <div className="px-4 py-3 border-b border-white/10">
-        <h2 className="font-semibold text-white flex items-center gap-2">
+    <div className="rounded-xl border border-gray-200 bg-white">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
           <Plus className="w-4 h-4" /> Add a bottle from the catalog
         </h2>
-        <p className="text-xs text-white/50 mt-0.5">
+        <p className="text-xs text-gray-400 mt-0.5">
           Price, name and stock stay linked to the product — edit them in Inventory as usual. Catalog photos must be on a white background; for the cleanest look, upload a transparent bottle photo after adding.
         </p>
       </div>
       <div className="p-4">
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search products… (min 2 characters)"
-            className="w-full bg-black/30 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/50"
+            className="w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-amber-400"
           />
         </div>
 
         {q.trim().length >= 2 && (
-          <ul className="mt-3 divide-y divide-white/5 border border-white/10 rounded-lg overflow-hidden">
+          <ul className="mt-3 divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
             {isFetching && (
-              <li className="px-3 py-3 text-sm text-white/50 flex items-center gap-2">
+              <li className="px-3 py-3 text-sm text-gray-400 flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" /> Searching…
               </li>
             )}
             {!isFetching && results.length === 0 && (
-              <li className="px-3 py-3 text-sm text-white/50">No matching products (already added ones are hidden).</li>
+              <li className="px-3 py-3 text-sm text-gray-400">No matching products (already added ones are hidden).</li>
             )}
             {results.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 px-3 py-2 bg-black/20">
-                <div className="w-8 h-10 rounded bg-white flex items-center justify-center overflow-hidden shrink-0">
+              <li key={p.id} className="flex items-center gap-3 px-3 py-2 bg-white">
+                <div className="w-8 h-10 rounded bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
                   {p.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.imageUrl} alt="" className="max-w-full max-h-full object-contain" />
                   ) : (
-                    <Wine className="w-4 h-4 text-black/20" />
+                    <Wine className="w-4 h-4 text-gray-300" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-white truncate">{p.name}</p>
-                  <p className="text-xs text-white/50">
+                  <p className="text-sm text-gray-900 truncate">{p.name}</p>
+                  <p className="text-xs text-gray-500">
                     ${(p.salePrice ?? p.price).toFixed(2)} · {p.stockQty > 0 ? `${p.stockQty} in stock` : "sold out"}
                   </p>
                 </div>
@@ -462,7 +462,7 @@ function AddProduct({
                   type="button"
                   disabled={busy}
                   onClick={() => onAdd(p.id)}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-400 text-black text-xs font-bold disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold disabled:opacity-40"
                 >
                   Add
                 </button>
