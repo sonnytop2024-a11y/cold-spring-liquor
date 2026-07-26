@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ShoppingBag, Package, Car, Settings, MoreHorizontal,
-  LayoutDashboard, Megaphone, Users, BarChart3, X, Tag, Gift,
+  LayoutDashboard, Megaphone, Users, BarChart3, X, Tag, Gift, Wine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ const PRIMARY = [
 const MORE = [
   { href: "/dashboard",   label: "Dashboard",  icon: LayoutDashboard },
   { href: "/customers",   label: "Customers",  icon: Users },
+  { href: "/vault",       label: "Rare Vault", icon: Wine },
   { href: "/gift-cards",  label: "Gift Cards", icon: Gift },
   { href: "/marketing",   label: "Marketing",  icon: Megaphone },
   { href: "/reports",     label: "Reports",    icon: BarChart3 },

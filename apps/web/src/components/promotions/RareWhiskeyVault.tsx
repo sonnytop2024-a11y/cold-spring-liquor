@@ -184,8 +184,15 @@ function NicheBottle({
       <span className="niche-light" style={{ left: `${centerPct}%`, ...stagger }} aria-hidden="true" />
       <span className="lamp-glow" style={{ left: `${centerPct}%`, ...stagger }} aria-hidden="true" />
       <span className="shelf-glow" style={{ left: `${centerPct}%`, ...stagger }} aria-hidden="true" />
-      <span className="niche-badge" style={{ left: `${centerPct + 5.2}%` }}>{badgeLabel(item.stock)}</span>
-      <span className="niche-shadow" style={{ left: `${centerPct}%` }} aria-hidden="true" />
+      {/* Stock badge/shadow only make sense next to a visible bottle — while
+          the image is loading, or once bg-removal rejects a busy catalog
+          photo (anh Sơn, 26/07: "no bottle, no info"), the niche stays bare. */}
+      {src && (
+        <>
+          <span className="niche-badge" style={{ left: `${centerPct + 5.2}%` }}>{badgeLabel(item.stock)}</span>
+          <span className="niche-shadow" style={{ left: `${centerPct}%` }} aria-hidden="true" />
+        </>
+      )}
       <Link
         className="niche-bottle"
         style={{ left: `${centerPct}%` }}
@@ -544,7 +551,7 @@ const vaultCSS = `/* ===========================================================
 .rwv .niche-shadow { position: absolute; bottom: 11.5%; width: 9%; height: 2.4%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse at center, rgba(0,0,0,.85) 0%, rgba(0,0,0,.45) 45%, rgba(0,0,0,0) 72%); pointer-events: none; z-index: 2; }
 
 /* badge sits in the niche's top-right corner, clear of the bottle */
-.rwv .niche-badge { position: absolute; top: 25%; width: 30px; height: 30px; transform: translateX(-50%); display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; color: var(--gold-light); background: rgba(10,6,2,.94); font-size: 6px; font-weight: 800; line-height: 1.05; text-align: center; text-transform: uppercase; z-index: 8; }
+.rwv .niche-badge { position: absolute; top: 25%; width: 15px; height: 15px; transform: translateX(-50%); display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; color: var(--gold-light); background: rgba(10,6,2,.94); font-size: 3px; font-weight: 800; line-height: 1.05; text-align: center; text-transform: uppercase; z-index: 8; }
 
 /* Info columns are NOT evenly split — the cabinet photo's 5 niches aren't
    evenly spaced (NICHE_CENTERS above), so each column's width is set to put
@@ -574,7 +581,7 @@ const vaultCSS = `/* ===========================================================
    anything longer, but shouldn't normally trigger. Height allows 3 lines
    (not 2) since the name now carries the size too, e.g. "Eagle Rare, 750mL"
    (anh Sơn, 26/07 — no separate size line, size lives in the product name). */
-.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 9.5px; font-weight: 600; line-height: 1.3; height: 37px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 6.5px; font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
 .rwv .product-price { margin: 4px 0 7px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1; height: 18px; font-variant-numeric: tabular-nums; }
 
 .rwv .qty-control { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; min-height: 20px; border: 1px solid #4a4a4a; border-radius: 5px; overflow: hidden; background: #090909; }
@@ -600,9 +607,9 @@ const vaultCSS = `/* ===========================================================
 
 
 @media (min-width: 700px) {
-    .rwv .niche-badge { width: 44px; height: 44px; font-size: 8px; }
+    .rwv .niche-badge { width: 22px; height: 22px; font-size: 4px; }
     .rwv .info-cell { padding: 18px 12px 22px; }
-    .rwv .product-name { font-size: 15px; height: 52px; }
+    .rwv .product-name { font-size: 10.5px; height: 38px; }
     .rwv .product-price { font-size: 27px; height: 28px; margin: 8px 0 12px; }
     .rwv .qty-control { min-height: 32px; }
     .rwv .qty-control output { font-size: 13px; }
