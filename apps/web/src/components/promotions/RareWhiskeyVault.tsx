@@ -215,16 +215,31 @@ function squatScale(aspect: number): number {
   return 1 - ((aspect - TALL) / (SQUAT - TALL)) * (1 - MIN_SCALE);
 }
 
+// Per-niche lamp tints (anh Sơn, 26/07): đỏ, tím, vàng, xanh, trắng.
+// Static colors + the existing opacity blink — deliberately NOT animating the
+// color itself; the old beamTint hue-rotate animation was removed for causing
+// scroll jank (continuous repaints), and this keeps that perf win.
+// "R, G, B" strings so the CSS can build rgba() at any alpha.
+const LAMP_COLORS = [
+  "255, 58, 36",   // đỏ
+  "205, 130, 255", // tím
+  "255, 203, 124", // vàng (the original amber)
+  "72, 148, 255",  // xanh
+  "255, 250, 240", // trắng
+];
+
 function NicheBottle({
   item,
   centerPct,
   delaySec,
+  lampRgb,
 }: {
   item: VaultProduct;
   centerPct: number;
   delaySec: number;
+  lampRgb: string;
 }) {
-  const stagger = { animationDelay: `${delaySec}s` };
+  const stagger = { animationDelay: `${delaySec}s`, "--lamp-rgb": lampRgb } as React.CSSProperties;
   const [squat, setSquat] = useState(1);
   // Reuse the niche's existing stagger (0, 0.89s, 1.78s…) as a small ms delay
   // so 3+ bottles needing bg-removal don't all crunch pixels in the same frame.
@@ -486,7 +501,7 @@ export function RareWhiskeyVault({ initialData }: { initialData?: VaultFeedData 
 
                   <div className={`vault-page${fadeCls}`}>
                     {pageItems.map((p, i) => (
-                      <NicheBottle key={p.id} item={p} centerPct={NICHE_CENTERS[i]} delaySec={i * 0.89} />
+                      <NicheBottle key={p.id} item={p} centerPct={NICHE_CENTERS[i]} delaySec={i * 0.89} lampRgb={LAMP_COLORS[i]} />
                     ))}
                   </div>
 
@@ -623,26 +638,12 @@ const vaultCSS = `/* ===========================================================
     pointer-events: none; z-index: 2; border-radius: 50%;
     background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(var(--lamp-rgb, 255, 214, 140),.95), rgba(var(--lamp-rgb, 255, 180, 90),.4) 45%, transparent 70%);
     mix-blend-mode: screen; opacity: .5; }
-.rwv .fx-on .lamp-glow { animation: lampBlink 5.46s ease-in-out infinite, lampCycle 7.5s linear infinite; }
-.rwv .fx-on .niche-light { animation: beamBlink 5.46s ease-in-out infinite, lampCycle 7.5s linear infinite; }
-.rwv .fx-on .shelf-glow { animation: beamBlink 5.46s ease-in-out infinite, lampCycle 7.5s linear infinite; }
+.rwv .fx-on .lamp-glow { animation: lampBlink 5.46s ease-in-out infinite; }
+.rwv .fx-on .niche-light { animation: beamBlink 5.46s ease-in-out infinite; }
+.rwv .fx-on .shelf-glow { animation: beamBlink 5.46s ease-in-out infinite; }
 
 @keyframes lampBlink { 0%,100%{opacity:.5} 8%{opacity:1} 13%{opacity:.3} 18%{opacity:.95} 48%{opacity:.75} 56%{opacity:.25} 62%{opacity:1} 80%{opacity:.6} }
 @keyframes beamBlink { 0%,100%{opacity:.55} 8%{opacity:.95} 13%{opacity:.3} 18%{opacity:.9} 48%{opacity:.7} 56%{opacity:.28} 62%{opacity:.92} 80%{opacity:.6} }
-/* Every lamp cycles through 5 colors — đỏ, tím, vàng, xanh, trắng (anh Sơn,
-   26/07). --lamp-rgb is an UNregistered custom property on purpose: CSS
-   animates those discretely (hard switch between keyframes, no per-frame
-   interpolation), so the gradients only repaint 5 times per 7.5s cycle —
-   nothing like the continuous-repaint hue-rotate that was removed for jank.
-   Each niche's existing animation-delay stagger (0/.89s/1.78s…) offsets the
-   cycle too, so the five lamps are always showing a mix of colors. */
-@keyframes lampCycle {
-  0%, 19.99% { --lamp-rgb: 255, 58, 36; }   /* đỏ */
-  20%, 39.99% { --lamp-rgb: 205, 130, 255; } /* tím */
-  40%, 59.99% { --lamp-rgb: 255, 203, 124; } /* vàng */
-  60%, 79.99% { --lamp-rgb: 72, 148, 255; }  /* xanh */
-  80%, 100% { --lamp-rgb: 255, 250, 240; }   /* trắng */
-}
 /* Dropped the beamTint hue-rotate/saturate animation that used to run
    alongside beamBlink on every light beam — animating the CSS filter
    property forces an ongoing repaint (not a cheap composite like opacity),
