@@ -30,7 +30,7 @@ export default async function HomePage() {
           pops in (anh Sơn, 26/07). Preloading it here means the download
           starts immediately with the rest of the page instead of behind
           the vault's fetch, so by the time it's needed it's already there. */}
-      <link rel="preload" as="image" href="/vault/cabinet.jpg" fetchPriority="high" />
+      <link rel="preload" as="image" href="/vault/cabinet.webp" fetchPriority="high" />
       <SpinToWin />
       <HeroBannerCarousel initialBanners={banners} />
       {/* Renders nothing until admin adds bottles in Admin → Rare Vault.

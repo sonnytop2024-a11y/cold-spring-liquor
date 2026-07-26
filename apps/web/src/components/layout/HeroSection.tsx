@@ -435,6 +435,8 @@ export async function HeroSection() {
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <picture className="absolute inset-0 w-full h-full pointer-events-none select-none">
+        <source media="(max-width: 767px)" type="image/webp" srcSet="/hero-bg-mobile.webp" />
+        <source media="(min-width: 768px)"  type="image/webp" srcSet="/hero-bg.webp" />
         <source media="(max-width: 767px)" srcSet="/hero-bg-mobile.jpg" />
         <source media="(min-width: 768px)"  srcSet="/hero-bg.jpg" />
         <img src="/hero-bg.jpg" alt="" aria-hidden="true"
@@ -443,6 +445,8 @@ export async function HeroSection() {
       {/* Daylight artwork — crossfades in over the night hero on day mode */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <picture className="hero-bg-day absolute inset-0 w-full h-full pointer-events-none select-none">
+        <source media="(max-width: 767px)" type="image/webp" srcSet="/hero-bg-mobile-day.webp" />
+        <source media="(min-width: 768px)"  type="image/webp" srcSet="/hero-bg-day.webp" />
         <source media="(max-width: 767px)" srcSet="/hero-bg-mobile-day.jpg" />
         <source media="(min-width: 768px)"  srcSet="/hero-bg-day.jpg" />
         <img src="/hero-bg-day.jpg" alt="" aria-hidden="true"

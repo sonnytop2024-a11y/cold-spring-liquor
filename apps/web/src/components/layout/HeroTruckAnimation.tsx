@@ -253,7 +253,7 @@ export function HeroTruckAnimation() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={truckRef}
-        src="/truck-sprite.png"
+        src="/truck-sprite.webp"
         alt=""
         aria-hidden="true"
         className="absolute top-0 left-0 pointer-events-none select-none"

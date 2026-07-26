@@ -466,7 +466,7 @@ export function RareWhiskeyVault({ initialData }: { initialData?: VaultFeedData 
               <div className="cabinet-inner">
                 <div className="cabinet-stage">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="cabinet-bg" src="/vault/cabinet.jpg" alt="Rare Whiskey Vault display cabinet" />
+                  <img className="cabinet-bg" src="/vault/cabinet.webp" alt="Rare Whiskey Vault display cabinet" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="vault-ornament ornament-left" src="/vault/ornament-deer.webp" alt="" aria-hidden="true" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -656,7 +656,7 @@ const vaultCSS = `/* ===========================================================
    lights warming up, and the swap to real content is nearly seamless. */
 .rwv .rare-vault-skeleton { margin: 12px 0; border-radius: 16px; aspect-ratio: 1774 / 887;
     border: 1px solid rgba(216,166,87,.35);
-    background: #0c0704 url(/vault/cabinet.jpg) center / cover no-repeat;
+    background: #0c0704 url(/vault/cabinet.webp) center / cover no-repeat;
     filter: brightness(.6); }
 
 /* heading text is baked into the cabinet photo itself now — keep an
@@ -748,7 +748,12 @@ const vaultCSS = `/* ===========================================================
     .rwv .qty-control output { font-size: 13px; }
     .rwv .add-to-cart { height: 34px; font-size: 11px; }
 }
-@media (max-width: 430px) {
+/* 480px covers every current phone: iPhone 17 Pro Max is 440px CSS wide and
+   was falling through to desktop sizing at the old 430px cutoff (anh Sơn's
+   iPhone Air is 420px, hence the two phones looked different). Galaxy
+   S/Ultra <=480, Z Fold cover screen 344; Fold opened (~673px) is treated
+   as tablet on purpose — the cabinet is big enough there at base size. */
+@media (max-width: 480px) {
     /* Cancel the page's normal 16px side padding for just this section so
        the cabinet reads almost edge-to-edge on a phone (anh Sơn, 26/07) —
        every other section keeps its usual container-main margins. */
