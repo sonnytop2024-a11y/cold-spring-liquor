@@ -215,31 +215,16 @@ function squatScale(aspect: number): number {
   return 1 - ((aspect - TALL) / (SQUAT - TALL)) * (1 - MIN_SCALE);
 }
 
-// Per-niche lamp tints (anh Sơn, 26/07): đỏ, tím, vàng, xanh, trắng.
-// Static colors + the existing opacity blink — deliberately NOT animating the
-// color itself; the old beamTint hue-rotate animation was removed for causing
-// scroll jank (continuous repaints), and this keeps that perf win.
-// "R, G, B" strings so the CSS can build rgba() at any alpha.
-const LAMP_COLORS = [
-  "255, 58, 36",   // đỏ
-  "205, 130, 255", // tím
-  "255, 203, 124", // vàng (the original amber)
-  "72, 148, 255",  // xanh
-  "255, 250, 240", // trắng
-];
-
 function NicheBottle({
   item,
   centerPct,
   delaySec,
-  lampRgb,
 }: {
   item: VaultProduct;
   centerPct: number;
   delaySec: number;
-  lampRgb: string;
 }) {
-  const stagger = { animationDelay: `${delaySec}s`, "--lamp-rgb": lampRgb } as React.CSSProperties;
+  const stagger = { animationDelay: `${delaySec}s` };
   const [squat, setSquat] = useState(1);
   // Reuse the niche's existing stagger (0, 0.89s, 1.78s…) as a small ms delay
   // so 3+ bottles needing bg-removal don't all crunch pixels in the same frame.
@@ -501,7 +486,7 @@ export function RareWhiskeyVault({ initialData }: { initialData?: VaultFeedData 
 
                   <div className={`vault-page${fadeCls}`}>
                     {pageItems.map((p, i) => (
-                      <NicheBottle key={p.id} item={p} centerPct={NICHE_CENTERS[i]} delaySec={i * 0.89} lampRgb={LAMP_COLORS[i]} />
+                      <NicheBottle key={p.id} item={p} centerPct={NICHE_CENTERS[i]} delaySec={i * 0.89} />
                     ))}
                   </div>
 
@@ -601,15 +586,13 @@ const vaultCSS = `/* ===========================================================
 /* ---------- animated spotlights ----------
      NOTE: the cabinet photo already contains the lamp fixtures. We only overlay
      the light BEAM below them — drawing a second lamp disc doubles them up. */
-/* --lamp-rgb is set per niche from LAMP_COLORS (đỏ/tím/vàng/xanh/trắng);
-   the amber fallback keeps the original look if the var is ever missing */
 .rwv .niche-light { position: absolute; top: 21%; width: 19%; height: 66%; transform: translateX(-50%); pointer-events: none; z-index: 1;
-    background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(var(--lamp-rgb, 255, 203, 124),.72), rgba(var(--lamp-rgb, 255, 178, 84),.34) 38%, rgba(var(--lamp-rgb, 255, 160, 60),.12) 66%, transparent 82%);
+    background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(255,203,124,.72), rgba(255,178,84,.34) 38%, rgba(255,160,60,.12) 66%, transparent 82%);
     mix-blend-mode: screen; opacity: .72; }
 
-/* pool of light spilling onto the shelf under the bottle */
+/* pool of warm light spilling onto the shelf under the bottle */
 .rwv .shelf-glow { position: absolute; bottom: 10.5%; width: 21%; height: 5.5%; transform: translateX(-50%); pointer-events: none; z-index: 1;
-    border-radius: 50%; background: radial-gradient(ellipse at center, rgba(var(--lamp-rgb, 255, 196, 116),.4), rgba(var(--lamp-rgb, 255, 170, 70),.14) 45%, transparent 72%);
+    border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,196,116,.4), rgba(255,170,70,.14) 45%, transparent 72%);
     mix-blend-mode: screen; }
 
 /* interior depth: darkens the compartment corners so it reads recessed */
@@ -636,7 +619,7 @@ const vaultCSS = `/* ===========================================================
    animation-delay from the component so the bulbs take turns flaring */
 .rwv .lamp-glow { position: absolute; top: 19.2%; width: 7.5%; height: 6%; transform: translateX(-50%);
     pointer-events: none; z-index: 2; border-radius: 50%;
-    background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(var(--lamp-rgb, 255, 214, 140),.95), rgba(var(--lamp-rgb, 255, 180, 90),.4) 45%, transparent 70%);
+    background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,214,140,.95), rgba(255,180,90,.4) 45%, transparent 70%);
     mix-blend-mode: screen; opacity: .5; }
 .rwv .fx-on .lamp-glow { animation: lampBlink 5.46s ease-in-out infinite; }
 .rwv .fx-on .niche-light { animation: beamBlink 5.46s ease-in-out infinite; }
