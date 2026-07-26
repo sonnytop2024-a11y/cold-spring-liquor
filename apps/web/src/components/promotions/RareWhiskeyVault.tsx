@@ -28,7 +28,6 @@ interface VaultProduct {
   id: string;
   handle: string;
   name: string;
-  volume: string;
   price: number;
   stock: number;
   image: string | null;
@@ -232,10 +231,9 @@ function InfoCell({
 
   return (
     <div className="info-cell">
+      {/* Volume lives in the product name (anh Sơn, 26/07) and stock/sold-out
+          already shows in the niche badge above — no separate meta line. */}
       <h3 className="product-name">{item.name}</h3>
-      {/* Stock count already shows in the niche badge above — repeating it
-          here just crowded the column and got clipped on narrow screens. */}
-      <p className="product-meta">{soldOut ? <span className="oos">Sold Out</span> : item.volume}</p>
       <p className="product-price">{formatCurrency(item.price)}</p>
 
       <div className="qty-control" aria-label={`Choose quantity for ${item.name}`}>
@@ -573,11 +571,11 @@ const vaultCSS = `/* ===========================================================
    cleanly at the space ("Woodford Reserve" rendered as "Woodfor/Reserve"). */
 /* 9.5px (not 10px) so 8-letter single-word names like "Woodford" fit one
    line at this column width — hyphens/break-word stay as a safety net for
-   anything longer, but shouldn't normally trigger */
-.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 9.5px; font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
-.rwv .product-meta { margin: 3px 0 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #8f7c62; font-size: 8px; font-weight: 600; line-height: 1.2; letter-spacing: .06em; text-transform: uppercase; height: 10px; }
-.rwv .product-meta .oos { color: #e06a5a; }
-.rwv .product-price { margin: 2px 0 7px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1; height: 18px; font-variant-numeric: tabular-nums; }
+   anything longer, but shouldn't normally trigger. Height allows 3 lines
+   (not 2) since the name now carries the size too, e.g. "Eagle Rare, 750mL"
+   (anh Sơn, 26/07 — no separate size line, size lives in the product name). */
+.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 9.5px; font-weight: 600; line-height: 1.3; height: 37px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+.rwv .product-price { margin: 4px 0 7px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1; height: 18px; font-variant-numeric: tabular-nums; }
 
 .rwv .qty-control { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; min-height: 20px; border: 1px solid #4a4a4a; border-radius: 5px; overflow: hidden; background: #090909; }
 .rwv .qty-control button, .rwv .qty-control output { border: 0; color: #d8d8d8; background: transparent; display: grid; place-items: center; font: inherit; }
@@ -604,9 +602,8 @@ const vaultCSS = `/* ===========================================================
 @media (min-width: 700px) {
     .rwv .niche-badge { width: 44px; height: 44px; font-size: 8px; }
     .rwv .info-cell { padding: 18px 12px 22px; }
-    .rwv .product-name { font-size: 15px; height: 38px; }
-    .rwv .product-meta { font-size: 10px; height: 13px; margin-top: 6px; }
-    .rwv .product-price { font-size: 27px; height: 28px; margin: 6px 0 12px; }
+    .rwv .product-name { font-size: 15px; height: 52px; }
+    .rwv .product-price { font-size: 27px; height: 28px; margin: 8px 0 12px; }
     .rwv .qty-control { min-height: 32px; }
     .rwv .qty-control output { font-size: 13px; }
     .rwv .add-to-cart { height: 34px; font-size: 11px; }

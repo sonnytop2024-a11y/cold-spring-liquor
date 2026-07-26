@@ -29,23 +29,12 @@ export async function GET() {
         if (!p || p.active === false) return null;
         if (!item.visible) return null;
         if (vault.hideSoldOut && (p.stockQty ?? 0) <= 0) return null;
-        // Display fields: full product name (volume suffix stripped) + volume.
-        // Catalog names often look like "Eagle Rare, 750mL".
-        let name = p.name.trim();
-        let volume = (p.volume || "").trim();
-        const m = name.match(/^(.*?)[,\s]+([\d.]+\s*m?L)\s*$/i);
-        if (m) {
-          name = m[1].trim();
-          // The name suffix is what's printed on the label — it wins over the
-          // volume column, which is sometimes stale (e.g. Weller 1.75L vs 750ml)
-          volume = m[2].trim();
-        }
-
         return {
           id: p.id,
           handle: p.slug,
-          name,
-          volume,
+          // The vault has no separate size line — anh Sơn keeps volume in the
+          // product name itself (e.g. "Eagle Rare, 750mL"), shown as-is.
+          name: p.name.trim(),
           price: p.salePrice ?? p.price,
           stock: p.stockQty ?? 0,
           image: item.imageUrl ?? p.imageUrl,
