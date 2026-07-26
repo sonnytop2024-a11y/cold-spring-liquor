@@ -1116,3 +1116,56 @@ export async function dbSaveVault(patch: Partial<VaultConfig>): Promise<VaultCon
   }
   return vault;
 }
+
+export interface VaultFeedProduct {
+  id: string;
+  handle: string;
+  name: string;
+  price: number;
+  stock: number;
+  image: string | null;
+  needsBgRemoval: boolean;
+  visible: true;
+  product: MockProduct;
+}
+
+export interface VaultFeed {
+  settings: { enabled: boolean; lightFx: boolean; hideSoldOut: boolean };
+  products: VaultFeedProduct[];
+}
+
+// Shared by the SSR homepage (page.tsx, so the cabinet paints in the initial
+// HTML instead of popping in after a client fetch — that pop-in was reading
+// as jank/layout-shift to anh Sơn) and GET /api/vault (client-side revalidation).
+export async function dbGetVaultFeed(): Promise<VaultFeed> {
+  const vault = await dbGetVault();
+  const settings = { enabled: vault.enabled, lightFx: vault.lightFx, hideSoldOut: vault.hideSoldOut };
+
+  if (!vault.enabled || vault.items.length === 0) {
+    return { settings, products: [] };
+  }
+
+  const byId = await dbGetProductsByIds(vault.items.map((i) => i.productId));
+
+  const products = vault.items
+    .map((item): VaultFeedProduct | null => {
+      const p = byId.get(item.productId);
+      if (!p || p.active === false) return null;
+      if (!item.visible) return null;
+      if (vault.hideSoldOut && (p.stockQty ?? 0) <= 0) return null;
+      return {
+        id: p.id,
+        handle: p.slug,
+        name: p.name.trim(),
+        price: p.salePrice ?? p.price,
+        stock: p.stockQty ?? 0,
+        image: item.imageUrl ?? p.imageUrl,
+        needsBgRemoval: !item.imageUrl,
+        visible: true,
+        product: p,
+      };
+    })
+    .filter((p): p is VaultFeedProduct => p !== null);
+
+  return { settings, products };
+}

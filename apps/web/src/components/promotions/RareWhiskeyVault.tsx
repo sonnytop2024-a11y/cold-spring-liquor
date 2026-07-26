@@ -56,13 +56,12 @@ async function fetchVault(): Promise<VaultFeed | null> {
    2. After clearing we crop to the opaque bounding box, so the bottle's base
       sits exactly on the shelf instead of floating on invisible padding. */
 const BG_WHITE_MIN = 232;
-// Bottles now display noticeably bigger (full-width mobile cabinet, +30%
-// bottle frame) than when this was first tuned, and on a 3x-retina phone
-// 240px made every catalog-fallback bottle look visibly soft/blurry (anh
-// Sơn, 26/07). Raised back up — the earlier load-time jank this was meant
-// to fix is now handled by deferring + staggering the processing below
-// instead of by starving it of resolution.
-const BG_MAX_SIDE = 450;
+// Anh Sơn wants max sharpness always — 800 is a passthrough for typical
+// 800x800 catalog photos (only genuinely huge source images get downscaled
+// at all). Load-time jank is handled by deferring + staggering the
+// processing below, and results are cached per URL, so this is a one-time
+// cost per bottle rather than something paid on every render.
+const BG_MAX_SIDE = 800;
 const bgRemovalCache = new Map<string, Promise<string | null>>();
 
 function removeWhiteBg(url: string): Promise<string | null> {
@@ -211,7 +210,7 @@ function NicheBottle({
   // so 3+ bottles needing bg-removal don't all crunch pixels in the same frame.
   // Wider stagger than before since each image now has more pixels to
   // process at the higher BG_MAX_SIDE — keeps bottles from crunching back-to-back.
-  const src = useBottleImage(item.image, item.needsBgRemoval, Math.round(delaySec * 170));
+  const src = useBottleImage(item.image, item.needsBgRemoval, Math.round(delaySec * 260));
   return (
     <>
       <span className="niche-light" style={{ left: `${centerPct}%`, ...stagger }} aria-hidden="true" />
@@ -318,7 +317,7 @@ function InfoCell({
 }
 
 export function RareWhiskeyVault() {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["vault"],
     queryFn: fetchVault,
     staleTime: 30_000,
@@ -346,6 +345,20 @@ export function RareWhiskeyVault() {
   useEffect(() => {
     setPage((prev) => Math.min(prev, pageCount - 1));
   }, [pageCount]);
+
+  // Still fetching (only reachable if SSR's initialData wasn't provided) —
+  // reserve the cabinet's footprint so Hero Section doesn't jump once the
+  // real content lands, instead of rendering nothing then popping in.
+  if (isLoading) {
+    return (
+      <section className="bg-[#050505] py-4 rwv">
+        <style dangerouslySetInnerHTML={{ __html: vaultCSS }} />
+        <div className="container-main">
+          <div className="rare-vault-skeleton" aria-hidden="true" />
+        </div>
+      </section>
+    );
+  }
 
   // Admin switched the section off, or nothing to display → render nothing.
   if (!data || !data.settings.enabled || products.length === 0) return null;
@@ -575,6 +588,15 @@ const vaultCSS = `/* ===========================================================
     box-shadow: 0 16px 42px rgba(0,0,0,.55), 0 0 78px 12px rgba(188,140,72,.14);
     padding-bottom: 12px; }
 
+/* Reserves the cabinet's footprint (same margin/radius/aspect-ratio as
+   .rare-vault) while the first fetch is in flight, so Hero Section is
+   already in its final position on first paint instead of getting pushed
+   down once the vault's content pops in — that shove was reading as jank
+   to anh Sơn even after the animation/perf fixes. */
+.rwv .rare-vault-skeleton { margin: 12px 0; border-radius: 16px; aspect-ratio: 1774 / 887;
+    border: 1px solid rgba(216,166,87,.22);
+    background: linear-gradient(180deg, #140d07 0%, #0c0704 55%, #070402 100%); }
+
 /* heading text is baked into the cabinet photo itself now — keep an
      accessible, visually-hidden heading for screen readers only */
 .rwv .vault-heading-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
@@ -667,6 +689,7 @@ const vaultCSS = `/* ===========================================================
        every other section keeps its usual container-main margins. */
     .rwv .container-main { padding-left: 4px; padding-right: 4px; }
     .rwv .rare-vault { border-radius: 10px; margin-inline: 0; }
+    .rwv .rare-vault-skeleton { border-radius: 10px; margin-inline: 0; }
     /* pagination arrows only felt oversized on phones — desktop is unchanged */
     .rwv .vault-arrow { width: 27px; height: 27px; font-size: 17px; }
 }
