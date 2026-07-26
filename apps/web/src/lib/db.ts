@@ -1078,7 +1078,8 @@ export interface VaultConfig {
   items: VaultItem[];
 }
 
-const VAULT_DEFAULTS: VaultConfig = { enabled: true, lightFx: true, hideSoldOut: false, items: [] };
+// hideSoldOut defaults ON per anh Sơn (25/07): sold-out bottles leave the shelf
+const VAULT_DEFAULTS: VaultConfig = { enabled: true, lightFx: true, hideSoldOut: true, items: [] };
 
 export async function dbGetVault(): Promise<VaultConfig> {
   const t = tbl("csl_settings");

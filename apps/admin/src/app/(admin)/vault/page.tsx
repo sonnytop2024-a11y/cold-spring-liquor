@@ -418,7 +418,7 @@ function AddProduct({
           <Plus className="w-4 h-4" /> Add a bottle from the catalog
         </h2>
         <p className="text-xs text-white/50 mt-0.5">
-          Price, name and stock stay linked to the product — edit them in Inventory as usual.
+          Price, name and stock stay linked to the product — edit them in Inventory as usual. Catalog photos must be on a white background; for the cleanest look, upload a transparent bottle photo after adding.
         </p>
       </div>
       <div className="p-4">

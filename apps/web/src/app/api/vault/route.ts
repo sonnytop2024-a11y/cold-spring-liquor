@@ -29,31 +29,23 @@ export async function GET() {
         if (!p || p.active === false) return null;
         if (!item.visible) return null;
         if (vault.hideSoldOut && (p.stockQty ?? 0) <= 0) return null;
-        // Two display lines: bold brand line + small variant line. Catalog rows
-        // often have an empty brand field and names like "Eagle Rare, 750mL",
-        // so fall back to splitting the trailing volume off the name.
-        let brand = p.brand?.trim() || "";
-        let variant = "";
-        if (brand && p.name.toLowerCase().startsWith(brand.toLowerCase())) {
-          variant = p.name.slice(brand.length).replace(/^[\s,–—-]+/, "").trim();
-        } else if (!brand) {
-          const m = p.name.match(/^(.*?)[,\s]+([\d.]+\s*m?L)\s*$/i);
-          if (m) {
-            brand = m[1].trim();
-            variant = m[2].trim();
-          } else {
-            brand = p.name;
-          }
-        } else {
-          variant = p.name;
+        // Display fields: full product name (volume suffix stripped) + volume.
+        // Catalog names often look like "Eagle Rare, 750mL".
+        let name = p.name.trim();
+        let volume = (p.volume || "").trim();
+        const m = name.match(/^(.*?)[,\s]+([\d.]+\s*m?L)\s*$/i);
+        if (m) {
+          name = m[1].trim();
+          // The name suffix is what's printed on the label — it wins over the
+          // volume column, which is sometimes stale (e.g. Weller 1.75L vs 750ml)
+          volume = m[2].trim();
         }
-        if (!variant) variant = p.volume || "";
 
         return {
           id: p.id,
           handle: p.slug,
-          brand,
-          variant,
+          name,
+          volume,
           price: p.salePrice ?? p.price,
           stock: p.stockQty ?? 0,
           image: item.imageUrl ?? p.imageUrl,

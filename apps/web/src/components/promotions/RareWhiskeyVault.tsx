@@ -27,8 +27,8 @@ const NICHE_CENTERS = [14.68, 31.96, 49.92, 67.25, 84.24];
 interface VaultProduct {
   id: string;
   handle: string;
-  brand: string;
-  variant: string;
+  name: string;
+  volume: string;
   price: number;
   stock: number;
   image: string | null;
@@ -48,11 +48,14 @@ async function fetchVault(): Promise<VaultFeed | null> {
 }
 
 /* ── White-background removal fallback ──────────────────────────────────────
-   Copied from FlashDeals.tsx (keep in sync). Dedicated vault uploads are
-   already transparent; this only runs for items still using the catalog photo
-   (white 800×800 square), so the bottle doesn't render as a white box on the
-   shelf. Flood-fills only the contiguous near-white region connected to the
-   border, so white areas inside labels survive. */
+   Based on FlashDeals.tsx, extended for the cabinet. Dedicated vault uploads
+   are already transparent; this only runs for items still using the catalog
+   photo. Two extra rules vs FlashDeals:
+   1. The border must be mostly white — busy backgrounds (smoke, bar photos)
+      cannot be cleaned, and per shop policy they must NOT appear as a photo
+      box in the cabinet, so we return null and the niche stays empty.
+   2. After clearing we crop to the opaque bounding box, so the bottle's base
+      sits exactly on the shelf instead of floating on invisible padding. */
 const BG_WHITE_MIN = 232;
 const BG_MAX_SIDE = 480;
 const bgRemovalCache = new Map<string, Promise<string | null>>();
@@ -97,11 +100,46 @@ function removeWhiteBg(url: string): Promise<string | null> {
           if (p >= w) queue.push(p - w);
           if (p < w * (h - 1)) queue.push(p + w);
         }
-        if (cleared === 0) return resolve(null); // no white bg — use original
+        // Rule 1: mostly-white border required
+        let borderTotal = 0;
+        let borderCleared = 0;
+        const countBorder = (p: number) => {
+          borderTotal++;
+          if (d[p * 4 + 3] === 0) borderCleared++;
+        };
+        for (let x = 0; x < w; x++) {
+          countBorder(x);
+          countBorder((h - 1) * w + x);
+        }
+        for (let y = 1; y < h - 1; y++) {
+          countBorder(y * w);
+          countBorder(y * w + w - 1);
+        }
+        if (cleared === 0 || borderCleared / borderTotal < 0.5) return resolve(null);
+
+        // Rule 2: crop to the opaque bounding box (bottle feet on the shelf)
+        let minX = w, minY = h, maxX = -1, maxY = -1;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (d[(y * w + x) * 4 + 3] !== 0) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (maxX < 0) return resolve(null);
         ctx.putImageData(id, 0, 0);
-        resolve(canvas.toDataURL("image/png"));
+        const out = document.createElement("canvas");
+        out.width = maxX - minX + 1;
+        out.height = maxY - minY + 1;
+        const octx = out.getContext("2d");
+        if (!octx) return resolve(null);
+        octx.drawImage(canvas, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+        resolve(out.toDataURL("image/png"));
       } catch {
-        resolve(null); // CORS/decode issues → original image
+        resolve(null); // CORS/decode issues → no bottle image shown
       }
     };
     img.src = url;
@@ -118,7 +156,9 @@ function useBottleImage(url: string | null, needsBgRemoval: boolean) {
     if (!needsBgRemoval) return setSrc(url);
     setSrc(null);
     removeWhiteBg(url).then((out) => {
-      if (alive) setSrc(out ?? url);
+      // null = catalog photo isn't on a clean white background → show no
+      // bottle rather than an ugly photo box; admin sees a warning for it
+      if (alive) setSrc(out);
     });
     return () => {
       alive = false;
@@ -151,11 +191,11 @@ function NicheBottle({
         className="niche-bottle"
         style={{ left: `${centerPct}%` }}
         href={`/products/${item.handle || item.id}`}
-        aria-label={`View ${item.brand} ${item.variant}`}
+        aria-label={`View ${item.name}`}
       >
         {src && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={`${item.brand} ${item.variant}`} loading="lazy" />
+          <img src={src} alt={item.name} loading="lazy" />
         )}
       </Link>
     </>
@@ -192,15 +232,19 @@ function InfoCell({
 
   return (
     <div className="info-cell">
-      <h3 className="product-name">{item.brand}</h3>
-      <p className="product-variant">{item.variant}</p>
+      <h3 className="product-name">{item.name}</h3>
+      <p className="product-meta">
+        {item.volume}
+        {item.volume ? " · " : ""}
+        {soldOut ? <span className="oos">Sold Out</span> : `Only ${item.stock} left`}
+      </p>
       <p className="product-price">{formatCurrency(item.price)}</p>
 
-      <div className="qty-control" aria-label={`Choose quantity for ${item.brand} ${item.variant}`}>
+      <div className="qty-control" aria-label={`Choose quantity for ${item.name}`}>
         <button
           type="button"
           disabled={soldOut || qty <= 1}
-          aria-label={`Decrease quantity for ${item.brand} ${item.variant}`}
+          aria-label={`Decrease quantity for ${item.name}`}
           onClick={() => onQtyChange(item.id, Math.max(1, qty - 1))}
         >
           −
@@ -209,7 +253,7 @@ function InfoCell({
         <button
           type="button"
           disabled={soldOut || qty >= item.stock}
-          aria-label={`Increase quantity for ${item.brand} ${item.variant}`}
+          aria-label={`Increase quantity for ${item.name}`}
           onClick={() => onQtyChange(item.id, Math.min(item.stock, qty + 1))}
         >
           +
@@ -220,7 +264,7 @@ function InfoCell({
         className="add-to-cart"
         type="button"
         disabled={soldOut || state !== "idle"}
-        aria-label={soldOut ? "Sold out" : `Add ${item.brand} ${item.variant} to cart`}
+        aria-label={soldOut ? "Sold out" : `Add ${item.name} to cart`}
         onClick={handleAdd}
       >
         {label}
@@ -273,7 +317,7 @@ export function RareWhiskeyVault() {
   };
 
   const showToast = (item: VaultProduct, qty: number) => {
-    setToast(`${qty} × ${item.brand} ${item.variant} added to cart`);
+    setToast(`${qty} × ${item.name} added to cart`);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2300);
   };
@@ -496,7 +540,7 @@ const vaultCSS = `/* ===========================================================
 .rwv .cabinet-bg { display: block; width: 100%; height: auto; user-select: none; pointer-events: none; }
 
 /* measured from the cabinet photo: shelf surface at 84.6%, spotlight at 22.5% */
-.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: 52%; width: 14%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
+.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: 62%; width: 15.5%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
 .rwv .niche-bottle img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 4px 6px rgba(0,0,0,.75)); transition: transform .22s ease; }
 .rwv .niche-bottle:hover img { transform: translateY(-3px) scale(1.03); }
 
@@ -510,14 +554,15 @@ const vaultCSS = `/* ===========================================================
      continuation of the cabinet, not a separate black strip below it */
 .rwv .info-row { position: relative; display: flex; align-items: stretch; padding: 0 7.06% 0 5.99%;
     background: linear-gradient(180deg, #1c130b 0%, #120c07 60%, #0c0805 100%); }
-.rwv .info-cell { flex: 0 0 20%; width: 20%; display: flex; flex-direction: column; padding: 6px 4px 8px; text-align: center;
+.rwv .info-cell { flex: 0 0 20%; width: 20%; display: flex; flex-direction: column; padding: 10px 5px 12px; text-align: center;
     border-left: 1px solid rgba(126,84,42,.38); min-width: 0; }
 .rwv .info-cell:first-child { border-left: none; }
 
 /* fixed-height text slots keep every column's rows on the same baseline */
-.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 10px; font-weight: 700; line-height: 1.18; height: 20px; display: flex; align-items: center; justify-content: center; }
-.rwv .product-variant { margin: 0 0 1px; font-family: "Poppins", Inter, Arial, sans-serif; color: #d6c9b8; font-size: 8px; font-weight: 500; line-height: 1.22; height: 25px; display: flex; align-items: center; justify-content: center; }
-.rwv .product-price { margin: 0 0 4px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 16px; font-weight: 700; height: 19px; }
+.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 11px; font-weight: 600; line-height: 1.25; height: 28px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rwv .product-meta { margin: 4px 0 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #b7a68e; font-size: 7.5px; font-weight: 600; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; height: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rwv .product-meta .oos { color: #e06a5a; }
+.rwv .product-price { margin: 3px 0 8px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 19px; font-weight: 700; line-height: 1; height: 20px; }
 
 .rwv .qty-control { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; min-height: 24px; border: 1px solid #737373; border-radius: 6px; overflow: hidden; background: #090909; }
 .rwv .qty-control button, .rwv .qty-control output { border: 0; color: #fff; background: transparent; display: grid; place-items: center; font: inherit; }
@@ -543,10 +588,10 @@ const vaultCSS = `/* ===========================================================
 
 @media (min-width: 700px) {
     .rwv .niche-badge { width: 44px; height: 44px; font-size: 8px; }
-    .rwv .info-cell { padding: 12px 8px 16px; }
-    .rwv .product-name { font-size: 14px; height: 34px; }
-    .rwv .product-variant { font-size: 11px; height: 42px; }
-    .rwv .product-price { font-size: 22px; height: 28px; }
+    .rwv .info-cell { padding: 18px 12px 22px; }
+    .rwv .product-name { font-size: 15px; height: 38px; }
+    .rwv .product-meta { font-size: 10px; height: 13px; margin-top: 6px; }
+    .rwv .product-price { font-size: 27px; height: 28px; margin: 6px 0 12px; }
     .rwv .qty-control { min-height: 32px; }
     .rwv .qty-control output { font-size: 13px; }
     .rwv .add-to-cart { height: 34px; font-size: 11px; }
