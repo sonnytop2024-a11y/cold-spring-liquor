@@ -1056,3 +1056,62 @@ export async function dbDeleteBundleTier(id: string): Promise<boolean> {
   await dbSaveBundleTiers(tiers);
   return true;
 }
+
+// ── Rare Whiskey Vault (stored in csl_settings row id=1 under vault key) ─────
+// Only productId + display state live here; price/name/stock/catalog image are
+// ALWAYS joined live from csl_products so the vault can never show stale data.
+
+export interface VaultItem {
+  productId: string;
+  visible: boolean;
+  // Dedicated transparent bottle photo (uploaded via /api/admin/upload?folder=vault).
+  // null → storefront falls back to the catalog image with client-side bg removal.
+  imageUrl: string | null;
+  addedAt: string;
+}
+
+export interface VaultConfig {
+  enabled: boolean;
+  lightFx: boolean;
+  hideSoldOut: boolean;
+  // Array order IS the display order (first item = first niche).
+  items: VaultItem[];
+}
+
+const VAULT_DEFAULTS: VaultConfig = { enabled: true, lightFx: true, hideSoldOut: false, items: [] };
+
+export async function dbGetVault(): Promise<VaultConfig> {
+  const t = tbl("csl_settings");
+  if (t) {
+    try {
+      const { data, error } = await t.select("data").eq("id", 1).maybeSingle();
+      if (!error && data?.data?.vault) {
+        const v = data.data.vault as Partial<VaultConfig>;
+        return { ...VAULT_DEFAULTS, ...v, items: Array.isArray(v.items) ? v.items : [] };
+      }
+    } catch (e) {
+      console.error("[db] getVault exception:", e);
+    }
+  }
+  return { ...VAULT_DEFAULTS };
+}
+
+export async function dbSaveVault(patch: Partial<VaultConfig>): Promise<VaultConfig> {
+  const t = tbl("csl_settings");
+  if (!t) throw new Error("Vault save failed: storage not configured");
+  // Read current row, patch vault key only, write back (same as flashDeals)
+  const { data, error: readErr } = await t.select("data").eq("id", 1).maybeSingle();
+  if (readErr) {
+    console.error("[db] saveVault aborted — could not read current row:", readErr.message);
+    throw new Error(`Vault read failed: ${readErr.message}`);
+  }
+  const current = (data?.data ?? {}) as Record<string, unknown>;
+  const vault: VaultConfig = { ...VAULT_DEFAULTS, ...(current.vault as Partial<VaultConfig> ?? {}), ...patch };
+  const updated = { ...current, vault };
+  const { error } = await t.upsert({ id: 1, data: updated }, { onConflict: "id" });
+  if (error) {
+    console.error("[db] saveVault error:", error.message);
+    throw new Error(`Vault save failed: ${error.message}`);
+  }
+  return vault;
+}

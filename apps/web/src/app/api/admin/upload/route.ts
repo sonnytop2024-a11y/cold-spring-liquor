@@ -53,6 +53,36 @@ async function processShowcaseImage(buffer: ArrayBuffer): Promise<Buffer> {
     .toBuffer();
 }
 
+// Vault bottle images: the Rare Whiskey Vault stands bottles on a photographed
+// shelf, so the image MUST have a transparent background. We validate real
+// transparency, auto-trim the empty border (this is what guarantees the bottle
+// sits exactly on the shelf line), and cap at 700px tall — keeping alpha.
+async function processVaultImage(buffer: ArrayBuffer): Promise<Buffer> {
+  const input = Buffer.from(buffer);
+  const img = sharp(input);
+  const meta = await img.metadata();
+  if (!meta.hasAlpha) {
+    throw new VaultImageError(
+      "Bottle image must have a transparent background (PNG or WebP with alpha). Remove the background first, then upload again.",
+    );
+  }
+  const stats = await img.stats();
+  const alpha = stats.channels[stats.channels.length - 1];
+  if (alpha.min > 250) {
+    // Alpha channel exists but nothing is actually transparent (e.g. white box)
+    throw new VaultImageError(
+      "This image has no transparent pixels — the bottle would show as a box on the shelf. Remove the background first, then upload again.",
+    );
+  }
+  return sharp(input)
+    .trim({ threshold: 12 })
+    .resize(undefined, 700, { fit: "inside", withoutEnlargement: true })
+    .toFormat("webp", { quality: 88, effort: 4 })
+    .toBuffer();
+}
+
+class VaultImageError extends Error {}
+
 export async function POST(req: NextRequest) {
 try {
     const formData = await req.formData();
@@ -80,13 +110,23 @@ try {
     }
 
     const rawBytes = await f.arrayBuffer();
-    const processed = folder === "banners"
-      ? await processBannerImage(rawBytes)
-      : folder === "showcase"
-        ? await processShowcaseImage(rawBytes)
-        : folder === "categories"
-          ? await processCategoryImage(rawBytes)
-          : await processProductImage(rawBytes);
+    let processed: Buffer;
+    try {
+      processed = folder === "banners"
+        ? await processBannerImage(rawBytes)
+        : folder === "showcase"
+          ? await processShowcaseImage(rawBytes)
+          : folder === "categories"
+            ? await processCategoryImage(rawBytes)
+            : folder === "vault"
+              ? await processVaultImage(rawBytes)
+              : await processProductImage(rawBytes);
+    } catch (err) {
+      if (err instanceof VaultImageError) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      }
+      throw err;
+    }
 
     const safeName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
 

@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   Megaphone,
+  Wine,
   Tag,
   Gift,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/drivers", label: "Drivers", icon: Car },
   { href: "/marketing", label: "Marketing", icon: Megaphone },
+  { href: "/vault", label: "Rare Vault", icon: Wine },
   { href: "/gift-cards", label: "Gift Cards", icon: Gift },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },

@@ -5,6 +5,7 @@ import { DeliveryChecker } from "@/components/layout/DeliveryChecker";
 import { MarketingHighlights } from "@/components/layout/MarketingHighlights";
 import { FeaturedCategories } from "@/components/product/FeaturedCategories";
 import { FlashDeals } from "@/components/promotions/FlashDeals";
+import { RareWhiskeyVault } from "@/components/promotions/RareWhiskeyVault";
 import { BundleDeals } from "@/components/promotions/BundleDeals";
 import { GiftCardBanner } from "@/components/promotions/GiftCardBanner";
 import { RewardsStrip } from "@/components/rewards/RewardsStrip";
@@ -20,6 +21,8 @@ export default async function HomePage() {
     <>
       <SpinToWin />
       <HeroBannerCarousel initialBanners={banners} />
+      {/* Renders nothing until admin adds bottles in Admin → Rare Vault */}
+      <RareWhiskeyVault />
       <HeroSection />
       <ReorderBanner />
       <FlashDeals />
