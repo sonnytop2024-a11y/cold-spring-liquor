@@ -755,8 +755,8 @@ const vaultCSS = `/* ===========================================================
     .rwv .container-main { padding-left: 4px; padding-right: 4px; }
     .rwv .rare-vault { border-radius: 10px; margin-inline: 0; }
     .rwv .rare-vault-skeleton { border-radius: 10px; margin-inline: 0; }
-    /* +15% bottles on phones only (anh Sơn, 26/07) — desktop keeps base size */
-    .rwv .niche-bottle { height: calc(46.35% * var(--squat, 1)); width: calc(11.66% * var(--squat, 1)); }
+    /* +15% then +10% more on phones only (anh Sơn, 26/07) — desktop keeps base size */
+    .rwv .niche-bottle { height: calc(51% * var(--squat, 1)); width: calc(12.83% * var(--squat, 1)); }
     /* pagination arrows only felt oversized on phones — desktop is unchanged */
     .rwv .vault-arrow { width: 27px; height: 27px; font-size: 17px; }
 }
