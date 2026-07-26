@@ -183,6 +183,18 @@ function useBottleImage(url: string | null, needsBgRemoval: boolean, staggerMs =
 
 const badgeLabel = (stock: number) => (stock <= 0 ? "Sold Out" : `Only ${stock} Left`);
 
+// Full catalog names can run long ("Heaven Hill Bourbon Straight Grain To
+// Glass..., 750mL") and were clipping inside the fixed-height name box at a
+// one-size-fits-all font. Scale down for longer names instead of clipping;
+// short/typical names (the common case) keep the size already approved.
+function nameFontScale(name: string): number {
+  const len = name.length;
+  if (len <= 22) return 1;
+  if (len <= 30) return 0.85;
+  if (len <= 40) return 0.72;
+  return 0.6;
+}
+
 function NicheBottle({
   item,
   centerPct,
@@ -256,8 +268,16 @@ function InfoCell({
   return (
     <div className="info-cell">
       {/* Volume lives in the product name (anh Sơn, 26/07) and stock/sold-out
-          already shows in the niche badge above — no separate meta line. */}
-      <h3 className="product-name">{item.name}</h3>
+          already shows in the niche badge above — no separate meta line.
+          Long names (e.g. "Heaven Hill Bourbon Straight Grain To Glass...")
+          were getting clipped by the fixed-height box at a one-size-fits-all
+          font — scale down per item so it actually fits instead of cutting. */}
+      <h3
+        className="product-name"
+        style={{ "--name-scale": nameFontScale(item.name) } as React.CSSProperties}
+      >
+        {item.name}
+      </h3>
       <p className="product-price">{formatCurrency(item.price)}</p>
 
       <div className="qty-control" aria-label={`Choose quantity for ${item.name}`}>
@@ -434,7 +454,10 @@ export function RareWhiskeyVault() {
             </div>
           )}
 
-          <Link className="view-all" href="/products?tag=rare">
+          {/* "rare" is the Hard to Find category value (lib/db.ts cat_rare) —
+              ?tag=rare isn't a filter the products page understands, so this
+              was silently landing on the unfiltered "All" list. */}
+          <Link className="view-all" href="/products?category=rare">
             View All Rare Items <span aria-hidden="true">→</span>
           </Link>
         </section>
@@ -512,16 +535,17 @@ const vaultCSS = `/* ===========================================================
     background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,214,140,.95), rgba(255,180,90,.4) 45%, transparent 70%);
     mix-blend-mode: screen; opacity: .5; }
 .rwv .fx-on .lamp-glow { animation: lampBlink 5.46s ease-in-out infinite; }
-.rwv .fx-on .niche-light { animation: beamBlink 5.46s ease-in-out infinite, beamTint 14s ease-in-out infinite; }
-.rwv .fx-on .shelf-glow { animation: beamBlink 5.46s ease-in-out infinite, beamTint 14s ease-in-out infinite; }
+.rwv .fx-on .niche-light { animation: beamBlink 5.46s ease-in-out infinite; }
+.rwv .fx-on .shelf-glow { animation: beamBlink 5.46s ease-in-out infinite; }
 
 @keyframes lampBlink { 0%,100%{opacity:.5} 8%{opacity:1} 13%{opacity:.3} 18%{opacity:.95} 48%{opacity:.75} 56%{opacity:.25} 62%{opacity:1} 80%{opacity:.6} }
 @keyframes beamBlink { 0%,100%{opacity:.55} 8%{opacity:.95} 13%{opacity:.3} 18%{opacity:.9} 48%{opacity:.7} 56%{opacity:.28} 62%{opacity:.92} 80%{opacity:.6} }
-@keyframes beamTint {
-    0%,100% { filter: hue-rotate(0deg) saturate(1); }
-    30%     { filter: hue-rotate(-14deg) saturate(1.25); }
-    60%     { filter: hue-rotate(16deg) saturate(.9); }
-}
+/* Dropped the beamTint hue-rotate/saturate animation that used to run
+   alongside beamBlink on every light beam — animating the CSS filter
+   property forces an ongoing repaint (not a cheap composite like opacity),
+   and with 10 beams doing it continuously it was a real contributor to the
+   scroll jank anh Sơn reported. The opacity blink alone covers the "living
+   light" effect. */
 /* fast blinking is a photosensitivity risk — respect the OS setting */
 @media (prefers-reduced-motion: reduce) {
     .rwv .fx-on .niche-light, .rwv .fx-on .shelf-glow, .rwv .fx-on .lamp-glow { animation: none; }
@@ -560,7 +584,7 @@ const vaultCSS = `/* ===========================================================
 .rwv .cabinet-bg { display: block; width: 100%; height: auto; user-select: none; pointer-events: none; }
 
 /* measured from the cabinet photo: shelf surface at 84.6%, spotlight at 22.5% */
-.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: 31%; width: 7.8%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
+.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: 40.3%; width: 10.14%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
 .rwv .niche-bottle img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 4px 6px rgba(0,0,0,.75)); transition: transform .22s ease; }
 .rwv .niche-bottle:hover img { transform: translateY(-3px) scale(1.03); }
 
@@ -598,7 +622,7 @@ const vaultCSS = `/* ===========================================================
    anything longer, but shouldn't normally trigger. Height allows 3 lines
    (not 2) since the name now carries the size too, e.g. "Eagle Rare, 750mL"
    (anh Sơn, 26/07 — no separate size line, size lives in the product name). */
-.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: 6.5px; font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+.rwv .product-name { margin: 0; font-family: "Poppins", Inter, Arial, sans-serif; color: #fff7e8; font-size: calc(6.5px * var(--name-scale, 1)); font-weight: 600; line-height: 1.3; height: 26px; overflow: hidden; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
 .rwv .product-price { margin: 4px 0 7px; color: var(--gold-light); font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1; height: 18px; font-variant-numeric: tabular-nums; }
 
 .rwv .qty-control { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; min-height: 20px; border: 1px solid #4a4a4a; border-radius: 5px; overflow: hidden; background: #090909; }
@@ -627,7 +651,7 @@ const vaultCSS = `/* ===========================================================
     /* desktop keeps the original size — it only looked oversized on mobile */
     .rwv .niche-badge { width: 44px; height: 44px; font-size: 8px; }
     .rwv .info-cell { padding: 18px 12px 22px; }
-    .rwv .product-name { font-size: 10.5px; height: 38px; }
+    .rwv .product-name { font-size: calc(10.5px * var(--name-scale, 1)); height: 38px; }
     .rwv .product-price { font-size: 27px; height: 28px; margin: 8px 0 12px; }
     .rwv .qty-control { min-height: 32px; }
     .rwv .qty-control output { font-size: 13px; }
