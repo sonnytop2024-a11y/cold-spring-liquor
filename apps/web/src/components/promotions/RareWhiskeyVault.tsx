@@ -56,7 +56,11 @@ async function fetchVault(): Promise<VaultFeed | null> {
    2. After clearing we crop to the opaque bounding box, so the bottle's base
       sits exactly on the shelf instead of floating on invisible padding. */
 const BG_WHITE_MIN = 232;
-const BG_MAX_SIDE = 480;
+// Processed once at this size then displayed at ~30-90px on screen — 480px
+// was doing 4x the pixel-crunching (flood fill + bbox scan) the final image
+// ever needed, and running that for 3 bottles right on page load was the
+// main-thread jank anh Sơn saw ("giật giật") right after the vault shipped.
+const BG_MAX_SIDE = 240;
 const bgRemovalCache = new Map<string, Promise<string | null>>();
 
 function removeWhiteBg(url: string): Promise<string | null> {
@@ -74,7 +78,9 @@ function removeWhiteBg(url: string): Promise<string | null> {
         const canvas = document.createElement("canvas");
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext("2d");
+        // willReadFrequently: avoids the GPU-readback penalty Safari/Chrome
+        // otherwise pay on every getImageData call against this canvas.
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) return resolve(null);
         ctx.drawImage(img, 0, 0, w, h);
         const id = ctx.getImageData(0, 0, w, h);
@@ -147,22 +153,31 @@ function removeWhiteBg(url: string): Promise<string | null> {
   return job;
 }
 
-function useBottleImage(url: string | null, needsBgRemoval: boolean) {
+function useBottleImage(url: string | null, needsBgRemoval: boolean, staggerMs = 0) {
   const [src, setSrc] = useState<string | null>(needsBgRemoval ? null : url);
   useEffect(() => {
     let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (!url) return setSrc(null);
     if (!needsBgRemoval) return setSrc(url);
     setSrc(null);
-    removeWhiteBg(url).then((out) => {
-      // null = catalog photo isn't on a clean white background → show no
-      // bottle rather than an ugly photo box; admin sees a warning for it
-      if (alive) setSrc(out);
-    });
+    // Defer past first paint (and stagger between niches) so the canvas work
+    // doesn't compete with initial hydration — that pile-up of 3+ bottles all
+    // crunching pixels the instant the page loaded was the jank anh Sơn saw.
+    timer = setTimeout(() => {
+      requestAnimationFrame(() => {
+        removeWhiteBg(url).then((out) => {
+          // null = catalog photo isn't on a clean white background → show no
+          // bottle rather than an ugly photo box; admin sees a warning for it
+          if (alive) setSrc(out);
+        });
+      });
+    }, staggerMs);
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
-  }, [url, needsBgRemoval]);
+  }, [url, needsBgRemoval, staggerMs]);
   return src;
 }
 
@@ -178,7 +193,9 @@ function NicheBottle({
   delaySec: number;
 }) {
   const stagger = { animationDelay: `${delaySec}s` };
-  const src = useBottleImage(item.image, item.needsBgRemoval);
+  // Reuse the niche's existing stagger (0, 0.89s, 1.78s…) as a small ms delay
+  // so 3+ bottles needing bg-removal don't all crunch pixels in the same frame.
+  const src = useBottleImage(item.image, item.needsBgRemoval, Math.round(delaySec * 120));
   return (
     <>
       <span className="niche-light" style={{ left: `${centerPct}%`, ...stagger }} aria-hidden="true" />
