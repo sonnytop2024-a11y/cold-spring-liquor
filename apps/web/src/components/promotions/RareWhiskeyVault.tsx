@@ -540,7 +540,7 @@ const vaultCSS = `/* ===========================================================
 .rwv .cabinet-bg { display: block; width: 100%; height: auto; user-select: none; pointer-events: none; }
 
 /* measured from the cabinet photo: shelf surface at 84.6%, spotlight at 22.5% */
-.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: 62%; width: 15.5%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
+.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: 31%; width: 7.8%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
 .rwv .niche-bottle img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 4px 6px rgba(0,0,0,.75)); transition: transform .22s ease; }
 .rwv .niche-bottle:hover img { transform: translateY(-3px) scale(1.03); }
 
