@@ -35,10 +35,11 @@ interface VaultProduct {
   product: Product;
 }
 
-interface VaultFeed {
+export interface VaultFeedData {
   settings: { enabled: boolean; lightFx: boolean; hideSoldOut: boolean };
   products: VaultProduct[];
 }
+type VaultFeed = VaultFeedData;
 
 async function fetchVault(): Promise<VaultFeed | null> {
   const res = await fetch("/api/vault");
@@ -316,10 +317,16 @@ function InfoCell({
   );
 }
 
-export function RareWhiskeyVault() {
+export function RareWhiskeyVault({ initialData }: { initialData?: VaultFeedData | null }) {
+  // initialData is page.tsx's server-side dbGetVaultFeed() snapshot (ISR,
+  // ≤60s old): the cabinet is part of the very first HTML — no fetch pop-in,
+  // no skeleton, and nothing at all in the HTML when the vault is off. The
+  // client query still refetches so stock/prices correct themselves quickly
+  // if the ISR snapshot was stale.
   const { data, isLoading } = useQuery({
     queryKey: ["vault"],
     queryFn: fetchVault,
+    initialData: initialData ?? undefined,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
@@ -618,10 +625,14 @@ const vaultCSS = `/* ===========================================================
    .rare-vault) while the first fetch is in flight, so Hero Section is
    already in its final position on first paint instead of getting pushed
    down once the vault's content pops in — that shove was reading as jank
-   to anh Sơn even after the animation/perf fixes. */
+   to anh Sơn even after the animation/perf fixes. Shows the (preloaded,
+   see page.tsx) cabinet photo dimmed rather than an empty dark box — anh
+   Sơn read the plain box as a glitch; this way it looks like the cabinet
+   lights warming up, and the swap to real content is nearly seamless. */
 .rwv .rare-vault-skeleton { margin: 12px 0; border-radius: 16px; aspect-ratio: 1774 / 887;
-    border: 1px solid rgba(216,166,87,.22);
-    background: linear-gradient(180deg, #140d07 0%, #0c0704 55%, #070402 100%); }
+    border: 1px solid rgba(216,166,87,.35);
+    background: #0c0704 url(/vault/cabinet.jpg) center / cover no-repeat;
+    filter: brightness(.6); }
 
 /* heading text is baked into the cabinet photo itself now — keep an
      accessible, visually-hidden heading for screen readers only */
