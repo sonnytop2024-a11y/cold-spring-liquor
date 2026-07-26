@@ -197,6 +197,20 @@ function nameFontScale(name: string): number {
   return 0.6;
 }
 
+// Real-world proportion for short/stout bottles (anh Sơn, 26/07: Blanton's at
+// full frame height looked comically oversized): the trimmed image's aspect
+// ratio tells us the bottle's shape, so squat bottles get a smaller frame the
+// way a real Blanton's stands shorter than an Eagle Rare on the same shelf.
+// aspect = width/height of the trimmed bottle image; tall bottles ~0.25-0.35.
+function squatScale(aspect: number): number {
+  const TALL = 0.38;   // at or below this: normal tall bottle, full size
+  const SQUAT = 0.85;  // at or above this: very stout, strongest reduction
+  const MIN_SCALE = 0.68;
+  if (aspect <= TALL) return 1;
+  if (aspect >= SQUAT) return MIN_SCALE;
+  return 1 - ((aspect - TALL) / (SQUAT - TALL)) * (1 - MIN_SCALE);
+}
+
 function NicheBottle({
   item,
   centerPct,
@@ -207,6 +221,7 @@ function NicheBottle({
   delaySec: number;
 }) {
   const stagger = { animationDelay: `${delaySec}s` };
+  const [squat, setSquat] = useState(1);
   // Reuse the niche's existing stagger (0, 0.89s, 1.78s…) as a small ms delay
   // so 3+ bottles needing bg-removal don't all crunch pixels in the same frame.
   // Wider stagger than before since each image now has more pixels to
@@ -228,13 +243,23 @@ function NicheBottle({
       )}
       <Link
         className="niche-bottle"
-        style={{ left: `${centerPct}%` }}
+        style={{ left: `${centerPct}%`, "--squat": squat } as React.CSSProperties}
         href={`/products/${item.handle || item.id}`}
         aria-label={`View ${item.name}`}
       >
         {src && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={item.name} loading="lazy" />
+          <img
+            src={src}
+            alt={item.name}
+            loading="lazy"
+            onLoad={(e) => {
+              const im = e.currentTarget;
+              if (im.naturalWidth > 0 && im.naturalHeight > 0) {
+                setSquat(squatScale(im.naturalWidth / im.naturalHeight));
+              }
+            }}
+          />
         )}
       </Link>
     </>
@@ -647,7 +672,10 @@ const vaultCSS = `/* ===========================================================
 .rwv .cabinet-bg { display: block; width: 100%; height: auto; user-select: none; pointer-events: none; }
 
 /* measured from the cabinet photo: shelf surface at 84.6%, spotlight at 22.5% */
-.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: 40.3%; width: 10.14%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
+/* --squat (set per bottle from its image's aspect ratio, see squatScale)
+   shrinks the frame for short/stout bottles so a Blanton's stands shorter
+   than an Eagle Rare, like on a real shelf. */
+.rwv .niche-bottle { position: absolute; bottom: 12.5%; height: calc(40.3% * var(--squat, 1)); width: calc(10.14% * var(--squat, 1)); transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; z-index: 3; }
 .rwv .niche-bottle img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 4px 6px rgba(0,0,0,.75)); transition: transform .22s ease; }
 .rwv .niche-bottle:hover img { transform: translateY(-3px) scale(1.03); }
 
@@ -727,6 +755,8 @@ const vaultCSS = `/* ===========================================================
     .rwv .container-main { padding-left: 4px; padding-right: 4px; }
     .rwv .rare-vault { border-radius: 10px; margin-inline: 0; }
     .rwv .rare-vault-skeleton { border-radius: 10px; margin-inline: 0; }
+    /* +15% bottles on phones only (anh Sơn, 26/07) — desktop keeps base size */
+    .rwv .niche-bottle { height: calc(46.35% * var(--squat, 1)); width: calc(11.66% * var(--squat, 1)); }
     /* pagination arrows only felt oversized on phones — desktop is unchanged */
     .rwv .vault-arrow { width: 27px; height: 27px; font-size: 17px; }
 }
