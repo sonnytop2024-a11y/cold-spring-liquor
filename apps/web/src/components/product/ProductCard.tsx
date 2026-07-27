@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Plus, Check, Minus, Heart } from "lucide-react";
-import { useState, useEffect, memo } from "react";
+import { Plus, Check, Minus, Store } from "lucide-react";
+import { useState, memo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
@@ -26,25 +26,7 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
   const queryClient = useQueryClient();
   const [justAdded, setJustAdded] = useState(false);
   const [popping, setPopping] = useState(false);
-  const [favorited, setFavorited] = useState(false);
   const [imgError, setImgError] = useState(false);
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("csl_favorites") ?? "[]");
-      setFavorited(saved.includes(product.id));
-    } catch {}
-  }, [product.id]);
-
-  function toggleFavorite(e: React.MouseEvent) {
-    e.preventDefault();
-    try {
-      const saved: string[] = JSON.parse(localStorage.getItem("csl_favorites") ?? "[]");
-      const next = favorited ? saved.filter((id) => id !== product.id) : [...saved, product.id];
-      localStorage.setItem("csl_favorites", JSON.stringify(next));
-      setFavorited(!favorited);
-    } catch {}
-  }
 
   const qty = cartItem?.quantity ?? 0;
 
@@ -118,18 +100,6 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
           )}
         </Link>
 
-        {/* Heart / Favorite */}
-        <button
-          onClick={toggleFavorite}
-          className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm shadow-sm transition-transform active:scale-90"
-        >
-          <Heart
-            size={14}
-            strokeWidth={2}
-            className={favorited ? "fill-red-500 text-red-500" : "text-gray-400"}
-          />
-        </button>
-
         {/* Discount badge */}
         {discountPct > 0 && (
           <span className="absolute top-2 left-2 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
@@ -145,12 +115,18 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
           </span>
         )}
 
-        {/* Pickup Only badge — stacked below discount/bundle badge, mode-independent */}
+        {/* Pickup Only badge — stacked below discount/bundle badge, mode-independent.
+            Compact pill (anh Sơn, 27/07: the old one covered the bottle): lucide
+            Store icon instead of the chunky 🏬 emoji, 9px text, and
+            text-size-adjust locked so mobile Safari can't auto-inflate it. */}
         {product.pickupOnly && (
-          <span className={`absolute left-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 bg-blue-600 text-white ${
-            discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-9" : "top-2"
-          }`}>
-            🏬 Pickup Only
+          <span
+            className={`absolute left-2 z-10 text-[9px] font-semibold leading-none pl-1.5 pr-2 py-1 rounded-full flex items-center gap-1 bg-blue-600/95 text-white shadow-sm ${
+              discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-9" : "top-2"
+            }`}
+            style={{ WebkitTextSizeAdjust: "100%", textSizeAdjust: "100%" } as React.CSSProperties}
+          >
+            <Store size={10} strokeWidth={2.5} /> Pickup Only
           </span>
         )}
 
