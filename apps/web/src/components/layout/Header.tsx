@@ -228,7 +228,6 @@ export function Header() {
   const { user, isLoggedIn, logout, fetchMe } = useAuthStore();
   const itemCount = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0));
   const pathname = usePathname();
-  const router = useRouter();
 
   useEffect(() => { fetchMe(); }, [fetchMe]);
   useEffect(() => { setMenuOpen(false); }, [pathname]);
@@ -309,19 +308,7 @@ export function Header() {
             )}
 
             <button
-              onClick={() => {
-                // Phones get the real /cart page, not the drawer: the drawer
-                // overlay was silently dismissed by iOS edge-swipe/gestures,
-                // dropping anh's customer back on the product page as if the
-                // cart had vanished (anh Sơn, 26/07). A real page can't be
-                // swiped away — back from it returns to the product, forward
-                // is checkout. Desktop keeps the drawer (no swipe gestures).
-                if (window.matchMedia("(max-width: 767px)").matches) {
-                  router.push("/cart");
-                  return;
-                }
-                setCartOpen(true);
-              }}
+              onClick={() => setCartOpen(true)}
               className="relative p-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
             >
               <ShoppingCart size={18} />
