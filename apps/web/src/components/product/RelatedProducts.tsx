@@ -12,11 +12,12 @@ export function RelatedProducts({ slug }: { slug: string }) {
 
   const { data } = useQuery({
     queryKey: ["products", "related", current?.category],
-    queryFn: () => fetchProducts({ category: current!.category, limit: 5 }),
+    // 9 so the grid still fills 8 after the current product filters itself out
+    queryFn: () => fetchProducts({ category: current!.category, limit: 9 }),
     enabled: !!current,
   });
 
-  const related = data?.products.filter((p) => p.id !== current?.id).slice(0, 4);
+  const related = data?.products.filter((p) => p.id !== current?.id).slice(0, 8);
   if (!related?.length) return null;
 
   return (
