@@ -136,6 +136,54 @@ function removeWhiteBg(url: string): Promise<CleanedBottle | null> {
         }
         if (cleared === 0 || borderCleared / borderTotal < 0.5) return resolve(null);
 
+        // ── Defringe (anh Sơn, 26/07: "nhìn giống như là dán chai rượu") ──
+        // The flood fill only clears near-pure white, so the anti-aliased rim
+        // where the bottle blends into the white background survives as a
+        // 1-3px whitish outline — that outline is what made bottles read as
+        // stickers pasted onto the cabinet instead of standing in it.
+        const edge = (p: number) => {
+          const x = p % w;
+          return (
+            (x > 0 && d[(p - 1) * 4 + 3] === 0) ||
+            (x < w - 1 && d[(p + 1) * 4 + 3] === 0) ||
+            (p >= w && d[(p - w) * 4 + 3] === 0) ||
+            (p < w * (h - 1) && d[(p + w) * 4 + 3] === 0)
+          );
+        };
+        // 1. Peel: up to 8 rings of whitish edge pixels. Only whitish ones —
+        // dark glass/label silhouettes are untouched. 8 (not 3) because the
+        // soft grey shadow slab under a bottle's base (Heaven Hill) is
+        // several px thick and 3 rings left a visible white plinth.
+        const HALO_MIN = 202;
+        for (let pass = 0; pass < 8; pass++) {
+          const peel: number[] = [];
+          for (let p = 0; p < w * h; p++) {
+            if (
+              d[p * 4 + 3] !== 0 &&
+              d[p * 4] > HALO_MIN && d[p * 4 + 1] > HALO_MIN && d[p * 4 + 2] > HALO_MIN &&
+              edge(p)
+            ) {
+              peel.push(p);
+            }
+          }
+          if (peel.length === 0) break;
+          for (const p of peel) d[p * 4 + 3] = 0;
+        }
+        // 2. Soften the cut: the outermost remaining ring gets partial alpha
+        // (fake anti-aliasing against the dark cabinet) and its white bleed
+        // unmixed (observed = 0.78*true + 0.22*white → solve for true), so
+        // the edge darkens into the niche shadow instead of glowing.
+        const soften: number[] = [];
+        for (let p = 0; p < w * h; p++) {
+          if (d[p * 4 + 3] !== 0 && edge(p)) soften.push(p);
+        }
+        for (const p of soften) {
+          d[p * 4 + 3] = 200;
+          for (let ch = 0; ch < 3; ch++) {
+            d[p * 4 + ch] = Math.max(0, Math.min(255, Math.round((d[p * 4 + ch] - 56) / 0.78)));
+          }
+        }
+
         // Rule 2: crop to the opaque bounding box (bottle feet on the shelf)
         let minX = w, minY = h, maxX = -1, maxY = -1;
         for (let y = 0; y < h; y++) {
