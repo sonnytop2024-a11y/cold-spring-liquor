@@ -673,7 +673,7 @@ export function RareWhiskeyVault({ initialData }: { initialData?: VaultFeedData 
               ?tag=rare isn't a filter the products page understands, so this
               was silently landing on the unfiltered "All" list. */}
           <Link className="view-all" href="/products?category=rare">
-            View All Rare Items <span aria-hidden="true">→</span>
+            View All <span aria-hidden="true">→</span>
           </Link>
         </section>
       </div>
