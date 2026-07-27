@@ -150,32 +150,67 @@ function removeWhiteBg(url: string): Promise<CleanedBottle | null> {
             (p < w * (h - 1) && d[(p + w) * 4 + 3] === 0)
           );
         };
-        // 1. Peel: up to 8 rings of whitish edge pixels. Only whitish ones —
-        // dark glass/label silhouettes are untouched. 8 (not 3) because the
-        // soft grey shadow slab under a bottle's base (Heaven Hill) is
-        // several px thick and 3 rings left a visible white plinth.
-        const HALO_MIN = 202;
-        for (let pass = 0; pass < 8; pass++) {
-          const peel: number[] = [];
-          for (let p = 0; p < w * h; p++) {
-            if (
-              d[p * 4 + 3] !== 0 &&
-              d[p * 4] > HALO_MIN && d[p * 4 + 1] > HALO_MIN && d[p * 4 + 2] > HALO_MIN &&
-              edge(p)
-            ) {
-              peel.push(p);
+        // 1. Soft matte for the bright band along the silhouette. A hard
+        // peel (delete every whitish edge pixel) bit visible chunks out of
+        // clear-glass bottle feet — the Weller Antique base looked gnawed
+        // (anh Sơn, 26/07) — because glass and shadow brightness overlap;
+        // there is no safe binary threshold. Instead the flood fill's hard
+        // 232 cutoff is extended into an alpha ramp: brightness 202→233 maps
+        // to opaque→transparent, white bleed unmixed. The grey shadow slab
+        // under a base fades into a faint natural contact shadow, clear
+        // glass goes slightly see-through like real glass, and nothing can
+        // be notched because nothing is a hard keep/delete decision.
+        const RAMP_LO = 202;
+        const RAMP_HI = 233;
+        const MATTE_DEPTH = 12; // rings; deep enough for the shadow slab
+        const whitish = (p: number) =>
+          d[p * 4] > RAMP_LO && d[p * 4 + 1] > RAMP_LO && d[p * 4 + 2] > RAMP_LO;
+        const ringDist = new Uint8Array(w * h);
+        let ring: number[] = [];
+        for (let p = 0; p < w * h; p++) {
+          if (d[p * 4 + 3] !== 0 && whitish(p) && edge(p)) {
+            ringDist[p] = 1;
+            ring.push(p);
+          }
+        }
+        for (let depth = 1; depth < MATTE_DEPTH && ring.length; depth++) {
+          const next: number[] = [];
+          for (const p of ring) {
+            const x = p % w;
+            const neigh = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, p >= w ? p - w : -1, p < w * (h - 1) ? p + w : -1];
+            for (const q of neigh) {
+              if (q >= 0 && d[q * 4 + 3] !== 0 && ringDist[q] === 0 && whitish(q)) {
+                ringDist[q] = 1;
+                next.push(q);
+              }
             }
           }
-          if (peel.length === 0) break;
-          for (const p of peel) d[p * 4 + 3] = 0;
+          ring = next;
         }
-        // 2. Soften the cut: the outermost remaining ring gets partial alpha
-        // (fake anti-aliasing against the dark cabinet) and its white bleed
-        // unmixed (observed = 0.78*true + 0.22*white → solve for true), so
-        // the edge darkens into the niche shadow instead of glowing.
+        for (let p = 0; p < w * h; p++) {
+          if (ringDist[p] === 0) continue;
+          const minCh = Math.min(d[p * 4], d[p * 4 + 1], d[p * 4 + 2]);
+          const t = Math.min(1, Math.max(0, (minCh - RAMP_LO) / (RAMP_HI - RAMP_LO)));
+          const alpha = Math.round(255 * (1 - t));
+          if (alpha >= 255) continue;
+          if (alpha < 10) {
+            d[p * 4 + 3] = 0;
+            continue;
+          }
+          const a = alpha / 255;
+          for (let ch = 0; ch < 3; ch++) {
+            d[p * 4 + ch] = Math.max(0, Math.min(255, Math.round((d[p * 4 + ch] - 255 * (1 - a)) / a)));
+          }
+          d[p * 4 + 3] = alpha;
+        }
+        // 2. Soften the cut: fully-opaque pixels still touching transparency
+        // (dark edges the ramp skipped) get partial alpha (fake anti-aliasing
+        // against the dark cabinet) and their white bleed unmixed (observed =
+        // 0.78*true + 0.22*white → solve for true), so the edge darkens into
+        // the niche shadow instead of glowing. Ramped pixels keep their alpha.
         const soften: number[] = [];
         for (let p = 0; p < w * h; p++) {
-          if (d[p * 4 + 3] !== 0 && edge(p)) soften.push(p);
+          if (d[p * 4 + 3] === 255 && edge(p)) soften.push(p);
         }
         for (const p of soften) {
           d[p * 4 + 3] = 200;
@@ -184,11 +219,14 @@ function removeWhiteBg(url: string): Promise<CleanedBottle | null> {
           }
         }
 
-        // Rule 2: crop to the opaque bounding box (bottle feet on the shelf)
+        // Rule 2: crop to the opaque bounding box (bottle feet on the shelf).
+        // Threshold >96 (not !==0): the ramped-out contact shadow is nearly
+        // transparent and must not pad the bbox, or the bottle floats above
+        // the shelf by the shadow's height.
         let minX = w, minY = h, maxX = -1, maxY = -1;
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
-            if (d[(y * w + x) * 4 + 3] !== 0) {
+            if (d[(y * w + x) * 4 + 3] > 96) {
               if (x < minX) minX = x;
               if (x > maxX) maxX = x;
               if (y < minY) minY = y;
@@ -210,7 +248,7 @@ function removeWhiteBg(url: string): Promise<CleanedBottle | null> {
           let top = -1;
           let bot = -1;
           for (let y = minY; y <= maxY; y++) {
-            if (d[(y * w + x) * 4 + 3] !== 0) {
+            if (d[(y * w + x) * 4 + 3] > 96) {
               if (top < 0) top = y;
               bot = y;
             }
