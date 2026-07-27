@@ -230,7 +230,32 @@ export function Header() {
   const pathname = usePathname();
 
   useEffect(() => { fetchMe(); }, [fetchMe]);
-  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => { setMenuOpen(false); setCartOpen(false); }, [pathname]);
+
+  // Cart drawer ↔ browser history (anh Sơn, 26/07): the iOS edge-swipe fires
+  // history.back(), which used to navigate the page away UNDER the open
+  // drawer — the customer landed back on the product page as if the cart had
+  // vanished mid-shopping. Opening the drawer now pushes a sentinel history
+  // entry, so that same swipe pops the sentinel and merely closes the drawer
+  // (page stays put); a second swipe navigates as normal. The drawer itself
+  // looks and behaves exactly as before.
+  const openCart = () => {
+    setCartOpen(true);
+    window.history.pushState({ cslCartDrawer: true }, "");
+  };
+  const closeCart = () => {
+    // Deliberate close (X / backdrop): consume the sentinel so the next
+    // back-swipe doesn't appear to do nothing. Links inside the drawer use
+    // CartDrawer's onNavigate instead — a back() here would race their
+    // forward navigation and could undo it.
+    setCartOpen(false);
+    if (window.history.state?.cslCartDrawer) window.history.back();
+  };
+  useEffect(() => {
+    const onPop = () => setCartOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   return (
     <>
@@ -308,7 +333,7 @@ export function Header() {
             )}
 
             <button
-              onClick={() => setCartOpen(true)}
+              onClick={openCart}
               className="relative p-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
             >
               <ShoppingCart size={18} />
@@ -368,7 +393,7 @@ export function Header() {
         )}
       </header>
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer open={cartOpen} onClose={closeCart} onNavigate={() => setCartOpen(false)} />
     </>
   );
 }

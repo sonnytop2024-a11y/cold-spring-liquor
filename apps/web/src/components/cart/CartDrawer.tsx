@@ -14,10 +14,17 @@ import type { Product } from "@/types";
 
 interface CartDrawerProps {
   open: boolean;
+  /** Deliberate dismissal (X, backdrop) — Header consumes the history entry
+      it pushed when opening, so the iOS back-swipe stays in sync. */
   onClose: () => void;
+  /** Closing because a link inside the drawer is navigating forward — must
+      NOT touch history (a history.back() here races the link's own push and
+      can undo the navigation). Falls back to onClose if not provided. */
+  onNavigate?: () => void;
 }
 
-export function CartDrawer({ open, onClose }: CartDrawerProps) {
+export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
+  const closeForNav = onNavigate ?? onClose;
   const { items, updateQuantity, removeItem, addItem, couponCode, couponDiscount, giftCardAmount, rewardsPointsToRedeem, setRewardsRedeem } = useCartStore();
   const { user } = useAuthStore();
 
@@ -130,7 +137,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-gray-400">
             <span className="text-5xl">🛒</span>
             <p>Your cart is empty</p>
-            <Link href="/products" onClick={onClose} className="text-brand-600 hover:underline text-sm font-medium">Browse products →</Link>
+            <Link href="/products" onClick={closeForNav} className="text-brand-600 hover:underline text-sm font-medium">Browse products →</Link>
           </div>
         ) : (
           <>
@@ -149,11 +156,11 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
               {items.map(({ product, quantity }) => (
                 <div key={product.id} className="flex gap-3">
-                  <Link href={`/products/${product.slug}`} onClick={onClose} className="relative w-16 h-16 bg-gray-50 rounded-lg overflow-hidden shrink-0">
+                  <Link href={`/products/${product.slug}`} onClick={closeForNav} className="relative w-16 h-16 bg-gray-50 rounded-lg overflow-hidden shrink-0">
                     <Image src={product.imageUrl || categoryPlaceholder(product.category)} alt={product.name} fill sizes="64px" className="object-contain p-1" />
                   </Link>
                   <div className="flex-1 min-w-0">
-                    <Link href={`/products/${product.slug}`} onClick={onClose} className="flex items-center gap-1.5 flex-wrap hover:text-brand-600">
+                    <Link href={`/products/${product.slug}`} onClick={closeForNav} className="flex items-center gap-1.5 flex-wrap hover:text-brand-600">
                       <p className="text-sm font-semibold line-clamp-1">{product.name}</p>
                       {product.pickupOnly && (
                         <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold shrink-0">PICKUP ONLY</span>
@@ -214,7 +221,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                         </button>
                       </div>
                     ))}
-                    <Link href="/products" onClick={onClose} className="flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-brand-600 pt-1">
+                    <Link href="/products" onClick={closeForNav} className="flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-brand-600 pt-1">
                       See all products <ChevronRight size={11} />
                     </Link>
                   </div>
@@ -262,7 +269,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               </p>
 
               {meetsMinimum ? (
-                <Link href="/checkout" onClick={() => { setSkipCloseAnim(true); onClose(); }}
+                <Link href="/checkout" onClick={() => { setSkipCloseAnim(true); closeForNav(); }}
                   className="block w-full text-center bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl transition-colors mt-2">
                   Checkout — {formatCurrency(total)}
                 </Link>
@@ -271,7 +278,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   <div className="w-full text-center bg-gray-200 text-gray-500 font-bold py-3.5 rounded-xl cursor-not-allowed text-sm">
                     Add {formatCurrency(amountToMin)} more to Continue
                   </div>
-                  <Link href="/products" onClick={onClose}
+                  <Link href="/products" onClick={closeForNav}
                     className="block w-full text-center border-2 border-brand-500 text-brand-600 hover:bg-brand-50 font-bold py-3 rounded-xl transition-colors text-sm">
                     + Add More Items
                   </Link>
