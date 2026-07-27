@@ -539,28 +539,3 @@ export async function HeroSection() {
   );
 }
 
-export function TrustBar() {
-  return (
-    <div className="relative z-10"
-      style={{ borderTop:"1px solid rgba(255,255,255,0.07)", background:"rgba(255,255,255,0.03)" }}>
-      <div className="container-main py-4 xs:py-5">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 xs:gap-4">
-          {[
-            { icon:"🚚", label:"FREE Delivery",   sub:"No minimum, every order"  },
-            { icon:"💰", label:"No Tip Required", sub:"We pay our drivers fairly" },
-            { icon:"⚡", label:"10–30 Min",       sub:"Fastest in Leander area"  },
-            { icon:"🔒", label:"Safe & Secure",   sub:"Verified ID at delivery"  },
-          ].map(({ icon, label, sub }) => (
-            <div key={label} className="flex items-center gap-2 xs:gap-3">
-              <span className="text-xl xs:text-2xl flex-shrink-0">{icon}</span>
-              <div className="min-w-0">
-                <p className="font-bold text-xs xs:text-sm text-white truncate">{label}</p>
-                <p className="text-[10px] xs:text-xs text-gray-500 truncate">{sub}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}

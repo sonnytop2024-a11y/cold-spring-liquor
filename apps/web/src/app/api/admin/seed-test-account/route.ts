@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetUserByEmail, dbCreateUser, dbSaveUser, dbCreateOrder, dbGetUserByEmail as checkEmail } from "@/lib/db";
+import { dbGetUserByEmail, dbCreateUser, dbSaveUser, dbCreateOrder } from "@/lib/db";
 import { createOrderNumber } from "../../_mock/store";
 import type { MockUser, MockOrder } from "../../_mock/store";
 
