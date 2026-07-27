@@ -67,12 +67,20 @@ const BG_WHITE_MIN = 232;
 // processing below, and results are cached per URL, so this is a one-time
 // cost per bottle rather than something paid on every render.
 const BG_MAX_SIDE = 800;
-const bgRemovalCache = new Map<string, Promise<string | null>>();
 
-function removeWhiteBg(url: string): Promise<string | null> {
+// Cleaned bottle image + how much of its width is "full height" (see
+// tallFrac computation below — used to keep bottle+tube combo shots from
+// being mistaken for squat bottles).
+interface CleanedBottle {
+  src: string;
+  tallFrac: number;
+}
+const bgRemovalCache = new Map<string, Promise<CleanedBottle | null>>();
+
+function removeWhiteBg(url: string): Promise<CleanedBottle | null> {
   const cached = bgRemovalCache.get(url);
   if (cached) return cached;
-  const job = new Promise<string | null>((resolve) => {
+  const job = new Promise<CleanedBottle | null>((resolve) => {
     const img = new window.Image();
     img.crossOrigin = "anonymous";
     img.onerror = () => resolve(null);
@@ -141,6 +149,28 @@ function removeWhiteBg(url: string): Promise<string | null> {
           }
         }
         if (maxX < 0) return resolve(null);
+
+        // tallFrac: share of columns whose opaque run spans ~the full bbox
+        // height. A bottle + gift tube shot (both E.H. Taylors) is WIDE like
+        // a squat bottle, but the tube is a full-height cylinder, so most
+        // columns are tall (measured 0.65-0.73). A genuinely squat Blanton's
+        // only reaches the top around the neck/stopper (measured 0.47).
+        // squatScale uses this to leave combo shots at full size.
+        const bboxH = maxY - minY + 1;
+        let tallCols = 0;
+        for (let x = minX; x <= maxX; x++) {
+          let top = -1;
+          let bot = -1;
+          for (let y = minY; y <= maxY; y++) {
+            if (d[(y * w + x) * 4 + 3] !== 0) {
+              if (top < 0) top = y;
+              bot = y;
+            }
+          }
+          if (top >= 0 && bot - top + 1 >= 0.88 * bboxH) tallCols++;
+        }
+        const tallFrac = tallCols / (maxX - minX + 1);
+
         ctx.putImageData(id, 0, 0);
         const out = document.createElement("canvas");
         out.width = maxX - minX + 1;
@@ -148,7 +178,7 @@ function removeWhiteBg(url: string): Promise<string | null> {
         const octx = out.getContext("2d");
         if (!octx) return resolve(null);
         octx.drawImage(canvas, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
-        resolve(out.toDataURL("image/png"));
+        resolve({ src: out.toDataURL("image/png"), tallFrac });
       } catch {
         resolve(null); // CORS/decode issues → no bottle image shown
       }
@@ -159,14 +189,19 @@ function removeWhiteBg(url: string): Promise<string | null> {
   return job;
 }
 
+// tallFrac is only known for images that went through removeWhiteBg —
+// dedicated vault uploads are already transparent and skip the pixel pass,
+// so for them squat falls back to the aspect-only heuristic.
 function useBottleImage(url: string | null, needsBgRemoval: boolean, staggerMs = 0) {
-  const [src, setSrc] = useState<string | null>(needsBgRemoval ? null : url);
+  const [bottle, setBottle] = useState<{ src: string; tallFrac?: number } | null>(
+    needsBgRemoval || !url ? null : { src: url },
+  );
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    if (!url) return setSrc(null);
-    if (!needsBgRemoval) return setSrc(url);
-    setSrc(null);
+    if (!url) return setBottle(null);
+    if (!needsBgRemoval) return setBottle({ src: url });
+    setBottle(null);
     // Defer past first paint (and stagger between niches) so the canvas work
     // doesn't compete with initial hydration — that pile-up of 3+ bottles all
     // crunching pixels the instant the page loaded was the jank anh Sơn saw.
@@ -175,7 +210,7 @@ function useBottleImage(url: string | null, needsBgRemoval: boolean, staggerMs =
         removeWhiteBg(url).then((out) => {
           // null = catalog photo isn't on a clean white background → show no
           // bottle rather than an ugly photo box; admin sees a warning for it
-          if (alive) setSrc(out);
+          if (alive) setBottle(out);
         });
       });
     }, staggerMs);
@@ -184,7 +219,7 @@ function useBottleImage(url: string | null, needsBgRemoval: boolean, staggerMs =
       clearTimeout(timer);
     };
   }, [url, needsBgRemoval, staggerMs]);
-  return src;
+  return bottle;
 }
 
 const badgeLabel = (stock: number) => (stock <= 0 ? "Sold Out" : `Only ${stock} Left`);
@@ -206,7 +241,13 @@ function nameFontScale(name: string): number {
 // ratio tells us the bottle's shape, so squat bottles get a smaller frame the
 // way a real Blanton's stands shorter than an Eagle Rare on the same shelf.
 // aspect = width/height of the trimmed bottle image; tall bottles ~0.25-0.35.
-function squatScale(aspect: number): number {
+function squatScale(aspect: number, tallFrac?: number): number {
+  // A wide image is NOT a squat bottle when most of its width is full-height
+  // — that's a bottle + gift tube/box combo (both E.H. Taylors, tallFrac
+  // 0.65-0.73), and shrinking those made the two Taylors render at different
+  // heights (anh Sơn, 26/07). Blanton's, the bottle this scaling exists for,
+  // measures 0.47, so 0.55 splits them with margin on both sides.
+  if (tallFrac !== undefined && tallFrac >= 0.55) return 1;
   const TALL = 0.38;   // at or below this: normal tall bottle, full size
   const SQUAT = 0.85;  // at or above this: very stout, strongest reduction
   const MIN_SCALE = 0.68;
@@ -230,7 +271,8 @@ function NicheBottle({
   // so 3+ bottles needing bg-removal don't all crunch pixels in the same frame.
   // Wider stagger than before since each image now has more pixels to
   // process at the higher BG_MAX_SIDE — keeps bottles from crunching back-to-back.
-  const src = useBottleImage(item.image, item.needsBgRemoval, Math.round(delaySec * 260));
+  const bottle = useBottleImage(item.image, item.needsBgRemoval, Math.round(delaySec * 260));
+  const src = bottle?.src ?? null;
   return (
     <>
       <span className="niche-light" style={{ left: `${centerPct}%`, ...stagger }} aria-hidden="true" />
@@ -260,7 +302,7 @@ function NicheBottle({
             onLoad={(e) => {
               const im = e.currentTarget;
               if (im.naturalWidth > 0 && im.naturalHeight > 0) {
-                setSquat(squatScale(im.naturalWidth / im.naturalHeight));
+                setSquat(squatScale(im.naturalWidth / im.naturalHeight, bottle?.tallFrac));
               }
             }}
           />
