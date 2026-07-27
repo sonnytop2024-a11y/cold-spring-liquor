@@ -121,12 +121,12 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
             text-size-adjust locked so mobile Safari can't auto-inflate it. */}
         {product.pickupOnly && (
           <span
-            className={`absolute left-2 z-10 text-[9px] font-semibold leading-none pl-1.5 pr-2 py-1 rounded-full flex items-center gap-1 bg-blue-600/95 text-white shadow-sm ${
+            className={`absolute left-2 z-10 text-[7px] font-semibold leading-none pl-1 pr-1.5 py-[3px] rounded-full flex items-center gap-0.5 bg-blue-600/95 text-white shadow-sm ${
               discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-9" : "top-2"
             }`}
             style={{ WebkitTextSizeAdjust: "100%", textSizeAdjust: "100%" } as React.CSSProperties}
           >
-            <Store size={10} strokeWidth={2.5} /> Pickup Only
+            <Store size={8} strokeWidth={2.5} /> Pickup Only
           </span>
         )}
 
