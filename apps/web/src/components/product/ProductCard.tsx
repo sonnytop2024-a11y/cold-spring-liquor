@@ -3,12 +3,45 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Plus, Check, Minus, Store } from "lucide-react";
-import { useState, memo } from "react";
+import { useState, useRef, useLayoutEffect, memo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
 import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
 import { fetchProductBySlug } from "@/lib/api/products";
+
+// Product name in a fixed 2-line-height box. Long names shrink (14px → 9px,
+// which lets them wrap to 3 lines) until the FULL name fits — never "…" cut.
+// Re-measures after the custom font loads and when the card width changes.
+function FitName({ name }: { name: string }) {
+  const ref = useRef<HTMLHeadingElement | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      let size = 14;
+      el.style.fontSize = `${size}px`;
+      while (size > 9 && el.scrollHeight > el.clientHeight + 1) {
+        size -= 0.5;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+    fit();
+    document.fonts?.ready.then(fit).catch(() => {});
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [name]);
+  return (
+    <h3
+      ref={ref}
+      className="font-product font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors overflow-hidden mb-2"
+      style={{ fontSize: 14, height: "2.75rem" }}
+    >
+      {name}
+    </h3>
+  );
+}
 
 interface ProductCardProps {
   product: Product;
@@ -145,9 +178,7 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
         </p>
 
         <Link href={`/products/${product.slug}`} className="flex-1" onMouseEnter={prefetchDetail}>
-          <h3 className="font-product text-[14px] font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors line-clamp-2 mb-2" style={{ minHeight: "2.5rem" }}>
-            {product.name}
-          </h3>
+          <FitName name={product.name} />
         </Link>
 
         <div className="flex items-center justify-between gap-2 mt-auto">
