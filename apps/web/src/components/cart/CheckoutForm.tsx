@@ -493,10 +493,13 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const minOrder = deliveryStatus?.minOrder ?? MIN_ORDER;
   const showFree = deliveryStatus?.freeDelivery !== false;
   const showNoTip = deliveryStatus?.noTipRequired !== false;
-  // Customer on the Delivery form when it goes offline → move them to Pick Up
+  // Customer on the Delivery form when it goes offline → move them to Pick Up.
+  // Never mid-payment (fulfillmentLocked) — the intent was created for delivery;
+  // re-runs once they come back to step 1 and the lock releases.
+  const fulfillmentLocked = useCheckoutStore(s => s.fulfillmentLocked);
   useEffect(() => {
-    if (deliveryDisabled && mode === "delivery") setFulfillmentMode("pickup");
-  }, [deliveryDisabled, mode, setFulfillmentMode]);
+    if (deliveryDisabled && mode === "delivery" && !fulfillmentLocked) setFulfillmentMode("pickup");
+  }, [deliveryDisabled, mode, fulfillmentLocked, setFulfillmentMode]);
   const { items, clearCart, removeItem, rewardsPointsToRedeem, setRewardsRedeem, giftCards, giftCardCode, giftCardAmount, addGiftCard, removeGiftCard } = useCartStore();
   const pickupOnlyConflictItems = items.filter(i => i.product.pickupOnly && !isPickup);
   const { user, isLoggedIn } = useAuthStore();
@@ -584,6 +587,14 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   // Scroll to top on mount and whenever switching to the payment step
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
   useEffect(() => { if (clientSecret || paymentStep) window.scrollTo({ top: 0, behavior: "smooth" }); }, [clientSecret, paymentStep]);
+
+  // Past step 1 → lock Delivery ↔ Pick Up switching (header button included):
+  // the payment intent amount and validated address belong to the current mode.
+  const setFulfillmentLocked = useCheckoutStore(s => s.setFulfillmentLocked);
+  useEffect(() => {
+    setFulfillmentLocked(!!clientSecret || !!paymentStep);
+  }, [clientSecret, paymentStep, setFulfillmentLocked]);
+  useEffect(() => () => setFulfillmentLocked(false), [setFulfillmentLocked]);
 
   // Handle return from Klarna / 3DS redirect
   useEffect(() => {
