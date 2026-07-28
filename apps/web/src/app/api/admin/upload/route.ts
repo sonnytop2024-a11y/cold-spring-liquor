@@ -7,15 +7,18 @@ const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const BUCKET = "csl-images";
 
 // Product images: 800×800 square, white background, WHOLE bottle centered.
-// fit "contain" (not "cover") so tall bottles are never cropped top/bottom —
-// the trimmed bottle fits inside the square with white padding on the sides.
+// fit "contain" (not "cover") so tall bottles are never cropped top/bottom,
+// plus a guaranteed 24px white margin — after trim the content would otherwise
+// touch the frame on two sides, which reads as "cropped" in the grid tile.
 // Only affects newly uploaded images; already-stored images are untouched.
 async function processProductImage(buffer: ArrayBuffer): Promise<Buffer> {
   const input = Buffer.from(buffer);
+  const WHITE = { r: 255, g: 255, b: 255 };
   return sharp(input)
     .trim({ background: "#FFFFFF", threshold: 15 })
-    .resize(800, 800, { fit: "contain", background: { r: 255, g: 255, b: 255 } })
-    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .resize(752, 752, { fit: "contain", background: WHITE })
+    .extend({ top: 24, bottom: 24, left: 24, right: 24, background: WHITE })
+    .flatten({ background: WHITE })
     .toFormat("webp", { quality: 85, effort: 4 })
     .toBuffer();
 }

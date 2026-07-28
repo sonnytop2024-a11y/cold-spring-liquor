@@ -183,3 +183,12 @@ input[type="date"]::-webkit-date-and-time-value {
 .checkout-font h4, .checkout-font h5, .checkout-font h6 {
   font-family: var(--font-product), "Source Sans Pro", sans-serif;
 }
+
+/* ── Product tile image zoom: pointer devices only. iOS Safari makes :hover
+   sticky after a tap, which left grid images stuck at 105% and visibly
+   cropped (trimmed uploads have content touching the frame). ── */
+@media (hover: hover) {
+  .group:hover .card-img-zoom {
+    transform: scale(1.05);
+  }
+}

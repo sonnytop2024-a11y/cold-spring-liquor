@@ -60,6 +60,11 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
   const [popping, setPopping] = useState(false);
   const [imgError, setImgError] = useState(false);
+  // Square-ish photos keep object-cover (fills the tile, the approved look).
+  // Clearly non-square photos (6-packs, bottle+box combos, tall shots) switch
+  // to object-contain so nothing gets cropped — decided from the file's real
+  // width/height, never pixel heuristics.
+  const [imgFit, setImgFit] = useState<"cover" | "contain">("cover");
 
   const qty = cartItem?.quantity ?? 0;
 
@@ -106,7 +111,7 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
     <div className="group bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 flex flex-col">
 
       {/* ── Image ────────────────────────────────────────────────── */}
-      <div className="relative mx-2 mt-2 rounded-xl overflow-hidden aspect-square bg-gray-50">
+      <div className={`relative mx-2 mt-2 rounded-xl overflow-hidden aspect-square ${imgFit === "contain" ? "bg-white" : "bg-gray-50"}`}>
         <Link href={`/products/${product.slug}`} className="absolute inset-0" onMouseEnter={prefetchDetail}>
           {product.imageUrl && !imgError ? (
             <Image
@@ -114,9 +119,13 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
               alt={product.name}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-cover rounded-xl group-hover:scale-105 transition-transform duration-300"
+              className={`${imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} rounded-xl card-img-zoom transition-transform duration-300`}
               loading={priority ? undefined : "lazy"}
               priority={priority}
+              onLoad={(e) => {
+                const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                if (w && h && (w / h > 1.1 || w / h < 0.9)) setImgFit("contain");
+              }}
               onError={() => setImgError(true)}
             />
           ) : (
@@ -126,7 +135,7 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
               <img
                 src={categoryPlaceholder(product.category)}
                 alt={product.name}
-                className="w-[64%] h-[64%] object-contain group-hover:scale-105 transition-transform duration-300"
+                className="w-[64%] h-[64%] object-contain card-img-zoom transition-transform duration-300"
                 loading="lazy"
               />
             </div>
