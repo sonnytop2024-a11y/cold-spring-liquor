@@ -1,5 +1,7 @@
 'use client';
 
+import Link from "next/link";
+
 const TIERS = [
   {
     qty: 3, label: "3 Bottles", pct: 5,
@@ -302,6 +304,24 @@ export function BundleDeals() {
           Mix any categories · All bottle sizes · Combines with{" "}
           <span style={{ color: "#FF6B00" }}>FREE delivery</span>
         </p>
+
+        {/* Option A CTA (approved preview 27/07): straight to the pre-filtered
+            list of bundle-eligible bottles — /products?bundle=true — so the
+            shopper only sees bottles that actually count toward the discount. */}
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+          <Link
+            href="/products?bundle=true"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 9,
+              padding: "13px 30px", borderRadius: 999,
+              background: "linear-gradient(135deg,#FF6B00,#e05a00)",
+              color: "#fff", fontWeight: 800, fontSize: 15, textDecoration: "none",
+              boxShadow: "0 0 26px rgba(255,107,0,0.35), 0 6px 18px rgba(0,0,0,0.5)",
+            }}
+          >
+            🍷 Shop Wine &amp; Save <span style={{ fontWeight: 400 }}>→</span>
+          </Link>
+        </div>
       </div>
     </section>
   );
