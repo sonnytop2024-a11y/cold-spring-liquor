@@ -53,8 +53,11 @@ export function CategoryCarousels({ categories }: { categories: AllTabCategory[]
       {categories.map((cat, ci) => (
         <section key={cat.id} className={ci === 0 ? "" : "mt-7"}>
           <div className="flex items-center justify-between mb-2.5">
-            <h2 className="font-bold text-[17px] text-gray-900 flex items-center gap-1.5">
-              <span aria-hidden="true">{cat.emoji}</span> {cat.label}
+            {/* Cinzel — engraved liquor-label face, bolder + bigger than the
+                old inherited Playfair (anh Sơn, 28/07: "đậm hơn, to hơn,
+                font riêng sang trọng") */}
+            <h2 className="font-luxury font-bold text-[14px] tracking-wide text-gray-900 flex items-center gap-1.5">
+              <span aria-hidden="true" className="text-[14px]">{cat.emoji}</span> {cat.label}
             </h2>
             <Link
               href={`/products?category=${encodeURIComponent(cat.value)}`}

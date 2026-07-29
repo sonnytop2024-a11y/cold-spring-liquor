@@ -31,6 +31,7 @@ const config: Config = {
         heading: ["var(--font-playfair)", "serif"],
         display: ["var(--font-montserrat)", "sans-serif"],
         product: ["var(--font-product)", "Source Sans Pro", "sans-serif"],
+        luxury: ["var(--font-cinzel)", "serif"],
       },
       screens: {
         xs: "360px",

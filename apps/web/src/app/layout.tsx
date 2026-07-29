@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display, Montserrat, Source_Sans_3 } from "next/font/google";
+import { Inter, Playfair_Display, Montserrat, Source_Sans_3, Cinzel } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Header } from "@/components/layout/Header";
@@ -14,6 +14,8 @@ const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfa
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat", weight: ["600", "700", "800"] });
 // Product typography — same family Total Wine uses
 const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-product", weight: ["400", "600", "700", "900"] });
+// Engraved luxury-label face — used only for category strip titles (anh Sơn, 28/07)
+const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel", weight: ["700", "800"] });
 
 export const metadata: Metadata = {
   title: "Cold Spring Liquor | FREE Delivery in Leander, Cedar Park & Liberty Hill",
@@ -43,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       {/* bg-dark-900 on <html> shows through iOS Safari's overscroll "bounce" gap
           above the page — must stay dark or that gap flashes white. Actual page
           content still sits on its own white/gray backgrounds as before. */}
-      <body className={`${inter.variable} ${playfair.variable} ${montserrat.variable} ${sourceSans.variable} font-sans bg-dark-900 text-gray-900`}>
+      <body className={`${inter.variable} ${playfair.variable} ${montserrat.variable} ${sourceSans.variable} ${cinzel.variable} font-sans bg-dark-900 text-gray-900`}>
         <Providers>
           <CartSyncProvider />
           <AgeGateModal />
