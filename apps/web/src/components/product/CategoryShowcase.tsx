@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Loader2, Zap, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 interface Category {
   value: string;
@@ -68,40 +68,10 @@ function CategoryCard({ value, label, emoji, imageUrl }: Category) {
   );
 }
 
-const SPECIALS = [
-  { href: "/products?flashdeal=true", label: "Flash Sale",   desc: "Limited Time Offers",            Icon: Zap,      img: "special-flash",    badge: null },
-  { href: "/products?featured=true",  label: "New Arrivals", desc: "Check out our latest additions", Icon: Sparkles, img: "special-new",      badge: "NEW" },
-];
-
-function SpecialCard({ href, label, desc, Icon, img, badge }: (typeof SPECIALS)[number]) {
-  const [imgFailed, setImgFailed] = useState(false);
-  return (
-    <Link href={href}
-      className="group relative flex items-center gap-3 rounded-2xl px-4 py-3 overflow-hidden hover:shadow-md active:scale-[.98] transition-all"
-      style={{ background: "#fff0e5" }}>
-      <span className="relative w-11 h-11 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0">
-        <Icon size={20} className="text-brand-500" />
-        {badge && (
-          <span className="absolute -top-1 -right-1.5 bg-brand-500 text-white text-[8px] font-black px-1.5 py-px rounded-full">{badge}</span>
-        )}
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="block font-heading font-bold text-sm sm:text-base text-gray-900">{label}</span>
-        <span className="block text-[11px] sm:text-xs text-gray-600 leading-snug">{desc}</span>
-      </span>
-      {!imgFailed && (
-        <Image src={catImg(img)} alt="" width={86} height={56} unoptimized
-          className="h-14 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform"
-          onError={() => setImgFailed(true)} />
-      )}
-      <span className="w-7 h-7 rounded-full bg-brand-500 text-white flex items-center justify-center shadow-md shadow-brand-500/30 shrink-0 group-hover:translate-x-0.5 transition-transform">
-        <ArrowRight size={14} />
-      </span>
-    </Link>
-  );
-}
-
-export function CategoryShowcase() {
+// Homepage "Shop By Category" (anh Sơn, 28/07): the photo-card grid that used
+// to live on the retired /categories page, replacing the old round-icon strip.
+// Photos stay fully admin-managed (Admin → Categories: add / edit / delete).
+export function ShopByCategorySection() {
   const { data: categories = [], isLoading } = useQuery<Category[]>({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -112,48 +82,38 @@ export function CategoryShowcase() {
     staleTime: 5 * 60_000,
   });
 
-  if (isLoading) {
-    return (
-      <div className="py-16 flex items-center justify-center gap-3 text-gray-400">
-        <Loader2 size={20} className="animate-spin" /> Loading categories…
-      </div>
-    );
-  }
-
   return (
-    <>
-      {/* Category grid — 2 cols mobile, up to 5 on wide screens like the design */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        {categories.map((c) => <CategoryCard key={c.value} {...c} />)}
-      </div>
-
-      {/* Special collections row */}
-      <div className="mt-3 sm:mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        {SPECIALS.map((s) => <SpecialCard key={s.label} {...s} />)}
-      </div>
-
-      <Link href="/products"
-        className="mt-4 sm:mt-6 flex items-center justify-center gap-2 w-full bg-white border border-gray-200 hover:border-brand-400 text-brand-600 font-black py-3.5 rounded-full text-sm sm:text-base transition-colors">
-        View All Products <ArrowRight size={16} />
-      </Link>
-
-      {/* Trust badges */}
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        {[
-          { icon: "🕐", title: "10–30 MINUTES", sub: "Fast Delivery" },
-          { icon: "🚚", title: "FREE DELIVERY", sub: "No minimum. No tip." },
-          { icon: "🪪", title: "21+ VERIFIED", sub: "ID checked on delivery" },
-          { icon: "🔒", title: "SAFE & SECURE", sub: "Secure checkout" },
-        ].map((b) => (
-          <div key={b.title} className="flex items-center gap-2.5 bg-white border border-gray-100 rounded-xl px-3 py-2.5">
-            <span className="text-lg">{b.icon}</span>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-[11px] font-black text-gray-800 leading-tight">{b.title}</p>
-              <p className="text-[9px] sm:text-[10px] text-gray-400 leading-tight">{b.sub}</p>
-            </div>
+    <section className="py-16" style={{ background: "#0d0d0d" }}>
+      <div className="container-main">
+        <div className="flex items-end justify-between mb-8">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#f97316" }}>
+              Browse
+            </p>
+            <h2 className="font-heading text-3xl md:text-4xl font-black text-white">Shop By Category</h2>
+            <p className="text-sm text-gray-400 mt-1">Find exactly what you need.</p>
           </div>
-        ))}
+          <Link
+            href="/products"
+            className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold transition-colors"
+            style={{ color: "#f97316" }}
+          >
+            View All Products →
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          {isLoading
+            ? Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="rounded-2xl aspect-[7/6] animate-pulse" style={{ background: "#1a1a1a" }} />
+              ))
+            : categories.map((c) => <CategoryCard key={c.value} {...c} />)}
+        </div>
+
+        <Link href="/products" className="sm:hidden block text-center mt-6 text-sm font-semibold" style={{ color: "#f97316" }}>
+          View All Products →
+        </Link>
       </div>
-    </>
+    </section>
   );
 }

@@ -3,7 +3,7 @@ import { HeroBannerCarousel } from "@/components/layout/HeroBannerCarousel";
 import { ReorderBanner } from "@/components/layout/ReorderBanner";
 import { DeliveryChecker } from "@/components/layout/DeliveryChecker";
 import { MarketingHighlights } from "@/components/layout/MarketingHighlights";
-import { FeaturedCategories } from "@/components/product/FeaturedCategories";
+import { ShopByCategorySection } from "@/components/product/CategoryShowcase";
 import { FlashDeals } from "@/components/promotions/FlashDeals";
 import { RareWhiskeyVault, type VaultFeedData } from "@/components/promotions/RareWhiskeyVault";
 import { BundleDeals } from "@/components/promotions/BundleDeals";
@@ -40,7 +40,7 @@ export default async function HomePage() {
       <HeroSection />
       <ReorderBanner />
       <FlashDeals />
-      <FeaturedCategories />
+      <ShopByCategorySection />
       <BundleDeals />
       <GiftCardBanner bonusTiers={bonusTiers} />
       <MarketingHighlights />

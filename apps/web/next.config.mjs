@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The old "Shop by Category" page is retired — browsing is consolidated into
+  // /products (All-tab category carousels). Permanent redirect keeps old
+  // bookmarks and Google-indexed links working.
+  async redirects() {
+    return [{ source: "/categories", destination: "/products", permanent: true }];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**.cloudfront.net" },
