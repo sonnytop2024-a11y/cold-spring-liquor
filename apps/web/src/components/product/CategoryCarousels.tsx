@@ -55,7 +55,6 @@ export function CategoryCarousels({ categories }: { categories: AllTabCategory[]
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="font-bold text-[17px] text-gray-900 flex items-center gap-1.5">
               <span aria-hidden="true">{cat.emoji}</span> {cat.label}
-              <span className="text-[11px] font-semibold text-gray-400 self-end mb-0.5">({cat.products.length})</span>
             </h2>
             <Link
               href={`/products?category=${encodeURIComponent(cat.value)}`}
