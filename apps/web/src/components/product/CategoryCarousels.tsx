@@ -39,7 +39,7 @@ function CarouselStrip({ products, eager }: { products: Product[]; eager: boolea
       onScroll={onScroll}
     >
       {products.slice(0, visible).map((product, i) => (
-        <div key={product.id} className="shrink-0 w-[25.8%]" style={{ scrollSnapAlign: "start" }}>
+        <div key={product.id} className="shrink-0 w-[29.7%]" style={{ scrollSnapAlign: "start" }}>
           <ProductCard product={product} compact priority={eager && i < 5} />
         </div>
       ))}
@@ -82,7 +82,7 @@ export function CategoryCarouselsSkeleton() {
           <div className="h-5 w-36 bg-gray-100 rounded animate-pulse mb-3" />
           <div className="flex gap-3 overflow-hidden -mx-4 px-4">
             {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="shrink-0 w-[25.8%] bg-gray-100 rounded-2xl aspect-[3/4] animate-pulse" />
+              <div key={i} className="shrink-0 w-[29.7%] bg-gray-100 rounded-2xl aspect-[3/4] animate-pulse" />
             ))}
           </div>
         </div>
