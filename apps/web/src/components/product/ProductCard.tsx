@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Plus, Check, Minus, Store } from "lucide-react";
-import { useState, useRef, useLayoutEffect, memo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, memo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
@@ -70,6 +70,17 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
   // to object-contain so nothing gets cropped — decided from the file's real
   // width/height, never pixel heuristics.
   const [imgFit, setImgFit] = useState<"cover" | "contain">("cover");
+  // Compact cards use an Instacart-style stepper: adding opens a floating
+  // − qty + pill OVER the card (no layout shift, nothing wraps), which
+  // auto-collapses into a small qty button after a pause.
+  const [stepperOpen, setStepperOpen] = useState(false);
+  const stepperTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (stepperTimer.current) clearTimeout(stepperTimer.current); }, []);
+  function pokeStepper() {
+    setStepperOpen(true);
+    if (stepperTimer.current) clearTimeout(stepperTimer.current);
+    stepperTimer.current = setTimeout(() => setStepperOpen(false), 2500);
+  }
 
   const qty = cartItem?.quantity ?? 0;
 
@@ -95,12 +106,14 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
     e.preventDefault();
     addItem(product);
     triggerPop();
+    if (compact) { pokeStepper(); return; }
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
   }
 
   function handleIncrease(e: React.MouseEvent) {
     e.preventDefault();
+    if (compact) pokeStepper();
     if (qty >= product.stockQty) return;
     addItem(product);
     triggerPop();
@@ -108,12 +121,13 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
 
   function handleDecrease(e: React.MouseEvent) {
     e.preventDefault();
+    if (compact) pokeStepper();
     if (qty <= 1) removeItem(product.id);
     else updateQuantity(product.id, qty - 1);
   }
 
   return (
-    <div className="group bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 flex flex-col">
+    <div className="group relative bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 flex flex-col">
 
       {/* ── Image ────────────────────────────────────────────────── */}
       <div className={`relative rounded-xl overflow-hidden aspect-square ${compact ? "mx-1 mt-1" : "mx-2 mt-2"} ${imgFit === "contain" ? "bg-white" : "bg-gray-50"}`}>
@@ -202,10 +216,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
           <FitName name={product.name} compact={compact} />
         </Link>
 
-        {/* Compact card with an in-cart qty: the − 1 + stepper next to the
-            price overflows an ~100px card (anh Sơn's screenshot), so it drops
-            to its own full-width row under the price instead. */}
-        <div className={`mt-auto ${compact && qty > 0 && product.inStock ? "flex flex-col items-stretch gap-1" : `flex items-center justify-between ${compact ? "gap-1" : "gap-2"}`}`}>
+        <div className={`flex items-center justify-between mt-auto ${compact ? "gap-1" : "gap-2"}`}>
           <div className="min-w-0">
             <span className={`font-product font-black block ${compact ? "text-[11px]" : "text-base"} ${product.salePrice ? "text-red-600" : "text-gray-900"}`}>
               ${(product.salePrice ?? product.price).toFixed(2)}
@@ -224,27 +235,37 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
             >
               <Plus size={compact ? 11 : 14} strokeWidth={2.5} />
             </button>
+          ) : qty > 0 && compact ? (
+            /* Instacart-style collapsed state: the add button becomes a qty
+               badge. Tapping it re-opens the floating stepper pill below. */
+            <button
+              onClick={(e) => { e.preventDefault(); pokeStepper(); }}
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-bold tabular-nums"
+              aria-label={`${qty} in cart — tap to adjust`}
+            >
+              {qty}
+            </button>
           ) : qty > 0 ? (
-            <div className={`flex items-center shrink-0 ${compact ? "justify-between w-full gap-1" : "gap-0.5"}`}>
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 onClick={handleDecrease}
-                className={`flex items-center justify-center rounded-md bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors ${compact ? "w-5 h-5" : "w-6 h-6"}`}
+                className="w-6 h-6 flex items-center justify-center rounded-md bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors"
               >
-                <Minus size={compact ? 9 : 10} strokeWidth={2.5} />
+                <Minus size={10} strokeWidth={2.5} />
               </button>
-              <span className={`font-bold text-center text-gray-900 tabular-nums ${compact ? "text-[11px] w-4" : "text-xs w-5"}`}>
+              <span className="font-bold text-center text-gray-900 tabular-nums text-xs w-5">
                 {qty}
               </span>
               <button
                 onClick={handleIncrease}
                 disabled={qty >= product.stockQty}
-                className={`flex items-center justify-center rounded-md transition-colors ${compact ? "w-5 h-5" : "w-6 h-6"} ${
+                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
                   qty >= product.stockQty
                     ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                     : `bg-brand-500 hover:bg-brand-600 text-white ${popping ? "animate-add-to-cart" : ""}`
                 }`}
               >
-                <Plus size={compact ? 9 : 10} strokeWidth={2.5} />
+                <Plus size={10} strokeWidth={2.5} />
               </button>
             </div>
           ) : justAdded ? (
@@ -264,6 +285,36 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
           )}
         </div>
       </div>
+
+      {/* Floating − qty + pill (compact only): overlays the card bottom, so
+          the price row never reflows or wraps. Auto-collapses back into the
+          qty badge ~2.5s after the last tap. */}
+      {compact && qty > 0 && product.inStock && stepperOpen && (
+        <div className="absolute bottom-1 left-1 right-1 z-20 flex items-center justify-between bg-white rounded-full shadow-lg border border-gray-200 p-0.5 animate-add-to-cart">
+          <button
+            onClick={handleDecrease}
+            className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors"
+            aria-label="Decrease quantity"
+          >
+            <Minus size={11} strokeWidth={2.5} />
+          </button>
+          <span className="font-bold text-center text-gray-900 tabular-nums text-xs">
+            {qty}
+          </span>
+          <button
+            onClick={handleIncrease}
+            disabled={qty >= product.stockQty}
+            className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+              qty >= product.stockQty
+                ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                : "bg-brand-500 hover:bg-brand-600 text-white"
+            }`}
+            aria-label="Increase quantity"
+          >
+            <Plus size={11} strokeWidth={2.5} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
