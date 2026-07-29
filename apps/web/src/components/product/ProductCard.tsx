@@ -171,7 +171,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
           <span
             className={`absolute z-10 leading-none rounded-full flex items-center bg-blue-600/95 text-white shadow-sm ${
               compact
-                ? `left-1 p-[3px] ${discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-6" : "top-1"}`
+                ? "top-1 right-1 p-[3px]" // opposite corner from the sale badge — never stacked (anh Sơn)
                 : `left-2 text-[7px] font-semibold pl-1 pr-1.5 py-[3px] gap-0.5 ${discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-9" : "top-2"}`
             }`}
             style={{ WebkitTextSizeAdjust: "100%", textSizeAdjust: "100%" } as React.CSSProperties}
@@ -202,7 +202,10 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
           <FitName name={product.name} compact={compact} />
         </Link>
 
-        <div className={`flex items-center justify-between mt-auto ${compact ? "gap-1" : "gap-2"}`}>
+        {/* Compact card with an in-cart qty: the − 1 + stepper next to the
+            price overflows an ~100px card (anh Sơn's screenshot), so it drops
+            to its own full-width row under the price instead. */}
+        <div className={`mt-auto ${compact && qty > 0 && product.inStock ? "flex flex-col items-stretch gap-1" : `flex items-center justify-between ${compact ? "gap-1" : "gap-2"}`}`}>
           <div className="min-w-0">
             <span className={`font-product font-black block ${compact ? "text-[11px]" : "text-base"} ${product.salePrice ? "text-red-600" : "text-gray-900"}`}>
               ${(product.salePrice ?? product.price).toFixed(2)}
@@ -222,26 +225,26 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
               <Plus size={compact ? 11 : 14} strokeWidth={2.5} />
             </button>
           ) : qty > 0 ? (
-            <div className="flex items-center gap-0.5 shrink-0">
+            <div className={`flex items-center shrink-0 ${compact ? "justify-between w-full gap-1" : "gap-0.5"}`}>
               <button
                 onClick={handleDecrease}
-                className={`flex items-center justify-center rounded-md bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors ${compact ? "w-4 h-4" : "w-6 h-6"}`}
+                className={`flex items-center justify-center rounded-md bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors ${compact ? "w-5 h-5" : "w-6 h-6"}`}
               >
-                <Minus size={compact ? 8 : 10} strokeWidth={2.5} />
+                <Minus size={compact ? 9 : 10} strokeWidth={2.5} />
               </button>
-              <span className={`font-bold text-center text-gray-900 tabular-nums ${compact ? "text-[10px] w-3.5" : "text-xs w-5"}`}>
+              <span className={`font-bold text-center text-gray-900 tabular-nums ${compact ? "text-[11px] w-4" : "text-xs w-5"}`}>
                 {qty}
               </span>
               <button
                 onClick={handleIncrease}
                 disabled={qty >= product.stockQty}
-                className={`flex items-center justify-center rounded-md transition-colors ${compact ? "w-4 h-4" : "w-6 h-6"} ${
+                className={`flex items-center justify-center rounded-md transition-colors ${compact ? "w-5 h-5" : "w-6 h-6"} ${
                   qty >= product.stockQty
                     ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                     : `bg-brand-500 hover:bg-brand-600 text-white ${popping ? "animate-add-to-cart" : ""}`
                 }`}
               >
-                <Plus size={compact ? 8 : 10} strokeWidth={2.5} />
+                <Plus size={compact ? 9 : 10} strokeWidth={2.5} />
               </button>
             </div>
           ) : justAdded ? (

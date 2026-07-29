@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { dbGetProductsPage, dbGetActiveCategories } from "@/lib/db";
 
+// Without this, Next statically prerenders this GET at build time (it reads no
+// request data), freezing the JSON — admin image/product edits never showed up
+// on the All tab. force-dynamic runs it per request like /api/products.
+export const dynamic = "force-dynamic";
+
 // "All" tab mobile carousels: every active category (admin sortOrder) with
 // ALL of its in-stock products that have a photo, in catalog order — the
 // customer can swipe through the entire category (anh Sơn, 28/07: no cap;
@@ -24,8 +29,9 @@ export async function GET() {
     }))
     .filter(s => s.products.length > 0);
 
+  // Short edge cache only — admin edits must reach the All tab within ~a minute
   return NextResponse.json(
     { categories: sections },
-    { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
+    { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=30" } },
   );
 }
