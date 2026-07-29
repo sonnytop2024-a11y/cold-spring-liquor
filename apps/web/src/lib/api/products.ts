@@ -45,3 +45,19 @@ export async function fetchProductBySlug(slug: string): Promise<Product> {
   if (!res.ok) throw new Error(`Product request failed: ${res.status}`);
   return res.json();
 }
+
+// "All" tab mobile carousels — every active category with a short preview
+// strip of in-stock products that have a photo.
+export interface AllTabCategory {
+  id: string;
+  value: string;
+  label: string;
+  emoji: string;
+  products: Product[];
+}
+
+export async function fetchAllTabPreview(): Promise<{ categories: AllTabCategory[] }> {
+  const res = await fetch(`${API_BASE}/products/all-tab-preview`);
+  if (!res.ok) throw new Error(`All-tab preview request failed: ${res.status}`);
+  return res.json();
+}

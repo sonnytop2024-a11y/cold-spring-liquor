@@ -13,15 +13,18 @@ import { fetchProductBySlug } from "@/lib/api/products";
 // Product name in a fixed 2-line-height box. Long names shrink (14px → 9px,
 // which lets them wrap to 3 lines) until the FULL name fits — never "…" cut.
 // Re-measures after the custom font loads and when the card width changes.
-function FitName({ name }: { name: string }) {
+// Compact mode (carousel half-size cards) starts at 10px with a 7px floor.
+function FitName({ name, compact = false }: { name: string; compact?: boolean }) {
   const ref = useRef<HTMLHeadingElement | null>(null);
+  const startSize = compact ? 10 : 14;
+  const minSize = compact ? 7 : 9;
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const fit = () => {
-      let size = 14;
+      let size = startSize;
       el.style.fontSize = `${size}px`;
-      while (size > 9 && el.scrollHeight > el.clientHeight + 1) {
+      while (size > minSize && el.scrollHeight > el.clientHeight + 1) {
         size -= 0.5;
         el.style.fontSize = `${size}px`;
       }
@@ -31,12 +34,12 @@ function FitName({ name }: { name: string }) {
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [name]);
+  }, [name, startSize, minSize]);
   return (
     <h3
       ref={ref}
-      className="font-product font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors overflow-hidden mb-2"
-      style={{ fontSize: 14, height: "2.75rem" }}
+      className={`font-product font-bold text-gray-900 leading-snug hover:text-brand-600 transition-colors overflow-hidden ${compact ? "mb-1" : "mb-2"}`}
+      style={{ fontSize: startSize, height: compact ? "2.4rem" : "2.75rem" }}
     >
       {name}
     </h3>
@@ -47,9 +50,11 @@ interface ProductCardProps {
   product: Product;
   /** Set true for the first few above-the-fold cards to skip lazy-loading their image */
   priority?: boolean;
+  /** Half-size card for the mobile category carousels — everything scales down */
+  compact?: boolean;
 }
 
-function ProductCardImpl({ product, priority = false }: ProductCardProps) {
+function ProductCardImpl({ product, priority = false, compact = false }: ProductCardProps) {
   // Narrow selectors — each ProductCard only re-renders when ITS OWN cart
   // entry changes, not on every add/remove/update anywhere in the cart.
   const cartItem = useCartStore((s) => s.items.find((i) => i.product.id === product.id));
@@ -111,7 +116,7 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
     <div className="group bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 flex flex-col">
 
       {/* ── Image ────────────────────────────────────────────────── */}
-      <div className={`relative mx-2 mt-2 rounded-xl overflow-hidden aspect-square ${imgFit === "contain" ? "bg-white" : "bg-gray-50"}`}>
+      <div className={`relative rounded-xl overflow-hidden aspect-square ${compact ? "mx-1 mt-1" : "mx-2 mt-2"} ${imgFit === "contain" ? "bg-white" : "bg-gray-50"}`}>
         <Link href={`/products/${product.slug}`} className="absolute inset-0" onMouseEnter={prefetchDetail}>
           {product.imageUrl && !imgError ? (
             <Image
@@ -144,59 +149,66 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
 
         {/* Discount badge */}
         {discountPct > 0 && (
-          <span className="absolute top-2 left-2 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+          <span className={`absolute z-10 bg-red-500 text-white font-bold rounded-md ${compact ? "top-1 left-1 text-[8px] px-1 py-px" : "top-2 left-2 text-[10px] px-1.5 py-0.5"}`}>
             -{discountPct}%
           </span>
         )}
 
         {/* Bundle badge */}
         {product.bundleEligible && !product.salePrice && (
-          <span className="absolute top-2 left-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+          <span className={`absolute z-10 font-bold rounded-md flex items-center gap-0.5 ${compact ? "top-1 left-1 text-[8px] px-1 py-px" : "top-2 left-2 text-[10px] px-1.5 py-0.5"}`}
             style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)", color: "#fff" }}>
-            📦 Bundle
+            📦{compact ? "" : " Bundle"}
           </span>
         )}
 
         {/* Pickup Only badge — stacked below discount/bundle badge, mode-independent.
             Compact pill (anh Sơn, 27/07: the old one covered the bottle): lucide
             Store icon instead of the chunky 🏬 emoji, 9px text, and
-            text-size-adjust locked so mobile Safari can't auto-inflate it. */}
+            text-size-adjust locked so mobile Safari can't auto-inflate it.
+            Carousel compact card: icon-only dot so it never covers the bottle. */}
         {product.pickupOnly && (
           <span
-            className={`absolute left-2 z-10 text-[7px] font-semibold leading-none pl-1 pr-1.5 py-[3px] rounded-full flex items-center gap-0.5 bg-blue-600/95 text-white shadow-sm ${
-              discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-9" : "top-2"
+            className={`absolute z-10 leading-none rounded-full flex items-center bg-blue-600/95 text-white shadow-sm ${
+              compact
+                ? `left-1 p-[3px] ${discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-6" : "top-1"}`
+                : `left-2 text-[7px] font-semibold pl-1 pr-1.5 py-[3px] gap-0.5 ${discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-9" : "top-2"}`
             }`}
             style={{ WebkitTextSizeAdjust: "100%", textSizeAdjust: "100%" } as React.CSSProperties}
+            title="Pickup Only"
           >
-            <Store size={8} strokeWidth={2.5} /> Pickup Only
+            <Store size={compact ? 7 : 8} strokeWidth={2.5} />{compact ? "" : " Pickup Only"}
           </span>
         )}
 
         {/* Out of stock overlay */}
         {!product.inStock && (
           <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center">
-            <span className="text-xs font-semibold text-gray-400 tracking-wide">Out of Stock</span>
+            <span className={`font-semibold text-gray-400 tracking-wide ${compact ? "text-[9px]" : "text-xs"}`}>Out of Stock</span>
           </div>
         )}
       </div>
 
       {/* ── Info ─────────────────────────────────────────────────── */}
-      <div className="p-3 flex flex-col flex-1">
-        <p className="font-product text-[10px] text-gray-400 uppercase tracking-widest truncate mb-0.5 h-3.5">
-          {product.brand ?? " "}
-        </p>
+      <div className={`flex flex-col flex-1 ${compact ? "p-1.5" : "p-3"}`}>
+        {/* Brand row is dropped in compact — no room, and it's often empty */}
+        {!compact && (
+          <p className="font-product text-[10px] text-gray-400 uppercase tracking-widest truncate mb-0.5 h-3.5">
+            {product.brand ?? " "}
+          </p>
+        )}
 
         <Link href={`/products/${product.slug}`} className="flex-1" onMouseEnter={prefetchDetail}>
-          <FitName name={product.name} />
+          <FitName name={product.name} compact={compact} />
         </Link>
 
-        <div className="flex items-center justify-between gap-2 mt-auto">
+        <div className={`flex items-center justify-between mt-auto ${compact ? "gap-1" : "gap-2"}`}>
           <div className="min-w-0">
-            <span className={`font-product text-base font-black block ${product.salePrice ? "text-red-600" : "text-gray-900"}`}>
+            <span className={`font-product font-black block ${compact ? "text-[11px]" : "text-base"} ${product.salePrice ? "text-red-600" : "text-gray-900"}`}>
               ${(product.salePrice ?? product.price).toFixed(2)}
             </span>
             {product.salePrice && (
-              <span className="font-product text-[11px] text-gray-400 line-through block leading-tight">
+              <span className={`font-product text-gray-400 line-through block leading-tight ${compact ? "text-[8px]" : "text-[11px]"}`}>
                 ${product.price.toFixed(2)}
               </span>
             )}
@@ -205,46 +217,46 @@ function ProductCardImpl({ product, priority = false }: ProductCardProps) {
           {!product.inStock ? (
             <button
               disabled
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-300 cursor-not-allowed"
+              className={`shrink-0 flex items-center justify-center rounded-lg bg-gray-100 text-gray-300 cursor-not-allowed ${compact ? "w-5 h-5" : "w-7 h-7"}`}
             >
-              <Plus size={14} strokeWidth={2.5} />
+              <Plus size={compact ? 11 : 14} strokeWidth={2.5} />
             </button>
           ) : qty > 0 ? (
             <div className="flex items-center gap-0.5 shrink-0">
               <button
                 onClick={handleDecrease}
-                className="w-6 h-6 flex items-center justify-center rounded-md bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors"
+                className={`flex items-center justify-center rounded-md bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 transition-colors ${compact ? "w-4 h-4" : "w-6 h-6"}`}
               >
-                <Minus size={10} strokeWidth={2.5} />
+                <Minus size={compact ? 8 : 10} strokeWidth={2.5} />
               </button>
-              <span className="text-xs font-bold w-5 text-center text-gray-900 tabular-nums">
+              <span className={`font-bold text-center text-gray-900 tabular-nums ${compact ? "text-[10px] w-3.5" : "text-xs w-5"}`}>
                 {qty}
               </span>
               <button
                 onClick={handleIncrease}
                 disabled={qty >= product.stockQty}
-                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
+                className={`flex items-center justify-center rounded-md transition-colors ${compact ? "w-4 h-4" : "w-6 h-6"} ${
                   qty >= product.stockQty
                     ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                     : `bg-brand-500 hover:bg-brand-600 text-white ${popping ? "animate-add-to-cart" : ""}`
                 }`}
               >
-                <Plus size={10} strokeWidth={2.5} />
+                <Plus size={compact ? 8 : 10} strokeWidth={2.5} />
               </button>
             </div>
           ) : justAdded ? (
             <button
               disabled
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 text-white"
+              className={`shrink-0 flex items-center justify-center rounded-lg bg-green-500 text-white ${compact ? "w-5 h-5" : "w-7 h-7"}`}
             >
-              <Check size={14} strokeWidth={2.5} />
+              <Check size={compact ? 11 : 14} strokeWidth={2.5} />
             </button>
           ) : (
             <button
               onClick={handleAdd}
-              className={`shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-brand-500 hover:bg-brand-600 text-white transition-colors ${popping ? "animate-add-to-cart" : ""}`}
+              className={`shrink-0 flex items-center justify-center rounded-lg bg-brand-500 hover:bg-brand-600 text-white transition-colors ${compact ? "w-5 h-5" : "w-7 h-7"} ${popping ? "animate-add-to-cart" : ""}`}
             >
-              <Plus size={14} strokeWidth={2.5} />
+              <Plus size={compact ? 11 : 14} strokeWidth={2.5} />
             </button>
           )}
         </div>

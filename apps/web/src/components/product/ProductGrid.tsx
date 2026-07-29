@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { ProductCard } from "./ProductCard";
-import { fetchProducts } from "@/lib/api/products";
+import { CategoryCarousels, CategoryCarouselsSkeleton } from "./CategoryCarousels";
+import { fetchProducts, fetchAllTabPreview } from "@/lib/api/products";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -34,13 +36,45 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
   const maxPrice  = currentParams.get("maxPrice")   ? Number(currentParams.get("maxPrice"))  : undefined;
   const page      = Number(currentParams.get("page") ?? 1);
 
+  // ── "All" tab on mobile → horizontal category carousels ──────────────────
+  // Only the untouched All view qualifies: any search, filter chip, category,
+  // price filter, or page > 1 keeps the classic grid. Desktop always keeps
+  // the grid (anh Sơn, 28/07). null = width unknown (first paint) → grid path.
+  const pureAll =
+    !category && !brand && !q && !sale && !featured && !flashdeal && !bundle &&
+    minPrice === undefined && maxPrice === undefined && page === 1;
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const preview = useQuery({
+    queryKey: ["all-tab-preview"],
+    queryFn: fetchAllTabPreview,
+    enabled: pureAll && isMobile === true,
+    staleTime: 60_000,
+  });
+  // API error or empty payload → fall back to the classic grid, never a blank tab
+  const useCarousels =
+    pureAll && isMobile === true && !preview.isError && (preview.data?.categories.length ?? 1) > 0;
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["products", { category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, page }],
     queryFn: () =>
       fetchProducts({ category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, page, limit: LIMIT }),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+    enabled: !useCarousels,
   });
+
+  if (useCarousels) {
+    if (!preview.data) return <CategoryCarouselsSkeleton />;
+    return <CategoryCarousels categories={preview.data.categories} />;
+  }
 
   function goToPage(p: number) {
     const params = new URLSearchParams(currentParams.toString());
