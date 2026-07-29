@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { dbGetProductsPage, dbGetActiveCategories } from "@/lib/db";
 
-// "All" tab mobile carousels: every active category (admin sortOrder) with a
-// short preview strip — first products in catalog order that are in stock AND
-// have a photo (anh Sơn: no-photo products never appear here). Categories with
-// nothing to show are skipped entirely.
-const PREVIEW_PER_CATEGORY = 6;
-
+// "All" tab mobile carousels: every active category (admin sortOrder) with
+// ALL of its in-stock products that have a photo, in catalog order — the
+// customer can swipe through the entire category (anh Sơn, 28/07: no cap;
+// no-photo products never appear here). Categories with nothing to show are
+// skipped entirely.
 export async function GET() {
   const [categories, { products }] = await Promise.all([
     dbGetActiveCategories(),
@@ -21,7 +20,7 @@ export async function GET() {
       value: cat.value,
       label: cat.label,
       emoji: cat.emoji,
-      products: withImage.filter(p => p.category === cat.value).slice(0, PREVIEW_PER_CATEGORY),
+      products: withImage.filter(p => p.category === cat.value),
     }))
     .filter(s => s.products.length > 0);
 
