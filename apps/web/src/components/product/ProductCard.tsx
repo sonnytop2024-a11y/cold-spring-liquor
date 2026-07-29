@@ -84,6 +84,11 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
 
   const qty = cartItem?.quantity ?? 0;
 
+  // Small-format bottles (50/100/200/375 mL in the name or volume) render 30%
+  // smaller than full-size bottles so a 375mL never looks as big as a 750mL
+  // (anh Sơn, 29/07). Word boundaries keep 1000mL etc. from matching.
+  const isSmallBottle = /\b(50|100|200|375)\s*ml\b/i.test(`${product.name} ${product.volume ?? ""}`);
+
   function prefetchDetail() {
     queryClient.prefetchQuery({
       queryKey: ["product", product.slug],
@@ -130,7 +135,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
     <div className="group relative bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 flex flex-col">
 
       {/* ── Image ────────────────────────────────────────────────── */}
-      <div className={`relative rounded-xl overflow-hidden aspect-square ${compact ? "mx-1 mt-1" : "mx-2 mt-2"} ${imgFit === "contain" ? "bg-white" : "bg-gray-50"}`}>
+      <div className={`relative rounded-xl overflow-hidden aspect-square ${compact ? "mx-1 mt-1" : "mx-2 mt-2"} ${imgFit === "contain" || isSmallBottle ? "bg-white" : "bg-gray-50"}`}>
         <Link href={`/products/${product.slug}`} className="absolute inset-0" onMouseEnter={prefetchDetail}>
           {product.imageUrl && !imgError ? (
             <Image
@@ -138,7 +143,11 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
               alt={product.name}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className={`${imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} rounded-xl card-img-zoom transition-transform duration-300`}
+              className={`${isSmallBottle ? "object-contain" : imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} rounded-xl card-img-zoom transition-transform duration-300`}
+              // Small bottle = 77% of the tile, parked at the BOTTOM like on a
+              // shelf: the empty space goes on top, the base lines up with the
+              // full-size bottles next to it (anh Sơn, 29/07).
+              style={isSmallBottle ? { padding: "21% 11.5% 2%", objectPosition: "bottom" } : undefined}
               loading={priority ? undefined : "lazy"}
               priority={priority}
               onLoad={(e) => {
