@@ -126,6 +126,9 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
   const [justAdded, setJustAdded] = useState(false);
   const [popping, setPopping] = useState(false);
   const [imgError, setImgError] = useState(false);
+  // Image fades in when loaded — the disc is there from first paint, the
+  // bottle materialising with a soft fade feels intentional, not laggy
+  const [imgLoaded, setImgLoaded] = useState(false);
   // Square-ish photos keep object-cover (fills the tile, the approved look).
   // Clearly non-square photos (6-packs, bottle+box combos, tall shots) switch
   // to object-contain so nothing gets cropped — decided from the file's real
@@ -151,10 +154,12 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
   const isSmallBottle = /\b(50|100|200|375)\s*ml\b/i.test(`${product.name} ${product.volume ?? ""}`);
 
   // Platform shelf disc — compact (All tab) cards only, never Beer, never
-  // boxed/multi-pack names; the image itself must pass the white-background
-  // single-bottle check after it loads.
+  // boxed/multi-pack names. The white-bg single-bottle verdict is pre-computed
+  // server-side (product.platformOk) so the disc renders in the FIRST paint —
+  // no canvas work on the phone, no late pop-in. The canvas check below only
+  // covers products the batch hasn't flagged yet (fresh uploads).
   const platformEligible = compact && product.category !== "beer" && !BOXED_NAME.test(product.name);
-  const [onPlatform, setOnPlatform] = useState(false);
+  const [onPlatform, setOnPlatform] = useState(platformEligible && product.platformOk === true);
 
   function prefetchDetail() {
     queryClient.prefetchQuery({
@@ -220,7 +225,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
                above the disc; otherwise it fills the tile. */
             <span
               className="absolute left-0 right-0 block"
-              style={onPlatform ? { bottom: "5%", height: isSmallBottle ? "70%" : "93.5%" } : { top: 0, bottom: 0 }}
+              style={onPlatform ? { bottom: "6.5%", height: isSmallBottle ? "69%" : "92%" } : { top: 0, bottom: 0 }}
             >
             <Image
               src={product.imageUrl}
@@ -230,7 +235,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
               // 50vw made every card download a double-size image (jank on
               // scroll from decode work + wasted bandwidth).
               sizes={compact ? "30vw" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
-              className={`${isSmallBottle || onPlatform ? "object-contain" : imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} rounded-xl card-img-zoom transition-transform duration-300`}
+              className={`${isSmallBottle || onPlatform ? "object-contain" : imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} ${imgLoaded ? "opacity-100" : "opacity-0"} rounded-xl card-img-zoom transition-[opacity,transform] duration-300`}
               // On the platform the white background melts away with multiply;
               // off it, small bottles keep the shelf-floor padding (77%).
               style={
@@ -244,9 +249,10 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
               priority={priority}
               onLoad={(e) => {
                 const img = e.currentTarget;
+                setImgLoaded(true);
                 const { naturalWidth: w, naturalHeight: h } = img;
                 if (w && h && (w / h > 1.1 || w / h < 0.9)) setImgFit("contain");
-                if (platformEligible) {
+                if (platformEligible && product.platformOk === undefined) {
                   const key = product.imageUrl!;
                   const cached = platformCache.get(key);
                   if (cached !== undefined) {

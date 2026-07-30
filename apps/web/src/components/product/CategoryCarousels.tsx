@@ -35,7 +35,7 @@ function CarouselStrip({ products, eager }: { products: Product[]; eager: boolea
   return (
     <div
       className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1"
-      style={{ scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch" }}
+      style={{ scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch", scrollPaddingLeft: "16px", scrollPaddingRight: "16px" }}
       onScroll={onScroll}
     >
       {products.slice(0, visible).map((product, i) => (
@@ -69,7 +69,7 @@ export function CategoryCarousels({ categories }: { categories: AllTabCategory[]
 
           {/* -mx-4 px-4: bleed to the screen edge (same trick as CategoryPills)
               so a sliver of the next card peeks in — ~4.4 cards per viewport. */}
-          <CarouselStrip products={cat.products} eager={ci === 0} />
+          <CarouselStrip products={cat.products} eager={ci < 2} />
         </section>
       ))}
     </div>

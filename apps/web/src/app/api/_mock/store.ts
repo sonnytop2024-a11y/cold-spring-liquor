@@ -114,6 +114,8 @@ export interface MockProduct {
   couponExcluded?: boolean;
   // Orderable via Pick Up In Store only — blocked for Delivery
   pickupOnly?: boolean;
+  /** Pre-computed server-side: white-bg single bottle → can stand on the All-tab shelf disc */
+  platformOk?: boolean;
 }
 
 export interface SavedAddress {

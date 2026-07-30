@@ -20,6 +20,8 @@ export interface Product {
   bundleEligible?: boolean;
   couponExcluded?: boolean;
   pickupOnly?: boolean;
+  /** Pre-computed server-side: white-bg single bottle → can stand on the All-tab shelf disc */
+  platformOk?: boolean;
 }
 
 export interface CartItem {

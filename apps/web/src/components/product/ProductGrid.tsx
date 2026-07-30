@@ -100,19 +100,19 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
   // A–Z quick filter — top of the list, label-free, hidden on the All view
   // (anh Sơn, 29/07). Tapping the active letter (or "All") clears it.
   const alphaBar = !isAllView || letter ? (
-    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 mb-4">
+    <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 mb-3">
       {["All", "#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map((l) => {
         const active = l === "All" ? !letter : letter === l;
         return (
           <button
             key={l}
             onClick={() => setLetter(l === "All" || letter === l ? null : l)}
-            className={`shrink-0 min-w-[34px] h-[34px] px-2.5 rounded-[10px] border text-[13px] font-extrabold transition-colors ${
+            className={`shrink-0 min-w-[26px] h-[26px] px-1.5 rounded-md border text-[11px] font-bold leading-none transition-colors ${
               active
                 ? l === "All"
                   ? "bg-gray-900 border-gray-900 text-white"
-                  : "bg-brand-500 border-brand-500 text-white shadow-md shadow-brand-500/30"
-                : "bg-white border-gray-200 text-gray-600 hover:border-brand-300"
+                  : "bg-brand-500 border-brand-500 text-white"
+                : "bg-white border-gray-100 text-gray-500 hover:border-brand-300 hover:text-gray-800"
             }`}
           >
             {l}

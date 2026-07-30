@@ -94,6 +94,7 @@ export function CategoryPills() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("page"); params.delete("category"); params.delete("featured");
     params.delete("flashdeal"); params.delete("bundle"); params.delete("sale"); params.delete("q");
+    params.delete("letter"); // All = back to the showcase, never "every product starting with C"
     router.replace(`/products?${params.toString()}`);
   }
 
