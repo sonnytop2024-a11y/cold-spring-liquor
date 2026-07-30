@@ -669,10 +669,9 @@ export function RareWhiskeyVault({ initialData }: { initialData?: VaultFeedData 
             </div>
           )}
 
-          {/* "rare" is the Hard to Find category value (lib/db.ts cat_rare) —
-              ?tag=rare isn't a filter the products page understands, so this
-              was silently landing on the unfiltered "All" list. */}
-          <Link className="view-all" href="/products?category=rare">
+          {/* Unfiltered /products — the "All" tab showcase (anh Sơn, 30/07),
+              not the Hard to Find category filter. */}
+          <Link className="view-all" href="/products">
             View All <span aria-hidden="true">→</span>
           </Link>
         </section>

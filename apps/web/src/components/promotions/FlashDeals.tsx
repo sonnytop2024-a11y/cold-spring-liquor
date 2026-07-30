@@ -292,10 +292,6 @@ const flashCSS = `
     .fd-cd .digit{font-size:19px;}
     .fd-cd .colon{font-size:16px;}
     .fd-cd-name{max-width:100%;font-size:10.5px;}
-    .fd-strip-item{flex-direction:column;text-align:center;gap:7px;}
-    .fd-strip-item .fd-strip-icon{width:34px;height:34px;font-size:14px;}
-    .fd-strip-item .fd-strip-title{font-size:12px;}
-    .fd-strip-item .fd-strip-sub{font-size:10px;margin-top:1px;}
   }
 `;
 
@@ -448,13 +444,6 @@ function PanelCountdown({ deals }: { deals: Deal[] }) {
   );
 }
 
-const BENEFITS = [
-  { icon: "🏷️", title: "Best Prices", sub: "Unbeatable deals" },
-  { icon: "⚡", title: "Limited Time", sub: "Deals end soon" },
-  { icon: "✔", title: "100% Authentic", sub: "Guaranteed quality" },
-  { icon: "🚚", title: "Fast Pickup", sub: "Ready in store" },
-];
-
 export function FlashDeals() {
   const { data: deals } = useQuery({
     queryKey: ["flash-deals"],
@@ -588,21 +577,6 @@ export function FlashDeals() {
             ))}
           </div>
         )}
-
-        {/* Benefit strip */}
-        <div className="mt-5 bg-[#0B0B0B] border border-[#222] rounded-[20px] p-5 flex max-[700px]:flex-wrap max-[700px]:gap-4">
-          {BENEFITS.map((b, i) => (
-            <div key={b.title} className={`fd-strip-item flex-1 max-[700px]:flex-none max-[700px]:w-[calc(50%-8px)] flex items-center gap-3 px-4 max-[700px]:px-0 relative ${i > 0 ? "min-[701px]:before:content-[''] min-[701px]:before:absolute min-[701px]:before:left-0 min-[701px]:before:top-[10%] min-[701px]:before:bottom-[10%] min-[701px]:before:w-px min-[701px]:before:bg-[#222]" : ""}`}>
-              <div className="fd-strip-icon w-[42px] h-[42px] rounded-full border-[1.5px] border-[#F6B94A] flex items-center justify-center flex-none text-[#F6B94A] text-lg">
-                {b.icon}
-              </div>
-              <div>
-                <div className="fd-strip-title text-[13px] font-extrabold text-white">{b.title}</div>
-                <div className="fd-strip-sub text-[11px] text-[#A4A4A4] mt-px">{b.sub}</div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   );
