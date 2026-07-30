@@ -24,8 +24,10 @@ export async function dbGetProductsPage(opts: {
   stock?: string;
   bundleEligible?: boolean;
   featured?: boolean;
+  /** A–Z quick filter: single letter matches names starting with it; "#" = starts with a digit */
+  letter?: string;
 }): Promise<{ products: MockProduct[]; total: number }> {
-  const { limit, offset, q, category, stock, bundleEligible, featured } = opts;
+  const { limit, offset, q, category, stock, bundleEligible, featured, letter } = opts;
   const t = tbl("csl_products");
   if (t) {
     try {
@@ -33,6 +35,8 @@ export async function dbGetProductsPage(opts: {
       const applyFilters = (query: any) => {
         if (category) query = query.filter("data->>category", "eq", category);
         if (q) query = query.or(`data->>name.ilike.%${q}%,data->>brand.ilike.%${q}%`);
+        if (letter === "#") query = query.or(Array.from({ length: 10 }, (_, i) => `data->>name.ilike.${i}%`).join(","));
+        else if (letter && /^[a-z]$/i.test(letter)) query = query.ilike("data->>name", `${letter}%`);
         if (stock === "in")  query = query.filter("data->>inStock", "eq", "true");
         if (stock === "out") query = query.filter("data->>inStock", "eq", "false");
         if (bundleEligible === true) query = query.filter("data->>bundleEligible", "eq", "true");
@@ -75,6 +79,8 @@ export async function dbGetProductsPage(opts: {
   if (stock === "out") all = all.filter(p => p.inStock === false || p.stockQty <= 0);
   if (bundleEligible === true) all = all.filter(p => p.bundleEligible);
   if (featured === true) all = all.filter(p => p.featured);
+  if (letter === "#") all = all.filter(p => /^\d/.test(p.name));
+  else if (letter && /^[a-z]$/i.test(letter)) all = all.filter(p => p.name.toLowerCase().startsWith(letter.toLowerCase()));
   all = [...all].sort((a, b) => computeProductSortKey(a).localeCompare(computeProductSortKey(b)));
   return { products: all.slice(offset, offset + limit), total: all.length };
 }

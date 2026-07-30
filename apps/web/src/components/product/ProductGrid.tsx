@@ -34,15 +34,21 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
   const bundle    = currentParams.get("bundle")     === "true";
   const minPrice  = currentParams.get("minPrice")   ? Number(currentParams.get("minPrice"))  : undefined;
   const maxPrice  = currentParams.get("maxPrice")   ? Number(currentParams.get("maxPrice"))  : undefined;
+  const rawLetter = currentParams.get("letter") ?? undefined;
+  const letter    = rawLetter && /^(#|[a-z])$/i.test(rawLetter) ? rawLetter.toUpperCase() : undefined;
   const page      = Number(currentParams.get("page") ?? 1);
+
+  // The untouched "All" view (no filter of any kind). The A–Z bar never shows
+  // here (anh Sơn, 29/07) and on mobile this view renders the carousels.
+  const isAllView =
+    !category && !brand && !q && !sale && !featured && !flashdeal && !bundle &&
+    minPrice === undefined && maxPrice === undefined && !letter;
 
   // ── "All" tab on mobile → horizontal category carousels ──────────────────
   // Only the untouched All view qualifies: any search, filter chip, category,
-  // price filter, or page > 1 keeps the classic grid. Desktop always keeps
-  // the grid (anh Sơn, 28/07). null = width unknown (first paint) → grid path.
-  const pureAll =
-    !category && !brand && !q && !sale && !featured && !flashdeal && !bundle &&
-    minPrice === undefined && maxPrice === undefined && page === 1;
+  // price filter, letter, or page > 1 keeps the classic grid. Desktop always
+  // keeps the grid (anh Sơn, 28/07). null = width unknown → grid path.
+  const pureAll = isAllView && page === 1;
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
@@ -63,9 +69,9 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
     pureAll && isMobile === true && !preview.isError && (preview.data?.categories.length ?? 1) > 0;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["products", { category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, page }],
+    queryKey: ["products", { category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, letter, page }],
     queryFn: () =>
-      fetchProducts({ category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, page, limit: LIMIT }),
+      fetchProducts({ category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, letter, page, limit: LIMIT }),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     enabled: !useCarousels,
@@ -82,13 +88,50 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
     router.replace(`/products?${params.toString()}`);
   }
 
+  function setLetter(l: string | null) {
+    const params = new URLSearchParams(currentParams.toString());
+    if (l) params.set("letter", l);
+    else params.delete("letter");
+    params.delete("page"); // a new letter always starts at page 1
+    const s = params.toString();
+    router.replace(s ? `/products?${s}` : "/products");
+  }
+
+  // A–Z quick filter — top of the list, label-free, hidden on the All view
+  // (anh Sơn, 29/07). Tapping the active letter (or "All") clears it.
+  const alphaBar = !isAllView || letter ? (
+    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 mb-4">
+      {["All", "#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map((l) => {
+        const active = l === "All" ? !letter : letter === l;
+        return (
+          <button
+            key={l}
+            onClick={() => setLetter(l === "All" || letter === l ? null : l)}
+            className={`shrink-0 min-w-[34px] h-[34px] px-2.5 rounded-[10px] border text-[13px] font-extrabold transition-colors ${
+              active
+                ? l === "All"
+                  ? "bg-gray-900 border-gray-900 text-white"
+                  : "bg-brand-500 border-brand-500 text-white shadow-md shadow-brand-500/30"
+                : "bg-white border-gray-200 text-gray-600 hover:border-brand-300"
+            }`}
+          >
+            {l}
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
   // First load — no previous data yet, show skeleton
   if (isLoading && !data) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-        {Array.from({ length: LIMIT }).map((_, i) => (
-          <div key={i} className="bg-gray-100 rounded-2xl aspect-[3/4] animate-pulse" />
-        ))}
+      <div>
+        {alphaBar}
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+          {Array.from({ length: LIMIT }).map((_, i) => (
+            <div key={i} className="bg-gray-100 rounded-2xl aspect-[3/4] animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -104,10 +147,13 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
 
   if (!data?.products.length) {
     return (
-      <div className="text-center py-16 text-gray-400">
-        <p className="text-4xl mb-3">🔍</p>
-        <p className="font-medium">No products found</p>
-        <p className="text-sm mt-1">Try adjusting your filters or search term</p>
+      <div>
+        {alphaBar}
+        <div className="text-center py-16 text-gray-400">
+          <p className="text-4xl mb-3">🔍</p>
+          <p className="font-medium">No products found</p>
+          <p className="text-sm mt-1">Try adjusting your filters or search term</p>
+        </div>
       </div>
     );
   }
@@ -116,6 +162,7 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
 
   return (
     <div>
+      {alphaBar}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
         {data.products.map((product, i) => (
           <ProductCard key={product.id} product={product} priority={page === 1 && i < 4} />

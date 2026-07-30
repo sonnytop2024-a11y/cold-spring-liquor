@@ -14,6 +14,8 @@ interface FetchProductsParams {
   bundle?: boolean;
   limit?: number;
   page?: number;
+  /** A–Z quick filter: "a".."z" = first letter of the name, "#" = starts with a digit */
+  letter?: string;
 }
 
 interface ProductsResponse {

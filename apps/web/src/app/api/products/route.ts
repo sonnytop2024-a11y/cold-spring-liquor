@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
   const sale = searchParams.get("sale");
   const flashdeal = searchParams.get("flashdeal");
   const bundle = searchParams.get("bundle");
+  // A–Z quick filter: "a".."z" match the name's first letter, "#" = digits
+  const rawLetter = searchParams.get("letter") ?? undefined;
+  const letter = rawLetter && /^(#|[a-z])$/i.test(rawLetter) ? rawLetter : undefined;
   const offset = (page - 1) * limit;
 
   const needsSale = sale === "true";
@@ -27,6 +30,8 @@ export async function GET(req: NextRequest) {
     // Fetch all in-stock products for lookup (paginate to cover all)
     const { products: allProds } = await dbGetProductsPage({ limit: 3000, offset: 0, stock: "in" });
     allProds.forEach(p => { productById.set(p.id, p); productBySlug.set(p.slug, p); });
+    const letterMatch = (name: string) =>
+      !letter || (letter === "#" ? /^\d/.test(name) : name.toLowerCase().startsWith(letter.toLowerCase()));
     const flashProducts = activeDeals.map(deal => {
       const real = (deal.productId ? productById.get(deal.productId) : undefined)
                 ?? productBySlug.get(deal.slug);
@@ -39,14 +44,14 @@ export async function GET(req: NextRequest) {
         rating: 0, reviewCount: 0, description: "", imageUrl: deal.imageUrl,
         abv: 0, country: "",
       } as MockProduct;
-    });
+    }).filter(p => letterMatch(p.name));
     const total = flashProducts.length;
     return NextResponse.json({ products: flashProducts, data: flashProducts, total, page: 1, pageSize: total, limit: total, totalPages: 1 });
   }
 
   // sale: requires in-memory filter (salePrice comparison can't be done in Supabase JSON query)
   if (needsSale) {
-    const { products: allProds } = await dbGetProductsPage({ limit: 3000, offset: 0, q, category, stock: "in" });
+    const { products: allProds } = await dbGetProductsPage({ limit: 3000, offset: 0, q, category, stock: "in", letter });
     let filtered = allProds.filter(p => p.salePrice !== null && p.salePrice < p.price);
     if (minPrice > 0) filtered = filtered.filter(p => p.price >= minPrice);
     if (maxPrice < 999999) filtered = filtered.filter(p => p.price <= maxPrice);
@@ -64,6 +69,7 @@ export async function GET(req: NextRequest) {
     stock: "in",
     bundleEligible: bundle === "true" ? true : undefined,
     featured: featured === "true" ? true : undefined,
+    letter,
   });
 
   if (minPrice > 0) products = products.filter(p => p.price >= minPrice);
