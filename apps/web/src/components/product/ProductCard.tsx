@@ -104,6 +104,17 @@ function canStandOnPlatform(img: HTMLImageElement): boolean {
 
 const BOXED_NAME = /\b\d+\s*(?:pk|pack)\b|\bbox\b|\bgift\b|\bcombo\b/i;
 
+// One canvas analysis per image URL for the whole session — the same product
+// appears in several strips/pages, and re-running 64×64 getImageData during a
+// swipe is exactly the kind of main-thread work that makes scrolling stutter.
+const platformCache = new Map<string, boolean>();
+
+// Run fn when the browser is idle (falls back to a timeout on Safari)
+function whenIdle(fn: () => void) {
+  if (typeof requestIdleCallback === "function") requestIdleCallback(fn, { timeout: 1500 });
+  else setTimeout(fn, 200);
+}
+
 function ProductCardImpl({ product, priority = false, compact = false }: ProductCardProps) {
   // Narrow selectors — each ProductCard only re-renders when ITS OWN cart
   // entry changes, not on every add/remove/update anywhere in the cart.
@@ -215,7 +226,10 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
               src={product.imageUrl}
               alt={product.name}
               fill
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              // Compact carousel cards are ~30% of the viewport — asking for
+              // 50vw made every card download a double-size image (jank on
+              // scroll from decode work + wasted bandwidth).
+              sizes={compact ? "30vw" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
               className={`${isSmallBottle || onPlatform ? "object-contain" : imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} rounded-xl card-img-zoom transition-transform duration-300`}
               // On the platform the white background melts away with multiply;
               // off it, small bottles keep the shelf-floor padding (77%).
@@ -229,9 +243,26 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
               loading={priority ? undefined : "lazy"}
               priority={priority}
               onLoad={(e) => {
-                const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                const img = e.currentTarget;
+                const { naturalWidth: w, naturalHeight: h } = img;
                 if (w && h && (w / h > 1.1 || w / h < 0.9)) setImgFit("contain");
-                if (platformEligible && canStandOnPlatform(e.currentTarget)) setOnPlatform(true);
+                if (platformEligible) {
+                  const key = product.imageUrl!;
+                  const cached = platformCache.get(key);
+                  if (cached !== undefined) {
+                    if (cached) setOnPlatform(true);
+                  } else {
+                    // Defer the canvas work to idle time — never mid-swipe.
+                    // A detached img (card unmounted meanwhile) is skipped
+                    // WITHOUT caching, so the next mount analyses it properly.
+                    whenIdle(() => {
+                      if (!img.isConnected) return;
+                      const ok = canStandOnPlatform(img);
+                      platformCache.set(key, ok);
+                      if (ok) setOnPlatform(true);
+                    });
+                  }
+                }
               }}
               onError={() => setImgError(true)}
             />

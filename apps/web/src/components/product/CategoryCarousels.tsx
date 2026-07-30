@@ -51,7 +51,7 @@ export function CategoryCarousels({ categories }: { categories: AllTabCategory[]
   return (
     <div>
       {categories.map((cat, ci) => (
-        <section key={cat.id} className={ci === 0 ? "" : "mt-7"}>
+        <section key={cat.id} className={`csl-strip-section ${ci === 0 ? "" : "mt-7"}`}>
           <div className="flex items-center justify-between mb-2.5">
             {/* Cinzel — engraved liquor-label face, bolder + bigger than the
                 old inherited Playfair (anh Sơn, 28/07: "đậm hơn, to hơn,
