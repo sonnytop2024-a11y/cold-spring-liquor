@@ -192,3 +192,24 @@ input[type="date"]::-webkit-date-and-time-value {
     transform: scale(1.05);
   }
 }
+
+/* ── All-tab platform cards (anh Sơn 29/07, "Minimal Apple Style"):
+   white-background single bottles stand on a soft white disc. The wide
+   shadow is its own radial-gradient layer — it fades to zero on its own,
+   so the tile edge can never clip it into a hard line. ── */
+.csl-halo {
+  position: absolute; left: 50%; top: 42%; width: 100%; aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,0,0,0.035) 0%, rgba(0,0,0,0.012) 48%, transparent 66%);
+}
+.csl-pshadow {
+  position: absolute; left: 50%; bottom: 1.5%; width: 104%; height: 17%;
+  transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.17) 0%, rgba(0,0,0,0.10) 38%, rgba(0,0,0,0.035) 62%, transparent 78%);
+}
+.csl-platform {
+  position: absolute; left: 50%; bottom: 8%; width: 86%; height: 12%;
+  transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 26%, #ffffff 42%, #f8f8fa 62%, #eeeef2 82%, #e0e0e6 100%);
+  box-shadow: 0 2px 3px rgba(0,0,0,0.10), inset 0 1px 2px #ffffff, inset 0 -3px 6px rgba(0,0,0,0.08);
+}

@@ -54,6 +54,56 @@ interface ProductCardProps {
   compact?: boolean;
 }
 
+// Platform (Apple-style shelf disc) eligibility — anh Sơn 29/07, All tab only:
+// white background, a single standing bottle (boxes/multi-packs are wide),
+// never Beer. The image is served through /_next/image (same origin), so the
+// canvas is never CORS-tainted.
+function canStandOnPlatform(img: HTMLImageElement): boolean {
+  try {
+    const S = 64;
+    const c = document.createElement("canvas");
+    c.width = S; c.height = S;
+    const ctx = c.getContext("2d");
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, S, S);
+    const d = ctx.getImageData(0, 0, S, S).data;
+    const at = (x: number, y: number) => { const i = (y * S + x) * 4; return Math.min(d[i], d[i + 1], d[i + 2]); };
+    // 1) The frame's inner ring must be white → photo backgrounds out.
+    //    Skipped zones where a legit bottle shot has non-white pixels:
+    //    top-centre (cap), the whole bottom row and lower flanks (many photos
+    //    bake a soft floor shadow under the bottle).
+    const m = Math.round(S * 0.08);
+    const inner = Math.round(S * 0.3);
+    for (let x = m; x < S - m; x += 2) {
+      if (x > inner && x < S - inner) continue; // centre = cap zone
+      if (at(x, m) < 238) return false;
+    }
+    const sideStop = Math.round(S * 0.72); // below this: floor-shadow zone
+    for (let y = m; y < sideStop; y += 2) if (at(m, y) < 238 || at(S - 1 - m, y) < 238) return false;
+    // 2) Content must be tall and narrow like a single bottle — a box,
+    //    bottle+box combo, or multi-pack spreads wide → no platform
+    let minX = S, maxX = -1, minY = S, maxY = -1;
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        if (at(x, y) < 236) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return false;
+    // Boxes / bottle+box combos / multi-packs are near-square (~1.0); squat
+    // single bottles (1792, decanters) stay under this.
+    return (maxX - minX + 1) / (maxY - minY + 1) <= 0.92;
+  } catch {
+    return false;
+  }
+}
+
+const BOXED_NAME = /\b\d+\s*(?:pk|pack)\b|\bbox\b|\bgift\b|\bcombo\b/i;
+
 function ProductCardImpl({ product, priority = false, compact = false }: ProductCardProps) {
   // Narrow selectors — each ProductCard only re-renders when ITS OWN cart
   // entry changes, not on every add/remove/update anywhere in the cart.
@@ -88,6 +138,12 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
   // smaller than full-size bottles so a 375mL never looks as big as a 750mL
   // (anh Sơn, 29/07). Word boundaries keep 1000mL etc. from matching.
   const isSmallBottle = /\b(50|100|200|375)\s*ml\b/i.test(`${product.name} ${product.volume ?? ""}`);
+
+  // Platform shelf disc — compact (All tab) cards only, never Beer, never
+  // boxed/multi-pack names; the image itself must pass the white-background
+  // single-bottle check after it loads.
+  const platformEligible = compact && product.category !== "beer" && !BOXED_NAME.test(product.name);
+  const [onPlatform, setOnPlatform] = useState(false);
 
   function prefetchDetail() {
     queryClient.prefetchQuery({
@@ -135,27 +191,51 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
     <div className="group relative bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 flex flex-col">
 
       {/* ── Image ────────────────────────────────────────────────── */}
-      <div className={`relative rounded-xl overflow-hidden aspect-square ${compact ? "mx-1 mt-1" : "mx-2 mt-2"} ${imgFit === "contain" || isSmallBottle ? "bg-white" : "bg-gray-50"}`}>
+      <div className={`relative rounded-xl overflow-hidden aspect-square ${compact ? "mx-1 mt-1" : "mx-2 mt-2"} ${imgFit === "contain" || isSmallBottle || onPlatform ? "bg-white" : "bg-gray-50"}`}>
+        {/* Shelf disc UNDER the bottle (DOM order keeps the image on top);
+            the bottle's white background melts into it via multiply blend */}
+        {onPlatform && (
+          <>
+            <div className="csl-halo" aria-hidden="true" />
+            <div className="csl-pshadow" aria-hidden="true" />
+            <div className="csl-platform" aria-hidden="true" />
+          </>
+        )}
         <Link href={`/products/${product.slug}`} className="absolute inset-0" onMouseEnter={prefetchDetail}>
           {product.imageUrl && !imgError ? (
+            /* next/image with `fill` can't have its height overridden, so the
+               platform look shrinks THIS positioned frame instead: on the
+               disc the frame is 85% tall (small bottles 64%) anchored just
+               above the disc; otherwise it fills the tile. */
+            <span
+              className="absolute left-0 right-0 block"
+              style={onPlatform ? { bottom: "10.5%", height: isSmallBottle ? "64%" : "85%" } : { top: 0, bottom: 0 }}
+            >
             <Image
               src={product.imageUrl}
               alt={product.name}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className={`${isSmallBottle ? "object-contain" : imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} rounded-xl card-img-zoom transition-transform duration-300`}
-              // Small bottle = 77% of the tile, parked at the BOTTOM like on a
-              // shelf: the empty space goes on top, the base lines up with the
-              // full-size bottles next to it (anh Sơn, 29/07).
-              style={isSmallBottle ? { padding: "21% 11.5% 2%", objectPosition: "bottom" } : undefined}
+              className={`${isSmallBottle || onPlatform ? "object-contain" : imgFit === "cover" ? "object-cover" : "object-contain p-1.5"} rounded-xl card-img-zoom transition-transform duration-300`}
+              // On the platform the white background melts away with multiply;
+              // off it, small bottles keep the shelf-floor padding (77%).
+              style={
+                onPlatform
+                  ? { mixBlendMode: "multiply" }
+                  : isSmallBottle
+                    ? { padding: "21% 11.5% 2%", objectPosition: "bottom" }
+                    : undefined
+              }
               loading={priority ? undefined : "lazy"}
               priority={priority}
               onLoad={(e) => {
                 const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
                 if (w && h && (w / h > 1.1 || w / h < 0.9)) setImgFit("contain");
+                if (platformEligible && canStandOnPlatform(e.currentTarget)) setOnPlatform(true);
               }}
               onError={() => setImgError(true)}
             />
+            </span>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-white">
               {/* Category illustration placeholder — replaced automatically once a real photo is uploaded */}
