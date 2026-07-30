@@ -220,7 +220,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
                above the disc; otherwise it fills the tile. */
             <span
               className="absolute left-0 right-0 block"
-              style={onPlatform ? { bottom: "10.5%", height: isSmallBottle ? "64%" : "85%" } : { top: 0, bottom: 0 }}
+              style={onPlatform ? { bottom: "5%", height: isSmallBottle ? "70%" : "93.5%" } : { top: 0, bottom: 0 }}
             >
             <Image
               src={product.imageUrl}

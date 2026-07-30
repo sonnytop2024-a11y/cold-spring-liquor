@@ -203,12 +203,13 @@ input[type="date"]::-webkit-date-and-time-value {
   background: radial-gradient(circle, rgba(0,0,0,0.035) 0%, rgba(0,0,0,0.012) 48%, transparent 66%);
 }
 .csl-pshadow {
-  position: absolute; left: 50%; bottom: 1.5%; width: 104%; height: 17%;
+  position: absolute; left: 50%; bottom: 0.5%; width: 96%; height: 15%;
   transform: translateX(-50%); border-radius: 50%;
   background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.17) 0%, rgba(0,0,0,0.10) 38%, rgba(0,0,0,0.035) 62%, transparent 78%);
 }
 .csl-platform {
-  position: absolute; left: 50%; bottom: 8%; width: 86%; height: 12%;
+  /* +10% (anh Sơn 29/07): disc 94.5% wide, sits lower so the taller bottle still fits */
+  position: absolute; left: 50%; bottom: 1.2%; width: 90%; height: 13.2%;
   transform: translateX(-50%); border-radius: 50%;
   background: radial-gradient(ellipse at 50% 26%, #ffffff 42%, #f8f8fa 62%, #eeeef2 82%, #e0e0e6 100%);
   box-shadow: 0 2px 3px rgba(0,0,0,0.10), inset 0 1px 2px #ffffff, inset 0 -3px 6px rgba(0,0,0,0.08);
