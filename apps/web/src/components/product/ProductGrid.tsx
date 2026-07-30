@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ProductCard } from "./ProductCard";
 import { CategoryCarousels, CategoryCarouselsSkeleton } from "./CategoryCarousels";
 import { fetchProducts, fetchAllTabPreview } from "@/lib/api/products";
@@ -68,11 +68,20 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
   const useCarousels =
     pureAll && isMobile === true && !preview.isError && (preview.data?.categories.length ?? 1) > 0;
 
+  const filters = { category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, letter };
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["products", { category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, letter, page }],
-    queryFn: () =>
-      fetchProducts({ category, brand, q, sale, featured, flashdeal, bundle, minPrice, maxPrice, letter, page, limit: LIMIT }),
-    placeholderData: keepPreviousData,
+    queryKey: ["products", { ...filters, page }],
+    queryFn: () => fetchProducts({ ...filters, page, limit: LIMIT }),
+    // Keep the previous page's data ONLY while paging within the SAME filters
+    // (smooth pagination). Across a tab/filter switch it must be dropped —
+    // otherwise switching e.g. All → Vodka flashes the last grid's products
+    // (Wine) before Vodka arrives (anh Sơn, 30/07).
+    placeholderData: (prev: Awaited<ReturnType<typeof fetchProducts>> | undefined, prevQuery: { queryKey: readonly unknown[] } | undefined) => {
+      const pk = prevQuery?.queryKey?.[1] as Record<string, unknown> | undefined;
+      if (!pk) return undefined;
+      const { page: _p, ...prevFilters } = pk;
+      return JSON.stringify(prevFilters) === JSON.stringify(filters) ? prev : undefined;
+    },
     staleTime: 30_000,
     enabled: !useCarousels,
   });
