@@ -29,41 +29,37 @@ export async function dbGetProductsPage(opts: {
   const t = tbl("csl_products");
   if (t) {
     try {
-      let countQ = t.select("id", { count: "exact", head: true });
-      let dataQ  = t.select("data")
-        .order("data->>sortKey", { ascending: true, nullsFirst: false })
-        .order("data->>name", { ascending: true })
-        .range(offset, offset + limit - 1);
-      if (category) {
-        countQ = countQ.filter("data->>category", "eq", category);
-        dataQ  = dataQ.filter("data->>category", "eq", category);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const applyFilters = (query: any) => {
+        if (category) query = query.filter("data->>category", "eq", category);
+        if (q) query = query.or(`data->>name.ilike.%${q}%,data->>brand.ilike.%${q}%`);
+        if (stock === "in")  query = query.filter("data->>inStock", "eq", "true");
+        if (stock === "out") query = query.filter("data->>inStock", "eq", "false");
+        if (bundleEligible === true) query = query.filter("data->>bundleEligible", "eq", "true");
+        if (featured === true) query = query.filter("data->>featured", "eq", "true");
+        return query;
+      };
+      // Supabase caps every request at 1000 rows — a limit above that must be
+      // fetched in chunks or callers silently lose everything past row 1000
+      // (the All-tab carousels were missing whole brands, e.g. Tanqueray).
+      const CHUNK = 1000;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows: any[] = [];
+      for (let from = offset; from < offset + limit; from += CHUNK) {
+        const to = Math.min(from + CHUNK - 1, offset + limit - 1);
+        const { data, error } = await applyFilters(t.select("data"))
+          .order("data->>sortKey", { ascending: true, nullsFirst: false })
+          .order("data->>name", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < to - from + 1) break; // last page
       }
-      if (q) {
-        const orStr = `data->>name.ilike.%${q}%,data->>brand.ilike.%${q}%`;
-        countQ = countQ.or(orStr);
-        dataQ  = dataQ.or(orStr);
-      }
-      if (stock === "in")  {
-        countQ = countQ.filter("data->>inStock", "eq", "true");
-        dataQ  = dataQ.filter("data->>inStock", "eq", "true");
-      }
-      if (stock === "out") {
-        countQ = countQ.filter("data->>inStock", "eq", "false");
-        dataQ  = dataQ.filter("data->>inStock", "eq", "false");
-      }
-      if (bundleEligible === true) {
-        countQ = countQ.filter("data->>bundleEligible", "eq", "true");
-        dataQ  = dataQ.filter("data->>bundleEligible", "eq", "true");
-      }
-      if (featured === true) {
-        countQ = countQ.filter("data->>featured", "eq", "true");
-        dataQ  = dataQ.filter("data->>featured", "eq", "true");
-      }
-      const [{ count, error: cErr }, { data, error: dErr }] = await Promise.all([countQ, dataQ]);
+      const { count, error: cErr } = await applyFilters(t.select("id", { count: "exact", head: true }));
       if (cErr) throw cErr;
-      if (dErr) throw dErr;
       return {
-        products: (data ?? []).map((r: any) => r.data as MockProduct),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        products: rows.map((r: any) => r.data as MockProduct),
         total: count ?? 0,
       };
     } catch (e) {
