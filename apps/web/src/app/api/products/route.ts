@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+
+// Products change rarely — a short CDN cache makes tab switches feel instant
+// for everyone after the first visitor, while admin edits still land in <1 min.
+const CACHE = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" };
 import { dbGetProductsPage, dbSaveProduct, dbGetActiveFlashDeals } from "@/lib/db";
 import type { MockProduct } from "../_mock/store";
 
@@ -46,7 +50,7 @@ export async function GET(req: NextRequest) {
       } as MockProduct;
     }).filter(p => letterMatch(p.name));
     const total = flashProducts.length;
-    return NextResponse.json({ products: flashProducts, data: flashProducts, total, page: 1, pageSize: total, limit: total, totalPages: 1 });
+    return NextResponse.json({ products: flashProducts, data: flashProducts, total, page: 1, pageSize: total, limit: total, totalPages: 1 }, { headers: CACHE });
   }
 
   // sale: requires in-memory filter (salePrice comparison can't be done in Supabase JSON query)
@@ -57,7 +61,7 @@ export async function GET(req: NextRequest) {
     if (maxPrice < 999999) filtered = filtered.filter(p => p.price <= maxPrice);
     const total = filtered.length;
     const products = filtered.slice(offset, offset + limit);
-    return NextResponse.json({ products, data: products, total, page, pageSize: limit, limit, totalPages: Math.ceil(total / limit) });
+    return NextResponse.json({ products, data: products, total, page, pageSize: limit, limit, totalPages: Math.ceil(total / limit) }, { headers: CACHE });
   }
 
   // bundle / featured / normal: all handled at DB level now
@@ -75,7 +79,7 @@ export async function GET(req: NextRequest) {
   if (minPrice > 0) products = products.filter(p => p.price >= minPrice);
   if (maxPrice < 999999) products = products.filter(p => p.price <= maxPrice);
 
-  return NextResponse.json({ products, data: products, total, page, pageSize: limit, limit, totalPages: Math.ceil(total / limit) });
+  return NextResponse.json({ products, data: products, total, page, pageSize: limit, limit, totalPages: Math.ceil(total / limit) }, { headers: CACHE });
 }
 
 export async function POST(req: NextRequest) {

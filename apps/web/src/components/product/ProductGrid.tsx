@@ -82,7 +82,7 @@ export function ProductGrid({ searchParams: _serverSearchParams }: ProductGridPr
       const { page: _p, ...prevFilters } = pk;
       return JSON.stringify(prevFilters) === JSON.stringify(filters) ? prev : undefined;
     },
-    staleTime: 30_000,
+    staleTime: 60_000,
     enabled: !useCarousels,
   });
 

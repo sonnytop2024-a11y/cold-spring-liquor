@@ -14,7 +14,7 @@ import type { Product } from "@/types";
 // "View all ›" goes to the same page as tapping the category tab.
 
 const INITIAL_CARDS = 10;
-const BATCH_CARDS = 20;
+const BATCH_CARDS = 12;
 
 function CarouselStrip({ products, eager }: { products: Product[]; eager: boolean }) {
   const [visible, setVisible] = useState(INITIAL_CARDS);

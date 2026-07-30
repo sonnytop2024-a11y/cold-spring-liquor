@@ -46,6 +46,9 @@ export async function dbGetProductsPage(opts: {
       // Supabase caps every request at 1000 rows — a limit above that must be
       // fetched in chunks or callers silently lose everything past row 1000
       // (the All-tab carousels were missing whole brands, e.g. Tanqueray).
+      // The count runs IN PARALLEL with the chunk loop — running it after made
+      // every tab switch pay two sequential round-trips (felt slow).
+      const countPromise = applyFilters(t.select("id", { count: "exact", head: true }));
       const CHUNK = 1000;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows: any[] = [];
@@ -59,7 +62,7 @@ export async function dbGetProductsPage(opts: {
         rows.push(...(data ?? []));
         if (!data || data.length < to - from + 1) break; // last page
       }
-      const { count, error: cErr } = await applyFilters(t.select("id", { count: "exact", head: true }));
+      const { count, error: cErr } = await countPromise;
       if (cErr) throw cErr;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
