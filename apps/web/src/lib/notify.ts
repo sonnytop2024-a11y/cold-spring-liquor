@@ -57,6 +57,33 @@ async function sendTelegram(
   }
 }
 
+// Chat: push a new-message alert to the one driver assigned to the order.
+// Customer side has no push subscription — they see messages live on the
+// tracking page (5s polling), so only the driver direction needs a push.
+export async function sendChatPushToDriver(
+  driverId: string,
+  orderNumber: string,
+  text: string,
+): Promise<void> {
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  const subs = await dbGetDriverPushSubs();
+  const sub = subs[driverId];
+  if (!sub) return;
+  try {
+    webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+    await webpush.sendNotification(
+      sub as unknown as Parameters<typeof webpush.sendNotification>[0],
+      JSON.stringify({
+        title: `💬 Customer message — #${orderNumber}`,
+        body: text.length > 90 ? `${text.slice(0, 90)}…` : text,
+        url: "/dashboard",
+      }),
+    );
+  } catch {
+    // Subscription may have expired — ignore
+  }
+}
+
 async function sendPush(
   order: MockOrder,
   sub: Record<string, unknown> | null,

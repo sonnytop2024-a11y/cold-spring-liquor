@@ -32,6 +32,20 @@ async function processBannerImage(buffer: ArrayBuffer): Promise<Buffer> {
     .toBuffer();
 }
 
+// Promo banner strip images (chained in between category strips on the
+// mobile "All" tab): fixed ~2.65:1 landscape to match the 140px-tall slot,
+// cover-cropped and centered so any source image fills it cleanly — the
+// frontend never sizes off the image itself (see PromoBannerSlot), only this
+// fixed ratio, so a wrong-ratio upload would look off-center rather than
+// break layout.
+async function processPromoBannerImage(buffer: ArrayBuffer): Promise<Buffer> {
+  const input = Buffer.from(buffer);
+  return sharp(input)
+    .resize(900, 340, { fit: "cover", position: "centre" })
+    .toFormat("webp", { quality: 88, effort: 4 })
+    .toBuffer();
+}
+
 // Category card photos: landscape 7:5 to match the card frame on /categories,
 // cover-cropped and centered so any source image fills the tile cleanly.
 async function processCategoryImage(buffer: ArrayBuffer): Promise<Buffer> {
@@ -39,6 +53,17 @@ async function processCategoryImage(buffer: ArrayBuffer): Promise<Buffer> {
   return sharp(input)
     .resize(700, 500, { fit: "cover", position: "centre" })
     .toFormat("webp", { quality: 85, effort: 4 })
+    .toBuffer();
+}
+
+// Category pill/carousel icons: small, no forced crop (a custom-shaped or
+// transparent-background icon shouldn't be square-cropped), capped at 160px
+// so it stays crisp at the tiny sizes pills/carousel headers render it.
+async function processIconImage(buffer: ArrayBuffer): Promise<Buffer> {
+  const input = Buffer.from(buffer);
+  return sharp(input)
+    .resize(160, 160, { fit: "inside", withoutEnlargement: true })
+    .toFormat("webp", { quality: 90, effort: 4 })
     .toBuffer();
 }
 
@@ -121,9 +146,13 @@ try {
           ? await processShowcaseImage(rawBytes)
           : folder === "categories"
             ? await processCategoryImage(rawBytes)
-            : folder === "vault"
-              ? await processVaultImage(rawBytes)
-              : await processProductImage(rawBytes);
+            : folder === "icons"
+              ? await processIconImage(rawBytes)
+              : folder === "promo"
+                ? await processPromoBannerImage(rawBytes)
+                : folder === "vault"
+                  ? await processVaultImage(rawBytes)
+                  : await processProductImage(rawBytes);
     } catch (err) {
       if (err instanceof VaultImageError) {
         return NextResponse.json({ error: err.message }, { status: 400 });

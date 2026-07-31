@@ -14,25 +14,35 @@ interface BundleTier {
   id: string; minQty: number; discountPct: number; label: string; sortOrder: number; active?: boolean;
 }
 
+interface UnlockDeal {
+  id: string; productId: string; productName: string; minSpend: number; specialPrice: number; active?: boolean; sortOrder?: number;
+}
+
 export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "delivery" | "pickup" } = {}) {
   const { items, rewardsPointsToRedeem, giftCardCode, giftCardAmount } = useCartStore();
   const { promoCode, promoDiscount, fulfillmentMode } = useCheckoutStore();
   // Follows the client-side Delivery ↔ Pick Up switch (no reload)
   const isPickup = (fulfillmentMode ?? initialMode) === "pickup";
   const [bundleTiers, setBundleTiers] = useState<BundleTier[]>([]);
+  const [unlockDeals, setUnlockDeals] = useState<UnlockDeal[]>([]);
 
   useEffect(() => {
     fetch("/api/deals/bundle-tiers")
       .then(r => r.json())
       .then(setBundleTiers)
       .catch(() => {});
+    fetch("/api/deals/unlock-deals")
+      .then(r => r.json())
+      .then(setUnlockDeals)
+      .catch(() => {});
   }, []);
 
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
-  const { subtotal, flashSavings, bundlePct, bundleDiscount } = useMemo(() => calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
+  const { subtotal, flashSavings, bundlePct, bundleDiscount, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
+    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  ), [items, bundleTiers]);
+    unlockDeals,
+  ), [items, bundleTiers, unlockDeals]);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   // Admin kill-switch — shares the checkout's 10s poll via the same query key
   const { data: deliveryStatus } = useQuery({
@@ -52,8 +62,8 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
   // Pick Up In Store: automatic discount, tax on the discounted subtotal
   const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
   const tax = (subtotal - pickupDiscount) * TAX_RATE;
-  const total = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax);
-  const totalSavings = flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + giftCardAmount + pickupDiscount;
+  const total = Math.max(0, subtotal - bundleDiscount - unlockDiscount - promoDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax);
+  const totalSavings = flashSavings + bundleDiscount + unlockDiscount + promoDiscount + rewardsDiscount + giftCardAmount + pickupDiscount;
   const pointsEarned = Math.floor(total);
 
   return (
@@ -71,6 +81,8 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
           {items.map(({ product, quantity }) => {
             const effectivePrice = product.salePrice ?? product.price;
             const hasFlash = product.salePrice != null && product.salePrice < product.price;
+            const unlocked = unlockApplied[product.id];
+            const otherDealActive = !unlocked && unlockDeals.some(d => d.productId === product.id && d.active !== false);
             return (
               <div key={product.id} className="flex items-start gap-3">
                 <span className="w-5 h-5 bg-brand-500 rounded-full text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">{quantity}</span>
@@ -80,10 +92,14 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
                   {product.couponExcluded && promoCode && (
                     <p className="text-[10px] text-gray-400 italic">Coupon not applicable</p>
                   )}
+                  {otherDealActive && (
+                    <p className="text-[10px] text-teal-600 italic">Only 1 Unlocked Deal per order</p>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-gray-900 text-sm font-medium">{formatCurrency(effectivePrice * quantity)}</p>
+                  <p className="text-gray-900 text-sm font-medium">{formatCurrency(effectivePrice * quantity - (unlocked ? (effectivePrice - unlocked.specialPrice) * unlocked.qty : 0))}</p>
                   {hasFlash && <p className="text-xs text-gray-400 line-through">{formatCurrency(product.price * quantity)}</p>}
+                  {unlocked && <p className="text-xs text-gray-400 line-through">{formatCurrency(effectivePrice * quantity)}</p>}
                 </div>
               </div>
             );
@@ -98,6 +114,7 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
           <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
           {flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Deal savings</span><span>-{formatCurrency(flashSavings)}</span></div>}
           {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(bundlePct * 100)}%)</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
+          {unlockDiscount > 0 && <div className="flex justify-between text-teal-600 font-medium"><span>🔓 Unlocked Deal</span><span>-{formatCurrency(unlockDiscount)}</span></div>}
           {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {promoCode}</span><span>-{formatCurrency(promoDiscount)}</span></div>}
           {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
           {giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card ({giftCardCode})</span><span>-{formatCurrency(giftCardAmount)}</span></div>}

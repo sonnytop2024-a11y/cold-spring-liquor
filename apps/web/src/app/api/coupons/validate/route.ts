@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetCouponByCode } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
-  const { code, subtotal } = await req.json();
+  const { code, subtotal, hasUnlockDeal } = await req.json();
   if (!code) return NextResponse.json({ error: "No coupon code provided." }, { status: 400 });
+
+  // Unlock Deals don't stack with promo codes — the client already blocks the
+  // Apply button when a deal is active; this is the server-side backstop.
+  if (hasUnlockDeal) {
+    return NextResponse.json({ error: "Promo codes can't be combined with an Unlocked Deal in your cart." }, { status: 400 });
+  }
 
   const coupon = await dbGetCouponByCode(code);
 

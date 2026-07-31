@@ -28,28 +28,44 @@ export function CartView() {
   const [giftInput, setGiftInput] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
+  const [unlockDeals, setUnlockDeals] = useState<{ id: string; productId: string; minSpend: number; specialPrice: number; active?: boolean; sortOrder?: number }[]>([]);
   useEffect(() => {
     fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
+    fetch("/api/deals/unlock-deals").then(r => r.json()).then(setUnlockDeals).catch(() => {});
   }, []);
 
-  const { subtotal, flashSavings, bundleDiscount, bundleQty, promoBaseSubtotal } = useMemo(() => calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
+  const { subtotal, flashSavings, bundleDiscount, bundleQty, promoBaseSubtotal, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
+    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  ), [items, bundleTiers]);
+    unlockDeals,
+  ), [items, bundleTiers, unlockDeals]);
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   const { tax, total, appliedGiftCard } = calcCartTotals(
-    subtotal, couponDiscount + bundleDiscount, rewardsDiscount, giftCardAmount,
+    subtotal, couponDiscount + bundleDiscount + unlockDiscount, rewardsDiscount, giftCardAmount,
   );
   const pointsEarned = calcPointsEarned(total);
 
+  // Promo codes don't stack with an Unlocked Deal — if adding more items
+  // unlocks a deal after a code was already applied, drop the code.
+  useEffect(() => {
+    if (unlockDiscount > 0 && couponCode) {
+      setCoupon(null, 0);
+      alert("Your promo code was removed — it can't be combined with an Unlocked Deal.");
+    }
+  }, [unlockDiscount, couponCode, setCoupon]);
+
   async function applyCoupon() {
+    if (unlockDiscount > 0) {
+      alert("Promo codes can't be combined with an Unlocked Deal — remove the deal item to use a code.");
+      return;
+    }
     setApplyingCoupon(true);
     try {
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponInput, subtotal: promoBaseSubtotal }),
+        body: JSON.stringify({ code: couponInput, subtotal: promoBaseSubtotal, hasUnlockDeal: unlockDiscount > 0 }),
       });
       if (res.ok) {
         const { discount, message } = await res.json();
@@ -138,8 +154,18 @@ export function CartView() {
             ⚡ Flash Sale savings: -{formatCurrency(flashSavings)}
           </div>
         )}
+        {unlockDiscount > 0 && (
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-sm text-teal-700 font-medium">
+            🔓 Unlocked Deal savings: -{formatCurrency(unlockDiscount)}
+          </div>
+        )}
 
-        {items.map(({ product, quantity }) => (
+        {items.map(({ product, quantity }) => {
+          const unlocked = unlockApplied[product.id];
+          const otherDealActive = !unlocked && unlockDeals.some(d => d.productId === product.id && d.active !== false);
+          const effectivePrice = product.salePrice ?? product.price;
+          const lineTotal = effectivePrice * quantity - (unlocked ? (effectivePrice - unlocked.specialPrice) * unlocked.qty : 0);
+          return (
           <div key={product.id} className="flex gap-4 bg-white border rounded-xl p-4">
             <div className="relative w-20 h-20 bg-gray-50 rounded-lg overflow-hidden shrink-0">
               {product.imageUrl ? (
@@ -161,9 +187,13 @@ export function CartView() {
               {product.couponExcluded && couponCode && (
                 <p className="text-[11px] text-gray-400 italic">Coupon not applicable</p>
               )}
-              <p className="font-bold text-brand-600 mt-1">
-                {formatCurrency((product.salePrice ?? product.price) * quantity)}
-              </p>
+              {otherDealActive && (
+                <p className="text-[11px] text-teal-600 italic">Only 1 Unlocked Deal per order — already used on another item</p>
+              )}
+              <div className="flex items-baseline gap-2 mt-1">
+                <p className="font-bold text-brand-600">{formatCurrency(lineTotal)}</p>
+                {unlocked && <p className="text-xs text-gray-400 line-through">{formatCurrency(effectivePrice * quantity)}</p>}
+              </div>
             </div>
             <div className="flex flex-col items-end justify-between shrink-0">
               <button onClick={() => removeItem(product.id)} className="text-gray-400 hover:text-red-500">
@@ -184,7 +214,8 @@ export function CartView() {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Summary */}
@@ -194,25 +225,33 @@ export function CartView() {
           <p className="font-semibold mb-3 flex items-center gap-2 text-sm">
             <Tag size={15} className="text-brand-500" /> Coupon Code
           </p>
-          <div className="flex gap-2">
-            <input
-              value={couponInput}
-              onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-              placeholder="e.g. WELCOME10"
-              className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            <button
-              onClick={applyCoupon}
-              disabled={applyingCoupon}
-              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg"
-            >
-              Apply
-            </button>
-          </div>
-          {couponDiscount > 0 && (
-            <p className="text-xs text-green-600 font-medium mt-1.5">
-              ✓ Coupon applied — saving {formatCurrency(couponDiscount)}
-            </p>
+          {unlockDiscount > 0 ? (
+            <div className="flex items-center gap-2.5 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5 text-xs text-teal-700">
+              🔓 <span>Can&apos;t be combined with an Unlocked Deal — remove the deal item to use a code.</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <input
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  placeholder="e.g. WELCOME10"
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <button
+                  onClick={applyCoupon}
+                  disabled={applyingCoupon}
+                  className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+                >
+                  Apply
+                </button>
+              </div>
+              {couponDiscount > 0 && (
+                <p className="text-xs text-green-600 font-medium mt-1.5">
+                  ✓ Coupon applied — saving {formatCurrency(couponDiscount)}
+                </p>
+              )}
+            </>
           )}
         </div>
 
@@ -287,6 +326,12 @@ export function CartView() {
               <div className="flex justify-between text-purple-600 font-medium">
                 <span>📦 Bundle discount</span>
                 <span>-{formatCurrency(bundleDiscount)}</span>
+              </div>
+            )}
+            {unlockDiscount > 0 && (
+              <div className="flex justify-between text-teal-600 font-medium">
+                <span>🔓 Unlocked Deal</span>
+                <span>-{formatCurrency(unlockDiscount)}</span>
               </div>
             )}
             {flashSavings > 0 && (

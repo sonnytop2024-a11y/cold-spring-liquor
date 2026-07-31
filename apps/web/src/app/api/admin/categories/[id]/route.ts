@@ -13,7 +13,7 @@ const body = await req.json();
     return NextResponse.json({ ok: true });
   }
 
-  const { label, emoji, active, sortOrder, value, imageUrl } = body;
+  const { label, emoji, active, sortOrder, value, imageUrl, iconUrl } = body;
   const updated = await dbUpdateCategory(id, {
     ...(label !== undefined && { label: label.trim() }),
     ...(emoji !== undefined && { emoji: emoji.trim() }),
@@ -22,6 +22,8 @@ const body = await req.json();
     ...(value !== undefined && { value: value.toLowerCase().trim() }),
     // null/"" clears the custom photo → web falls back to default artwork
     ...(imageUrl !== undefined && { imageUrl: imageUrl || undefined }),
+    // null/"" clears the custom icon → pills/carousels fall back to emoji
+    ...(iconUrl !== undefined && { iconUrl: iconUrl || undefined }),
   });
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(updated);

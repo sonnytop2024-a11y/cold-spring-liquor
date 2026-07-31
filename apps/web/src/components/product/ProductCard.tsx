@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Plus, Check, Minus, Store } from "lucide-react";
 import { useState, useRef, useEffect, useLayoutEffect, memo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
 import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
@@ -104,6 +104,20 @@ function canStandOnPlatform(img: HTMLImageElement): boolean {
 
 const BOXED_NAME = /\b\d+\s*(?:pk|pack)\b|\bbox\b|\bgift\b|\bcombo\b/i;
 
+// Unlock Deal tag artwork — anh Sơn's own designs, not CSS-drawn. Each spend/
+// price combo is its own image file he supplies; add a line here per new
+// combo (public/unlock-deal-tag-<minSpend>.webp). No match = no tag shown,
+// rather than guessing/mislabeling the deal.
+const UNLOCK_TAG_IMAGES: Record<string, string> = {
+  "50-1": "/unlock-deal-tag.webp",
+  "60-1": "/unlock-deal-tag-60.webp",
+  "70-1": "/unlock-deal-tag-70.webp",
+  "100-1": "/unlock-deal-tag-100.webp",
+};
+function unlockTagImage(minSpend: number, specialPrice: number): string | null {
+  return UNLOCK_TAG_IMAGES[`${minSpend}-${specialPrice}`] ?? null;
+}
+
 // One canvas analysis per image URL for the whole session — the same product
 // appears in several strips/pages, and re-running 64×64 getImageData during a
 // swipe is exactly the kind of main-thread work that makes scrolling stutter.
@@ -172,6 +186,19 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
   const discountPct = product.salePrice
     ? Math.round(((product.price - product.salePrice) / product.price) * 100)
     : 0;
+
+  // Shared query key — every ProductCard on the page asks for the same data,
+  // so react-query dedupes it into a single request instead of one per card.
+  const { data: unlockDeals } = useQuery({
+    queryKey: ["active-unlock-deals"],
+    queryFn: async () => {
+      const r = await fetch("/api/deals/unlock-deals");
+      if (!r.ok) return [];
+      return r.json() as Promise<{ productId: string; minSpend: number; specialPrice: number }[]>;
+    },
+    staleTime: 60_000,
+  });
+  const unlockDeal = unlockDeals?.find((d) => d.productId === product.id);
 
   function triggerPop() {
     setPopping(false);
@@ -341,6 +368,16 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
         <Link href={`/products/${product.slug}`} className="flex-1" onMouseEnter={prefetchDetail}>
           <FitName name={product.name} compact={compact} />
         </Link>
+
+        {/* Unlock Deal tag — image swap per spend/price combo, see UNLOCK_TAG_IMAGES above. */}
+        {unlockDeal && unlockTagImage(unlockDeal.minSpend, unlockDeal.specialPrice) && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={unlockTagImage(unlockDeal.minSpend, unlockDeal.specialPrice)!}
+            alt={`Spend $${unlockDeal.minSpend}+ to unlock this at $${unlockDeal.specialPrice.toFixed(2)}`}
+            className={`w-full h-auto object-contain ${compact ? "mb-1" : "mb-1.5"}`}
+          />
+        )}
 
         <div className={`flex items-center justify-between mt-auto ${compact ? "gap-1" : "gap-2"}`}>
           <div className="min-w-0">

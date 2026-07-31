@@ -2,7 +2,7 @@
 import { store, createOrderNumber } from "../app/api/_mock/store";
 import { TAX_RATE } from "../app/api/_mock/data";
 import { getDeliveryTiming } from "./deliveryTiming";
-import { dbGetUserById, dbSaveUser, dbCreateOrder, dbUpdateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct, dbGetSettings, dbOverlayCurrentProductImages } from "./db";
+import { dbGetUserById, dbSaveUser, dbCreateOrder, dbUpdateOrder, dbGetGiftCard, dbSaveGiftCard, dbGetProduct, dbUpdateProduct, dbGetSettings, dbOverlayCurrentProductImages, dbGetActiveUnlockDeals, dbIncrementUnlockDealUsage } from "./db";
 import { notifyNewOrder } from "./notify";
 import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
@@ -92,6 +92,7 @@ export async function processOrder(
       name: product?.name ?? i.name ?? i.productId,
       stockQty: product?.stockQty ?? 0,
       price: i.price,
+      realPrice: product?.price ?? i.price,
       salePrice: null,
       bundleEligible: product?.bundleEligible ?? false,
       couponExcluded: product?.couponExcluded ?? false,
@@ -123,6 +124,66 @@ export async function processOrder(
   if (outOfStockItems.length > 0) {
     const list = outOfStockItems.map(i => `${i.name} (only ${i.stockQty} left)`).join(", ");
     return { error: `Not enough stock for: ${list}. Please update your cart and try again.`, status: 422 };
+  }
+
+  // Unlock Deals ("spend $X, unlock product Y at $Z"): the price for a
+  // deal-tagged product is NEVER trusted from the client — force it to the
+  // verified special price only when the rest of the cart actually clears
+  // the threshold, otherwise force it back to the real catalog price. This
+  // closes the specific abuse this promo type invites (claiming an
+  // unconfigured or unqualified $1 price); it does not fix price trust for
+  // every other line item, which remains a known broader gap (see
+  // todo_server_price_validation.md).
+  const activeUnlockDeals = await dbGetActiveUnlockDeals();
+  let anyDealUnlocked = false;
+  let winningDealId: string | null = null;
+  if (activeUnlockDeals.length > 0) {
+    const rawSubtotal = enrichedItems.reduce((s, i) => s + i.price * i.quantity, 0);
+    // Only ONE Unlocked Deal may apply per order, and only for exactly ONE
+    // unit — find every item that qualifies, then let the lowest-sortOrder
+    // deal win (ties keep cart order, since Array.sort is stable). Extra
+    // units of the winning product, and every other deal-tagged item, are
+    // forced back to real catalog price. (maxRedemptions is a separate,
+    // total-across-all-orders cap — already filtered out of activeUnlockDeals
+    // if exhausted — not a per-order quantity.)
+    // Only the ONE unit that would actually be discounted is excluded from
+    // the qualifying spend — extra units of this same product still count.
+    const candidates: { idx: number; deal: typeof activeUnlockDeals[number] }[] = [];
+    for (let idx = 0; idx < enrichedItems.length; idx++) {
+      const ei = enrichedItems[idx];
+      const deal = activeUnlockDeals.find(d => d.productId === ei.productId);
+      if (!deal) continue;
+      const otherSubtotal = rawSubtotal - ei.price;
+      if (otherSubtotal >= deal.minSpend) candidates.push({ idx, deal });
+    }
+    candidates.sort((a, b) => (a.deal.sortOrder ?? 0) - (b.deal.sortOrder ?? 0));
+    const winner = candidates[0];
+    for (let idx = 0; idx < enrichedItems.length; idx++) {
+      const ei = enrichedItems[idx];
+      const deal = activeUnlockDeals.find(d => d.productId === ei.productId);
+      if (!deal) continue;
+      const isWinner = winner?.idx === idx;
+      let corrected: number;
+      if (isWinner) {
+        anyDealUnlocked = true;
+        winningDealId = deal.id;
+        const extraUnits = ei.quantity - 1;
+        corrected = extraUnits > 0
+          ? Math.round(((deal.specialPrice + ei.realPrice * extraUnits) / ei.quantity) * 100) / 100
+          : Math.round(deal.specialPrice * 100) / 100;
+      } else {
+        corrected = Math.round(ei.realPrice * 100) / 100;
+      }
+      enrichedItems[idx] = { ...ei, price: corrected };
+      items[idx] = { ...items[idx], price: corrected };
+    }
+  }
+  // No stacking: an Unlocked Deal can't ride alongside a promo code on the
+  // same order — this is the authoritative check, independent of whatever
+  // the client claims (the coupon-validate route already blocks it up front,
+  // but a hand-crafted /api/orders request could otherwise skip that step).
+  if (anyDealUnlocked && (couponDiscount > 0 || couponCode)) {
+    return { error: "Promo codes can't be combined with an Unlocked Deal — please remove the deal item or the promo code.", status: 422 };
   }
 
   const bundleTiers = store.getActiveBundleTiers();
@@ -273,6 +334,7 @@ export async function processOrder(
   scheduleMissedCallCheck(order.id, 1, settings).catch(() => {});
 
   if (couponCode) store.incrementCouponUsage(couponCode);
+  if (winningDealId) await dbIncrementUnlockDealUsage(winningDealId).catch(() => {});
 
   if (giftCardList.length > 0) {
     // Only deduct what was actually charged (order could be < combined balance).

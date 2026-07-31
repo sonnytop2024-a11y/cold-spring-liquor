@@ -19,6 +19,7 @@ interface ReviewData {
   flashSavings: number;
   bundleDiscount: number;
   bundlePct: number;
+  unlockDiscount: number;
   promoCode: string | null;
   promoDiscount: number;
   rewardsDiscount: number;
@@ -57,7 +58,7 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onCustomerN
   const buttonsRef = useRef<{ close?: () => void } | null>(null);
 
   const rd = reviewData;
-  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount + (rd.pickupDiscount ?? 0);
+  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.unlockDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount + (rd.pickupDiscount ?? 0);
   const isPickup = !!rd.pickup;
   const addrStr = (a: ReviewData["deliveryAddress"]) => [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ");
 
@@ -231,6 +232,7 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onCustomerN
             <div className="flex justify-between text-gray-500"><span>Subtotal ({rd.items.reduce((a,i)=>a+i.quantity,0)} items)</span><span>{formatCurrency(rd.subtotal)}</span></div>
             {rd.flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Sale</span><span>-{formatCurrency(rd.flashSavings)}</span></div>}
             {rd.bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(rd.bundlePct*100)}%)</span><span>-{formatCurrency(rd.bundleDiscount)}</span></div>}
+            {rd.unlockDiscount > 0 && <div className="flex justify-between text-teal-600 font-medium"><span>🔓 Unlocked Deal</span><span>-{formatCurrency(rd.unlockDiscount)}</span></div>}
             {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
             {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
             {rd.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}

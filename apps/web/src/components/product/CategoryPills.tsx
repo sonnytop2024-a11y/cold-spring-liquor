@@ -10,6 +10,7 @@ interface Category {
   emoji: string;
   sortOrder: number;
   active: boolean;
+  iconUrl?: string;
 }
 
 type CatType = "all" | "featured" | "flashdeal" | "bundle" | "category";
@@ -18,6 +19,7 @@ interface Cat {
   label: string;
   value: string;
   emoji: string;
+  iconUrl?: string;
   type: CatType;
 }
 
@@ -51,7 +53,7 @@ const FALLBACK_CATS: Cat[] = [
 ];
 
 function dbCatsToPills(cats: Category[]): Cat[] {
-  return cats.map(c => ({ label: c.label, value: c.value, emoji: c.emoji, type: "category" as CatType }));
+  return cats.map(c => ({ label: c.label, value: c.value, emoji: c.emoji, iconUrl: c.iconUrl, type: "category" as CatType }));
 }
 
 export function CategoryPills() {
@@ -149,7 +151,12 @@ export function CategoryPills() {
                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900"
               }`}
             >
-              <span className="leading-none">{cat.emoji}</span>
+              {cat.iconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={cat.iconUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+              ) : (
+                <span className="leading-none">{cat.emoji}</span>
+              )}
               {cat.label}
             </button>
           );

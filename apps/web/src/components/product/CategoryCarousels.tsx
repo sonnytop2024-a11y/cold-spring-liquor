@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ProductCard } from "./ProductCard";
+import { PromoBannerSlot } from "./PromoBannerSlot";
 import type { AllTabCategory } from "@/lib/api/products";
 import type { Product } from "@/types";
 
@@ -57,7 +58,12 @@ export function CategoryCarousels({ categories }: { categories: AllTabCategory[]
                 old inherited Playfair (anh Sơn, 28/07: "đậm hơn, to hơn,
                 font riêng sang trọng") */}
             <h2 className="font-luxury font-bold text-[14px] tracking-wide text-gray-900 flex items-center gap-1.5">
-              <span aria-hidden="true" className="text-[14px]">{cat.emoji}</span> {cat.label}
+              {cat.iconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={cat.iconUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain shrink-0" />
+              ) : (
+                <span aria-hidden="true" className="text-[14px]">{cat.emoji}</span>
+              )} {cat.label}
             </h2>
             <Link
               href={`/products?category=${encodeURIComponent(cat.value)}`}
@@ -70,6 +76,7 @@ export function CategoryCarousels({ categories }: { categories: AllTabCategory[]
           {/* -mx-4 px-4: bleed to the screen edge (same trick as CategoryPills)
               so a sliver of the next card peeks in — ~4.4 cards per viewport. */}
           <CarouselStrip products={cat.products} eager={ci < 2} />
+          <PromoBannerSlot positionCategory={cat.value} />
         </section>
       ))}
     </div>

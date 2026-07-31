@@ -671,15 +671,18 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
 
   // Bundle tiers — fetched once from store (admin-configurable)
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; sortOrder: number }[]>([]);
+  const [unlockDeals, setUnlockDeals] = useState<{ id: string; productId: string; minSpend: number; specialPrice: number; active?: boolean; sortOrder?: number }[]>([]);
   useEffect(() => {
     fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
+    fetch("/api/deals/unlock-deals").then(r => r.json()).then(setUnlockDeals).catch(() => {});
   }, []);
 
   // Totals — delivery always FREE, minimum order $20
-  const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal } = useMemo(() => calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
+  const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
+    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  ), [items, bundleTiers]);
+    unlockDeals,
+  ), [items, bundleTiers, unlockDeals]);
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
   // Pick Up In Store: automatic discount, tax on the discounted subtotal
@@ -691,7 +694,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   // tries to create a Stripe charge below its $0.50 minimum — which always fails.
   const tax = Math.round((subtotal - pickupDiscount) * TAX * 100) / 100;
   // Re-cap gift card to what the order actually owes (guards against over-application when rewards added after gift card)
-  const preGiftOwed = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount - pickupDiscount + tax);
+  const preGiftOwed = Math.max(0, subtotal - bundleDiscount - unlockDiscount - promoDiscount - rewardsDiscount - pickupDiscount + tax);
   const effectiveGiftCard = Math.min(giftCardAmount, preGiftOwed);
   const total = Math.round(Math.max(0, preGiftOwed - effectiveGiftCard) * 100) / 100;
   // Card processors (Stripe) reject charges under $0.50 — any leftover below that after
@@ -705,12 +708,27 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const meetsMinimum = subtotal >= minOrder;
   const amountToMin = Math.max(0, minOrder - subtotal);
 
+  // Promo codes don't stack with an Unlocked Deal — if adding more items to
+  // the cart unlocks a deal AFTER a code was already applied, drop the code
+  // rather than silently letting both discounts ride through to checkout.
+  useEffect(() => {
+    if (unlockDiscount > 0 && promoCode) {
+      setPromoCode(null); setPromoDiscount(0); setPromoInput("");
+      setPromoMsg(""); clearPromo();
+      setPromoError("Your promo code was removed — it can't be combined with an Unlocked Deal.");
+    }
+  }, [unlockDiscount, promoCode, clearPromo]);
+
   async function applyPromo() {
     const code = promoInput.trim().toUpperCase();
     if (!code) return;
+    if (unlockDiscount > 0) {
+      setPromoError("Promo codes can't be combined with an Unlocked Deal — remove the deal item to use a code.");
+      return;
+    }
     setApplyingPromo(true); setPromoError(""); setPromoMsg("");
     try {
-      const res = await fetch("/api/coupons/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotal: promoBaseSubtotal }) });
+      const res = await fetch("/api/coupons/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, subtotal: promoBaseSubtotal, hasUnlockDeal: unlockDiscount > 0 }) });
       const data = await res.json();
       if (!res.ok) { setPromoError(data.error ?? "Invalid code"); setPromoDiscount(0); setPromoCode(null); clearPromo(); }
       else {
@@ -727,7 +745,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     if (!code) return;
     if (giftCards.some(c => c.code === code)) { setGiftError("This gift card is already applied"); return; }
     // Cap to what the order still owes after the cards already applied
-    const preGiftTotal = Math.max(0, subtotal - bundleDiscount - promoDiscount - rewardsDiscount + tax);
+    const preGiftTotal = Math.max(0, subtotal - bundleDiscount - unlockDiscount - promoDiscount - rewardsDiscount + tax);
     const remainingOwed = Math.round(Math.max(0, preGiftTotal - giftCardAmount) * 100) / 100;
     if (remainingOwed <= 0) { setGiftError("Your order is already fully covered by the applied gift cards"); return; }
     setApplyingGift(true); setGiftError("");
@@ -881,7 +899,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     const rd = {
       customerName: name, customerEmail: email, customerPhone: phone, customerNotes,
       deliveryAddress: delivery,
-      items, subtotal, flashSavings, bundleDiscount, bundlePct,
+      items, subtotal, flashSavings, bundleDiscount, bundlePct, unlockDiscount,
       promoCode, promoDiscount, rewardsDiscount, rewardsPointsToRedeem,
       giftCardAmount: effectiveGiftCard, tax,
     };
@@ -988,6 +1006,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(rd.subtotal)}</span></div>
             {rd.flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Sale</span><span>-{formatCurrency(rd.flashSavings)}</span></div>}
             {rd.bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(rd.bundlePct * 100)}%)</span><span>-{formatCurrency(rd.bundleDiscount)}</span></div>}
+            {rd.unlockDiscount > 0 && <div className="flex justify-between text-teal-600 font-medium"><span>🔓 Unlocked Deal</span><span>-{formatCurrency(rd.unlockDiscount)}</span></div>}
             {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
             {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
             {rd.giftCardAmount > 0 && <div className="flex justify-between text-emerald-600 font-medium"><span>🎁 Gift Card ({giftCardCode})</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}
@@ -1086,7 +1105,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           deliveryAddress: delivery,
           billingAddress: delivery,
           sameBilling: true,
-          items, subtotal, flashSavings, bundleDiscount, bundlePct,
+          items, subtotal, flashSavings, bundleDiscount, bundlePct, unlockDiscount,
           promoCode, promoDiscount, rewardsDiscount, rewardsPointsToRedeem,
           giftCardAmount: effectiveGiftCard, tax,
           pickup: isPickup && pickupSlot ? { dateLabel: pickupSlot.dateLabel, label: pickupSlot.label } : null,
@@ -1144,6 +1163,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             flashSavings,
             bundleDiscount,
             bundlePct,
+            unlockDiscount,
             promoCode,
             promoDiscount,
             rewardsDiscount,
@@ -1209,6 +1229,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <div className="border-t border-gray-200 pt-3 space-y-1 text-xs">
               <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
               {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
+              {unlockDiscount > 0 && <div className="flex justify-between text-teal-600 font-medium"><span>🔓 Unlocked Deal</span><span>-{formatCurrency(unlockDiscount)}</span></div>}
               {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo</span><span>-{formatCurrency(promoDiscount)}</span></div>}
               {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
               {effectiveGiftCard > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(effectiveGiftCard)}</span></div>}
@@ -1382,6 +1403,10 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             </div>
             <button type="button" onClick={() => { setPromoCode(null); setPromoDiscount(0); setPromoMsg(""); setPromoInput(""); clearPromo(); }} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
           </div>
+        ) : unlockDiscount > 0 ? (
+          <div className="flex items-center gap-2.5 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-3 text-xs text-teal-700">
+            🔓 <span>Promo codes can&apos;t be combined with an Unlocked Deal — remove the deal item to use a code.</span>
+          </div>
         ) : (
           <div className="mb-3">
             <div className="flex gap-2">
@@ -1488,6 +1513,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
               <div className="flex justify-between text-gray-500"><span>Subtotal ({totalQty} items)</span><span>{formatCurrency(subtotal)}</span></div>
               {flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Sale savings</span><span>-{formatCurrency(flashSavings)}</span></div>}
               {bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(bundlePct * 100)}%)</span><span>-{formatCurrency(bundleDiscount)}</span></div>}
+              {unlockDiscount > 0 && <div className="flex justify-between text-teal-600 font-medium"><span>🔓 Unlocked Deal</span><span>-{formatCurrency(unlockDiscount)}</span></div>}
               {promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ Promo ({promoCode})</span><span>-{formatCurrency(promoDiscount)}</span></div>}
               {rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rewardsDiscount)}</span></div>}
               {effectiveGiftCard > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(effectiveGiftCard)}</span></div>}
@@ -1507,9 +1533,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <div className="flex justify-between text-gray-900 font-bold text-sm pt-2 border-t border-gray-100">
               <span>Total</span><span>{formatCurrency(total)}</span>
             </div>
-            {(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard + pickupDiscount) > 0 && (
+            {(flashSavings + bundleDiscount + unlockDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard + pickupDiscount) > 0 && (
               <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
-                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(flashSavings + bundleDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard + pickupDiscount)} on this order!</p>
+                <p className="text-xs text-green-700 font-semibold">You save {formatCurrency(flashSavings + bundleDiscount + unlockDiscount + promoDiscount + rewardsDiscount + effectiveGiftCard + pickupDiscount)} on this order!</p>
               </div>
             )}
             <p className="text-xs text-center text-brand-600 font-medium pt-1">🏆 You&apos;ll earn <strong>{pointsEarned} CS Points</strong> on this order</p>
@@ -1591,6 +1617,7 @@ interface ReviewData {
   flashSavings: number;
   bundleDiscount: number;
   bundlePct: number;
+  unlockDiscount: number;
   promoCode: string | null;
   promoDiscount: number;
   rewardsDiscount: number;
@@ -1757,7 +1784,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
   }
 
   const rd = reviewData;
-  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount + (rd.pickupDiscount ?? 0);
+  const totalSavings = rd.flashSavings + rd.bundleDiscount + rd.unlockDiscount + rd.promoDiscount + rd.rewardsDiscount + rd.giftCardAmount + (rd.pickupDiscount ?? 0);
   const pointsEarned = Math.floor(total);
   const belowMin = rd.subtotal < minOrder;
 
@@ -1876,6 +1903,7 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
               <div className="flex justify-between text-gray-500"><span>Subtotal ({rd.items.reduce((a,i)=>a+i.quantity,0)} items)</span><span>{formatCurrency(rd.subtotal)}</span></div>
               {rd.flashSavings > 0 && <div className="flex justify-between text-red-600 font-medium"><span>⚡ Flash Deal savings</span><span>-{formatCurrency(rd.flashSavings)}</span></div>}
               {rd.bundleDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>📦 Bundle ({Math.round(rd.bundlePct * 100)}%)</span><span>-{formatCurrency(rd.bundleDiscount)}</span></div>}
+              {rd.unlockDiscount > 0 && <div className="flex justify-between text-teal-600 font-medium"><span>🔓 Unlocked Deal</span><span>-{formatCurrency(rd.unlockDiscount)}</span></div>}
               {rd.promoDiscount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🏷️ {rd.promoCode}</span><span>-{formatCurrency(rd.promoDiscount)}</span></div>}
               {rd.rewardsDiscount > 0 && <div className="flex justify-between text-purple-600 font-medium"><span>🏆 Rewards ({rd.rewardsPointsToRedeem} pts)</span><span>-{formatCurrency(rd.rewardsDiscount)}</span></div>}
               {rd.giftCardAmount > 0 && <div className="flex justify-between text-green-600 font-medium"><span>🎁 Gift Card</span><span>-{formatCurrency(rd.giftCardAmount)}</span></div>}

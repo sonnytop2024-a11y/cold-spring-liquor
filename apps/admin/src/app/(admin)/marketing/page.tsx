@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Tag, Edit2, Trash2, Loader2, X, Check,
   ToggleLeft, ToggleRight, AlertTriangle, Zap, Package, Search, ChevronRight,
-  Image as ImageIcon, GripVertical, ExternalLink, ChevronUp, ChevronDown,
+  Image as ImageIcon, GripVertical, ExternalLink, ChevronUp, ChevronDown, Unlock, Megaphone,
 } from "lucide-react";
 import { API } from "@/lib/api";
 
@@ -38,6 +38,13 @@ interface BundleTier {
   label: string; active: boolean; sortOrder: number;
 }
 
+interface UnlockDeal {
+  id: string; productId: string; productName: string; productBrand?: string;
+  productImage?: string | null; productSlug?: string; regularPrice: number;
+  minSpend: number; specialPrice: number; maxRedemptions: number | null; usageCount: number;
+  active: boolean; sortOrder: number; createdAt: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const COUPON_EMPTY: Partial<Coupon> = { code: "", type: "fixed", value: 0, label: "", minOrder: 0, maxUsage: null, usagePerCustomer: null, startDate: null, endDate: null, categoryRestriction: null, active: true };
@@ -65,7 +72,7 @@ function toLocalDatetimeInput(iso: string | null) {
 
 function DeleteConfirm({ onConfirm, onCancel, busy }: { onConfirm: () => void; onCancel: () => void; busy: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full text-center">
         <AlertTriangle size={32} className="text-red-500 mx-auto mb-3" />
         <h3 className="font-bold text-lg mb-1">Delete?</h3>
@@ -103,7 +110,7 @@ function CouponModal({ coupon, onClose, onSave }: { coupon: Partial<Coupon> | nu
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b">
           <h2 className="font-bold text-lg">{isEdit ? "Edit Coupon" : "Create Coupon"}</h2>
@@ -270,7 +277,7 @@ function FlashDealModal({ deal, onClose, onSave }: { deal: Partial<FlashDeal> | 
   const hasProduct = !!form.name;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b shrink-0">
@@ -471,7 +478,7 @@ function BundleTierModal({ tier, onClose, onSave }: { tier: Partial<BundleTier> 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b">
           <h2 className="font-bold text-lg flex items-center gap-2">
@@ -521,6 +528,228 @@ function BundleTierModal({ tier, onClose, onSave }: { tier: Partial<BundleTier> 
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
             {isEdit ? "Save Changes" : "Create Tier"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Unlock Deal Modal ────────────────────────────────────────────────────────
+
+const UD_EMPTY: Partial<UnlockDeal> = { minSpend: 50, specialPrice: 1, maxRedemptions: null, active: true, sortOrder: 1 };
+
+function UnlockDealModal({ deal, onClose, onSave }: { deal: Partial<UnlockDeal> | null; onClose: () => void; onSave: (d: any) => void }) {
+  const isEdit = !!deal?.id;
+  const [form, setForm] = useState<Partial<UnlockDeal>>(deal ?? { ...UD_EMPTY });
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showPicker, setShowPicker] = useState(!isEdit);
+
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productError, setProductError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    setLoadingProducts(true);
+    setProductError(null);
+    fetch(`${API}/admin/products`)
+      .then(r => {
+        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+        return r.json();
+      })
+      .then(json => {
+        const list: InventoryProduct[] = Array.isArray(json) ? json : (json.products ?? json.data ?? []);
+        setProducts(list);
+      })
+      .catch(e => setProductError(String(e)))
+      .finally(() => setLoadingProducts(false));
+  }, [showPicker]);
+
+  function set(k: keyof UnlockDeal, v: any) { setForm(f => ({ ...f, [k]: v })); }
+  async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
+
+  const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
+  function setNum(k: keyof UnlockDeal, raw: string, nullable = false) {
+    setRawInputs(r => ({ ...r, [k]: raw }));
+    if (raw === "") { set(k, nullable ? null : 0); return; }
+    const n = parseFloat(raw);
+    if (!isNaN(n)) set(k, n);
+  }
+  function numVal(k: keyof UnlockDeal): string {
+    return k in rawInputs ? rawInputs[k] : String((form as any)[k] ?? "");
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return products.slice(0, 40);
+    return products.filter(p => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)).slice(0, 40);
+  }, [products, search]);
+
+  function selectProduct(p: InventoryProduct) {
+    setForm(f => ({
+      ...f,
+      productId: p.id,
+      productName: p.name,
+      productBrand: p.brand,
+      productImage: p.imageUrl,
+      productSlug: p.slug,
+      regularPrice: p.price,
+    }));
+    setShowPicker(false);
+    setSearch("");
+  }
+
+  const hasProduct = !!form.productName;
+  const savingsPct = form.regularPrice && form.specialPrice != null ? Math.round((1 - (form.specialPrice as number) / form.regularPrice) * 100) : 0;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b shrink-0">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <Unlock size={18} className="text-teal-500" />
+            {isEdit ? "Edit Unlock Deal" : "New Unlock Deal"}
+          </h2>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className="overflow-y-auto flex-1">
+          {showPicker ? (
+            <div className="p-5 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select the product to unlock</p>
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search by name, brand or category…"
+                  className="w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                />
+              </div>
+              {loadingProducts ? (
+                <div className="py-12 flex items-center justify-center gap-2 text-gray-400">
+                  <Loader2 size={20} className="animate-spin" /> Loading products…
+                </div>
+              ) : productError ? (
+                <div className="py-10 text-center">
+                  <p className="text-red-500 text-sm font-medium mb-2">Failed to load products</p>
+                  <p className="text-xs text-gray-400 mb-3">{productError}</p>
+                  <button onClick={() => { setShowPicker(false); setTimeout(() => setShowPicker(true), 50); }}
+                    className="text-xs bg-teal-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-teal-600">
+                    Retry
+                  </button>
+                </div>
+              ) : filtered.length === 0 ? (
+                <p className="text-center text-gray-400 py-10 text-sm">
+                  {products.length === 0 ? "No products in inventory" : "No products match your search"}
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5 max-h-[52vh] overflow-y-auto pr-1">
+                  {filtered.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => selectProduct(p)}
+                      className="flex items-center gap-3 p-3 rounded-xl border hover:border-teal-400 hover:bg-teal-50 transition-colors text-left group"
+                    >
+                      <div className="w-14 h-14 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                        {p.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.imageUrl} alt="" className="w-full h-full object-contain p-1" />
+                        ) : (
+                          <Package size={22} className="text-gray-300" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-800 leading-tight line-clamp-2">{p.name}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{p.brand}</p>
+                        <p className="text-xs font-semibold text-gray-700 mt-1">${p.price.toFixed(2)}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300 group-hover:text-teal-500 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-teal-300 bg-teal-50">
+                <div className="w-14 h-14 rounded-lg border bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                  {form.productImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={form.productImage} alt="" className="w-full h-full object-contain p-1" />
+                  ) : (
+                    <Package size={22} className="text-gray-300" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 text-sm leading-tight truncate">{form.productName}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{form.productBrand}</p>
+                  <p className="text-xs font-semibold text-gray-600 mt-0.5">Regular price: ${form.regularPrice?.toFixed(2)}</p>
+                </div>
+                <button
+                  onClick={() => setShowPicker(true)}
+                  className="text-xs font-semibold text-teal-700 bg-white border border-teal-300 px-3 py-1.5 rounded-lg hover:bg-teal-100 transition-colors shrink-0"
+                >
+                  Change
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Spend at least ($) *</label>
+                  <input
+                    autoFocus
+                    type="text" inputMode="decimal"
+                    value={numVal("minSpend")}
+                    onChange={e => setNum("minSpend", e.target.value)}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">On the rest of the cart</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Special Price ($) *</label>
+                  <input
+                    type="text" inputMode="decimal"
+                    value={numVal("specialPrice")}
+                    onChange={e => setNum("specialPrice", e.target.value)}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                  {savingsPct > 0 && <p className="text-[11px] text-teal-600 font-semibold mt-1">-{savingsPct}% off regular price</p>}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Max Redemptions</label>
+                <input type="text" inputMode="decimal" placeholder="Unlimited" value={form.maxRedemptions == null ? "" : numVal("maxRedemptions")}
+                  onChange={e => setNum("maxRedemptions", e.target.value, true)}
+                  className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Total orders (across all customers) that may use this deal — not per order. {isEdit && form.usageCount != null ? `${form.usageCount} used so far.` : ""} Leave blank for unlimited.
+                </p>
+                <p className="text-[11px] text-gray-400">Within one order, exactly 1 bottle is ever discounted — no matter the cart quantity.</p>
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div onClick={() => set("active", !form.active)}>
+                  {form.active ? <ToggleRight size={28} className="text-green-500" /> : <ToggleLeft size={28} className="text-gray-300" />}
+                </div>
+                <span className="text-sm font-medium">{form.active ? "Active — live at checkout" : "Inactive — hidden"}</span>
+              </label>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 p-5 border-t shrink-0">
+          <button onClick={onClose} className="flex-1 border rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50">Cancel</button>
+          {!showPicker && (
+            <button onClick={handleSave} disabled={saving || !hasProduct || !form.minSpend || form.specialPrice == null}
+              className="flex-1 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm">
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {isEdit ? "Save Changes" : "Create Deal"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -984,6 +1213,491 @@ function BundleDealsTab() {
   );
 }
 
+// ─── Unlock Deals Tab ─────────────────────────────────────────────────────────
+
+function UnlockDealsTab() {
+  const [showModal, setShowModal] = useState(false);
+  const [editDeal, setEditDeal] = useState<UnlockDeal | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const qc = useQueryClient();
+
+  const { data: deals = [], isLoading } = useQuery<UnlockDeal[]>({
+    queryKey: ["admin-unlock-deals"],
+    queryFn: async () => { const r = await fetch(`${API}/admin/unlock-deals`); return r.json(); },
+    refetchInterval: 30_000,
+  });
+
+  const createM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/unlock-deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-unlock-deals"] }); setShowModal(false); },
+    onError: (e: any) => alert(e.message),
+  });
+  const updateM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/unlock-deals/${data.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-unlock-deals"] }); setEditDeal(null); setShowModal(false); },
+  });
+  const deleteM = useMutation({
+    mutationFn: async (id: string) => fetch(`${API}/admin/unlock-deals/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-unlock-deals"] }); setDeleteId(null); },
+  });
+  const toggleM = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const r = await fetch(`${API}/admin/unlock-deals/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) });
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-unlock-deals"] }),
+  });
+
+  async function handleSave(data: any) {
+    if (data.id) await updateM.mutateAsync(data);
+    else await createM.mutateAsync(data);
+  }
+
+  return (
+    <>
+      {showModal && <UnlockDealModal deal={editDeal} onClose={() => { setShowModal(false); setEditDeal(null); }} onSave={handleSave} />}
+      {deleteId && <DeleteConfirm onConfirm={() => deleteM.mutate(deleteId)} onCancel={() => setDeleteId(null)} busy={deleteM.isPending} />}
+
+      <div className="flex items-center justify-between mb-5">
+        <p className="text-sm text-gray-500">{deals.length} unlock deals · {deals.filter(d => d.active).length} active</p>
+        <button onClick={() => { setEditDeal(null); setShowModal(true); }}
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-colors">
+          <Plus size={16} /> New Deal
+        </button>
+      </div>
+
+      <div className="mb-5 bg-teal-50 border border-teal-200 rounded-xl p-4 flex gap-3">
+        <Unlock size={18} className="text-teal-500 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-teal-800">
+          <p className="font-semibold mb-0.5">How Unlock Deals work</p>
+          <p className="text-teal-700 text-xs">Pick any product, a spend threshold, and a special price. When a customer&apos;s cart (excluding that product) reaches the threshold, the product automatically unlocks at the special price — no promo code needed. Works for any product, any threshold, any price.</p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
+      ) : (
+        <div className="space-y-3">
+          {deals.length === 0 ? (
+            <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
+              <Unlock size={32} className="mx-auto mb-2 opacity-30" />
+              <p>No unlock deals yet. Create your first one!</p>
+            </div>
+          ) : deals.map(d => (
+            <div key={d.id} className={`bg-white rounded-xl border p-4 flex items-center gap-4 ${!d.active ? "opacity-60" : ""}`}>
+              <div className="w-14 h-14 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                {d.productImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={d.productImage} alt="" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <Package size={22} className="text-gray-300" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 truncate">{d.productName}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Spend <span className="font-semibold text-gray-700">${d.minSpend.toFixed(2)}+</span> → get it for <span className="font-semibold text-teal-600">${d.specialPrice.toFixed(2)}</span>
+                  {d.regularPrice > 0 && <span className="text-gray-400"> (reg. ${d.regularPrice.toFixed(2)})</span>}
+                  {" · "}{d.usageCount ?? 0}{d.maxRedemptions != null ? ` / ${d.maxRedemptions}` : ""} used
+                </p>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button onClick={() => toggleM.mutate({ id: d.id, active: !d.active })}
+                  className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${d.active ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                  {d.active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                  {d.active ? "Active" : "Off"}
+                </button>
+                <button onClick={() => { setEditDeal(d); setShowModal(true); }} className="text-gray-400 hover:text-teal-600 p-1.5 rounded-lg hover:bg-teal-50"><Edit2 size={15} /></button>
+                <button onClick={() => setDeleteId(d.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={15} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Promo Banner (category-strip banner, mobile All tab) ────────────────────
+
+interface PromoBanner {
+  id: string; name: string; active: boolean; priority: number;
+  positionCategory: string; image?: string;
+  destType: "product" | "url"; destValue: string;
+  startDate?: string; endDate?: string; createdAt: string;
+}
+
+interface CategoryOption { value: string; label: string; }
+
+const PB_EMPTY: Partial<PromoBanner> = { active: true, priority: 0, destType: "url", destValue: "" };
+
+function promoBannerStatus(b: PromoBanner): { label: string; cls: string } {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!b.active) return { label: "Off", cls: "bg-gray-50 text-gray-500 border-gray-200" };
+  if (!b.image) return { label: "No image", cls: "bg-gray-50 text-gray-500 border-gray-200" };
+  if (b.endDate && b.endDate < today) return { label: "Expired", cls: "bg-red-50 text-red-600 border-red-200" };
+  if (b.startDate && b.startDate > today) return { label: "Scheduled", cls: "bg-amber-50 text-amber-700 border-amber-200" };
+  return { label: "Live", cls: "bg-green-50 text-green-700 border-green-200" };
+}
+
+function PromoBannerModal({ banner, categories, onClose, onSave }: {
+  banner: Partial<PromoBanner> | null; categories: CategoryOption[];
+  onClose: () => void; onSave: (b: any) => void;
+}) {
+  const isEdit = !!banner?.id;
+  const [form, setForm] = useState<Partial<PromoBanner>>(banner ?? { ...PB_EMPTY });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [showPicker, setShowPicker] = useState(false);
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [search, setSearch] = useState("");
+
+  function set(k: keyof PromoBanner, v: any) { setForm(f => ({ ...f, [k]: v })); }
+  async function handleSave() { setSaving(true); await onSave(form); setSaving(false); }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true); setError("");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`${API}/admin/upload?folder=promo`, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || "Upload failed");
+      set("image", json.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  useEffect(() => {
+    if (!showPicker || products.length) return;
+    setLoadingProducts(true);
+    fetch(`${API}/admin/products`)
+      .then(r => r.json())
+      .then(json => setProducts(Array.isArray(json) ? json : (json.products ?? json.data ?? [])))
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, [showPicker, products.length]);
+
+  const filteredProducts = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    const list = q
+      ? products.filter(p => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q))
+      : products;
+    return list.slice(0, 30);
+  }, [products, search]);
+
+  function pickProduct(p: InventoryProduct) {
+    set("destType", "product");
+    set("destValue", `/products/${p.slug}`);
+    setShowPicker(false);
+    setSearch("");
+  }
+
+  const canSave = form.positionCategory && !uploading;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b shrink-0">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <ImageIcon size={18} className="text-orange-500" />
+            {isEdit ? "Edit Promo Banner" : "New Promo Banner"}
+          </h2>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Name</label>
+            <input value={form.name ?? ""} onChange={e => set("name", e.target.value)}
+              placeholder="e.g. Delivered To Your Doorstep"
+              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Image (mobile banner) *</label>
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleUpload} />
+            {form.image ? (
+              <div className="flex items-center gap-3 p-2.5 border rounded-xl bg-gray-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.image} alt="" className="w-24 h-10 object-cover rounded-lg border" />
+                <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                  className="text-xs font-semibold text-orange-600 bg-white border border-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-50">
+                  {uploading ? "Uploading…" : "Change"}
+                </button>
+                <button onClick={() => set("image", undefined)} className="text-xs text-gray-400 hover:text-red-500 underline">Remove</button>
+              </div>
+            ) : (
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="w-full flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-6 text-sm text-gray-500 hover:border-orange-300 hover:text-orange-600">
+                {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+                {uploading ? "Uploading…" : "Upload banner image"}
+              </button>
+            )}
+            <p className="text-[11px] text-gray-400 mt-1">Tự động crop về đúng tỉ lệ cố định (900×340) — không cần chỉnh tay.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Position — shows right after *</label>
+            <select value={form.positionCategory ?? ""} onChange={e => set("positionCategory", e.target.value)}
+              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+              <option value="" disabled>Select a category…</option>
+              {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Links to</label>
+            <div className="flex gap-2 mb-2">
+              <button onClick={() => { set("destType", "product"); setShowPicker(true); }}
+                className={`flex-1 text-xs font-semibold py-2 rounded-lg border ${form.destType === "product" ? "bg-orange-50 border-orange-300 text-orange-700" : "border-gray-200 text-gray-500"}`}>
+                Product
+              </button>
+              <button onClick={() => set("destType", "url")}
+                className={`flex-1 text-xs font-semibold py-2 rounded-lg border ${form.destType === "url" ? "bg-orange-50 border-orange-300 text-orange-700" : "border-gray-200 text-gray-500"}`}>
+                Custom URL / Path
+              </button>
+            </div>
+            {form.destType === "url" && (
+              <input value={form.destValue ?? ""} onChange={e => set("destValue", e.target.value)}
+                placeholder="/products?category=whiskey or https://…"
+                className="w-full border rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            )}
+            {form.destType === "product" && (
+              form.destValue
+                ? (
+                  <div className="flex items-center justify-between bg-gray-50 border rounded-xl px-3 py-2.5">
+                    <span className="text-xs font-mono text-gray-700 truncate">{form.destValue}</span>
+                    <button onClick={() => setShowPicker(true)} className="text-xs font-semibold text-orange-600 shrink-0 ml-2">Change</button>
+                  </div>
+                )
+                : <p className="text-xs text-gray-400">No product selected yet.</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Start Date</label>
+              <input type="date" value={form.startDate ?? ""} onChange={e => set("startDate", e.target.value)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">End Date</label>
+              <input type="date" value={form.endDate ?? ""} onChange={e => set("endDate", e.target.value)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 -mt-2">Để trống = không giới hạn. Tự ẩn khi hết ngày kết thúc.</p>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Priority</label>
+            <input type="number" value={form.priority ?? 0} onChange={e => set("priority", Number(e.target.value) || 0)}
+              className="w-28 border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            <p className="text-[11px] text-gray-400 mt-1">Nhiều banner cùng vị trí → số cao hơn hiện trước, tự luân phiên mỗi 5s.</p>
+          </div>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => set("active", !form.active)}>
+              {form.active ? <ToggleRight size={28} className="text-green-500" /> : <ToggleLeft size={28} className="text-gray-300" />}
+            </div>
+            <span className="text-sm font-medium">{form.active ? "Active" : "Inactive — hidden"}</span>
+          </label>
+
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 p-5 border-t shrink-0">
+          <button onClick={onClose} className="flex-1 border rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={!canSave || saving}
+            className="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {isEdit ? "Save Changes" : "Create Banner"}
+          </button>
+        </div>
+
+        {showPicker && (
+          <div className="absolute inset-0 bg-white rounded-2xl flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b shrink-0">
+              <h3 className="font-bold text-sm">Select a product</h3>
+              <button onClick={() => setShowPicker(false)}><X size={18} /></button>
+            </div>
+            <div className="p-4 pb-0">
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Search by name or brand…"
+                  className="w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4">
+              {loadingProducts ? (
+                <div className="py-12 flex items-center justify-center gap-2 text-gray-400"><Loader2 size={20} className="animate-spin" /> Loading…</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {filteredProducts.map(p => (
+                    <button key={p.id} onClick={() => pickProduct(p)}
+                      className="flex items-center gap-2.5 p-2.5 rounded-xl border hover:border-orange-400 hover:bg-orange-50 text-left">
+                      <div className="w-11 h-11 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                        {p.imageUrl
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={p.imageUrl} alt="" className="w-full h-full object-contain p-1" />
+                          : <Package size={18} className="text-gray-300" />}
+                      </div>
+                      <p className="text-xs font-semibold text-gray-800 line-clamp-2">{p.name}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PromoBannersTab() {
+  const qc = useQueryClient();
+  const [showModal, setShowModal] = useState(false);
+  const [editBanner, setEditBanner] = useState<PromoBanner | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const { data: banners = [], isLoading } = useQuery<PromoBanner[]>({
+    queryKey: ["admin-promo-banners"],
+    queryFn: async () => { const r = await fetch(`${API}/admin/promo-banners`); return r.json(); },
+    refetchInterval: 30_000,
+  });
+  const { data: categories = [] } = useQuery<CategoryOption[]>({
+    queryKey: ["admin-categories-for-promo"],
+    queryFn: async () => {
+      const r = await fetch(`${API}/admin/categories`);
+      const json = await r.json();
+      return (Array.isArray(json) ? json : []).map((c: any) => ({ value: c.value, label: c.label }));
+    },
+  });
+
+  const createM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/promo-banners`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-promo-banners"] }); setShowModal(false); },
+    onError: (e: any) => alert(e.message),
+  });
+  const updateM = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch(`${API}/admin/promo-banners/${data.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-promo-banners"] }); setEditBanner(null); setShowModal(false); },
+  });
+  const deleteM = useMutation({
+    mutationFn: async (id: string) => fetch(`${API}/admin/promo-banners/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-promo-banners"] }); setDeleteId(null); },
+  });
+  const toggleM = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const r = await fetch(`${API}/admin/promo-banners/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) });
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-promo-banners"] }),
+  });
+
+  async function handleSave(data: any) {
+    if (data.id) await updateM.mutateAsync(data);
+    else await createM.mutateAsync(data);
+  }
+
+  const catLabel = (value: string) => categories.find(c => c.value === value)?.label ?? value;
+
+  return (
+    <>
+      {showModal && <PromoBannerModal banner={editBanner} categories={categories} onClose={() => { setShowModal(false); setEditBanner(null); }} onSave={handleSave} />}
+      {deleteId && <DeleteConfirm onConfirm={() => deleteM.mutate(deleteId)} onCancel={() => setDeleteId(null)} busy={deleteM.isPending} />}
+
+      <div className="flex items-center justify-between mb-5">
+        <p className="text-sm text-gray-500">{banners.length} banners · {banners.filter(b => b.active).length} active</p>
+        <button onClick={() => { setEditBanner(null); setShowModal(true); }}
+          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-colors">
+          <Plus size={16} /> New Banner
+        </button>
+      </div>
+
+      <div className="mb-5 bg-orange-50 border border-orange-200 rounded-xl p-4 flex gap-3">
+        <ImageIcon size={18} className="text-orange-500 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-orange-800">
+          <p className="font-semibold mb-0.5">Cách hoạt động</p>
+          <p className="text-orange-700 text-xs">Banner tự chèn ngay sau khu danh mục đã chọn trên trang /products (tab All, mobile). Chỉ hiện khi: Active + có ảnh + trong khoảng ngày chạy — hết hạn tự ẩn, không cần tắt tay. Nhiều banner cùng vị trí sẽ tự luân phiên mỗi 5 giây.</p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="p-12 text-center text-gray-400"><Loader2 size={28} className="animate-spin mx-auto mb-2" />Loading...</div>
+      ) : (
+        <div className="space-y-3">
+          {banners.length === 0 ? (
+            <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
+              <ImageIcon size={32} className="mx-auto mb-2 opacity-30" />
+              <p>No promo banners yet.</p>
+            </div>
+          ) : banners.map(b => {
+            const status = promoBannerStatus(b);
+            return (
+              <div key={b.id} className={`bg-white rounded-xl border p-4 flex items-center gap-4 ${!b.active ? "opacity-60" : ""}`}>
+                <div className="w-20 h-10 rounded-lg border bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                  {b.image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={b.image} alt="" className="w-full h-full object-cover" />
+                    : <ImageIcon size={18} className="text-gray-300" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 truncate">{b.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Sau: <span className="font-semibold text-gray-700">{catLabel(b.positionCategory)}</span> · Ưu tiên {b.priority}
+                    {(b.startDate || b.endDate) && <> · {b.startDate ?? "…"} → {b.endDate ?? "…"}</>}
+                  </p>
+                </div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${status.cls}`}>{status.label}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => toggleM.mutate({ id: b.id, active: !b.active })}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${b.active ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                    {b.active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                    {b.active ? "Active" : "Off"}
+                  </button>
+                  <button onClick={() => { setEditBanner(b); setShowModal(true); }} className="text-gray-400 hover:text-orange-600 p-1.5 rounded-lg hover:bg-orange-50"><Edit2 size={15} /></button>
+                  <button onClick={() => setDeleteId(b.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"><Trash2 size={15} /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Banner Types & Helpers ───────────────────────────────────────────────────
 
 interface HeroBanner {
@@ -1035,7 +1749,7 @@ function BannerModal({ banner, onClose, onSave }: { banner: Partial<HeroBanner> 
   const needsValue = form.linkType === "category" || form.linkType === "product";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b">
           <h2 className="font-bold text-lg flex items-center gap-2">
@@ -1357,7 +2071,9 @@ const TABS = [
   { key: "coupons", label: "Coupons", icon: Tag, color: "text-brand-600" },
   { key: "flash", label: "Flash Deals", icon: Zap, color: "text-yellow-600" },
   { key: "bundle", label: "Bundle Deals", icon: Package, color: "text-purple-600" },
+  { key: "unlock", label: "Unlock Deals", icon: Unlock, color: "text-teal-600" },
   { key: "banners", label: "Banners", icon: ImageIcon, color: "text-indigo-600" },
+  { key: "promo", label: "Promo Banners", icon: Megaphone, color: "text-orange-600" },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -1388,7 +2104,9 @@ export default function MarketingPage() {
       {tab === "coupons" && <CouponsTab />}
       {tab === "flash" && <FlashDealsTab />}
       {tab === "bundle" && <BundleDealsTab />}
+      {tab === "unlock" && <UnlockDealsTab />}
       {tab === "banners" && <BannersTab />}
+      {tab === "promo" && <PromoBannersTab />}
     </div>
   );
 }

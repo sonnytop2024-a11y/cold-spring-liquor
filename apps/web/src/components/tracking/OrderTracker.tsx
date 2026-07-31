@@ -8,6 +8,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { ReorderModal, type ReorderDraft } from "@/components/account/AccountDashboard";
 import { ItemThumb } from "@/components/shared/orderDisplay";
+import { DeliveryPhotoCard } from "@/components/tracking/DeliveryPhotoCard";
+import { OrderChat } from "@/components/tracking/OrderChat";
 
 const STEPS = [
   {
@@ -385,6 +387,13 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
         )}
       </div>
 
+      {/* In-app chat with the assigned driver (delivery orders only) */}
+      {!isPickupOrder && order.driverId && !isFailed && (
+        <div className="px-6 pt-4">
+          <OrderChat order={order} />
+        </div>
+      )}
+
       {/* Failed state */}
       {isFailed && (
         <div className="px-6 py-5 space-y-3">
@@ -466,6 +475,13 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Delivery placement photo — where the driver left the order */}
+      {order.status === "delivered" && order.deliveryProof && (
+        <div className="px-6 pt-5">
+          <DeliveryPhotoCard photoUrl={order.deliveryProof} deliveredAt={order.statusTimestamps?.delivered} />
         </div>
       )}
 

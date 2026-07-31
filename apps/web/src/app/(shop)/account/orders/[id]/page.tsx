@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { ReorderModal, type ReorderDraft } from "@/components/account/AccountDashboard";
 import { STORE_HOURS } from "@/lib/pickupWindows";
+import { DeliveryPhotoCard } from "@/components/tracking/DeliveryPhotoCard";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Order Received",
@@ -342,6 +343,13 @@ export default function OrderDetailPage() {
           {order.ageVerified && (
             <p className="text-xs text-green-600 mt-0.5">✓ Age verified · Signature collected</p>
           )}
+        </div>
+      )}
+
+      {/* Delivery placement photo — where the driver left the order */}
+      {order.status === "delivered" && order.deliveryProof && (
+        <div className="mb-4">
+          <DeliveryPhotoCard photoUrl={order.deliveryProof} deliveredAt={order.statusTimestamps?.delivered} />
         </div>
       )}
 

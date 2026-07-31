@@ -10,7 +10,7 @@ const cats = await dbGetAllCategories();
 
 export async function POST(req: NextRequest) {
 const body = await req.json();
-  const { value, label, emoji, active, sortOrder } = body;
+  const { value, label, emoji, active, sortOrder, iconUrl } = body;
   if (!value || !label) {
     return NextResponse.json({ error: "value and label required" }, { status: 400 });
   }
@@ -25,6 +25,7 @@ const body = await req.json();
     emoji: emoji?.trim() || "📦",
     active: active !== false,
     sortOrder: sortOrder ?? existing.length,
+    ...(iconUrl ? { iconUrl } : {}),
   });
   return NextResponse.json(cat, { status: 201 });
 }

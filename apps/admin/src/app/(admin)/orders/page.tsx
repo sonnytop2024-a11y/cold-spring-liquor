@@ -72,6 +72,8 @@ const NEXT_STATUS: Record<string, string> = {
 
 const ALL_STATUSES = ["pending","confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived","delivered","failed_delivery","cancelled","refunded"];
 
+const DONE_STATUSES = ["delivered","failed_delivery","cancelled","refunded","picked_up"];
+
 // Pick Up orders have their own flow: New → Preparing → Ready for Pick Up → Picked Up
 const PICKUP_NEXT_STATUS: Record<string, string> = {
   pending:          "preparing",
@@ -294,6 +296,26 @@ function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {order.chat?.messages?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">💬 Customer ↔ Driver Chat ({order.chat.messages.length})</p>
+              <div className="border rounded-xl p-3 space-y-2 max-h-64 overflow-y-auto bg-gray-50">
+                {order.chat.messages.map((m: any) => (
+                  <div key={m.id} className={`flex ${m.from === "driver" ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[85%] rounded-xl px-3 py-1.5 text-xs ${
+                      m.from === "driver" ? "bg-purple-100 text-purple-900" : "bg-white border text-gray-800"
+                    }`}>
+                      <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {m.from === "driver" ? "🚗 Driver" : "👤 Customer"} · {new Date(m.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -634,7 +656,18 @@ export default function OrdersPage() {
   const revenue = filtered
     .filter((o: any) => !["cancelled", "failed_delivery", "refunded"].includes(o.status))
     .reduce((a: number, o: any) => a + Number(o.total ?? 0), 0);
-  const visible = filtered.slice(0, visibleCount);
+
+  // Orders still open (e.g. "Ready for Pickup" waiting on the customer) —
+  // pinned at the top regardless of the date filter, so one doesn't quietly
+  // fall out of view the moment the calendar rolls to a new day (anh Sơn,
+  // 31/07). Oldest-first: the longest-waiting order is the most urgent.
+  const pinnedOrders = liveOrders
+    .filter((o: any) => !DONE_STATUSES.includes(o.status) && matchTypeFilter(o) && matchSearch(o))
+    .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const pinnedIds = new Set(pinnedOrders.map((o: any) => o.id));
+
+  const paged = filtered.filter((o: any) => !pinnedIds.has(o.id));
+  const visible = paged.slice(0, visibleCount);
 
   // Reset pagination when filters change
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -660,11 +693,12 @@ export default function OrdersPage() {
   }
 
 
-  function renderOrder(order: any) {
+  function renderOrder(order: any, opts?: { pinned?: boolean }) {
     const isExpanded = expandedId === order.id;
     const isPickupOrder = order.orderType === "pickup";
     const nextStatus = isPickupOrder ? PICKUP_NEXT_STATUS[order.status] : NEXT_STATUS[order.status];
-    const isDone = ["delivered","failed_delivery","cancelled","refunded","picked_up"].includes(order.status);
+    const isDone = DONE_STATUSES.includes(order.status);
+    const pinned = !!opts?.pinned;
 
     const STATUS_LABELS: Record<string, string> = {
       pending: "New", confirmed: "Confirmed", preparing: "Preparing",
@@ -676,7 +710,7 @@ export default function OrdersPage() {
     };
 
     return (
-      <div key={order.id} className={`bg-white rounded-xl border transition-all ${isDone ? "opacity-60" : ""}`}>
+      <div key={order.id} className={`bg-white rounded-xl border transition-all ${isDone ? "opacity-60" : ""} ${pinned ? "border-red-300 ring-1 ring-red-100" : ""}`}>
         <div className="p-3 sm:p-4 flex items-start justify-between gap-3 cursor-pointer hover:bg-gray-50 rounded-xl"
           onClick={() => setExpandedId(isExpanded ? null : order.id)}>
           <div className="flex-1 min-w-0">
@@ -737,7 +771,13 @@ export default function OrdersPage() {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-500">
               <span className="flex items-center gap-1"><User size={11} /> {order.customerName}</span>
               {order.customerPhone && <span className="flex items-center gap-1">📞 {order.customerPhone}</span>}
-              <span className="flex items-center gap-1"><Clock size={11} /> {new Date(order.createdAt).toLocaleString()}</span>
+              {pinned ? (
+                <span className="flex items-center gap-1.5 font-black text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                  <Clock size={12} /> {dayLabel(order.createdAt)} · {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1"><Clock size={11} /> {new Date(order.createdAt).toLocaleString()}</span>
+              )}
               {isPickupOrder && order.pickupWindow ? (
                 <span className="flex items-center gap-1 font-semibold text-orange-600">
                   🕐 {order.pickupWindow.dateLabel} · {order.pickupWindow.label}
@@ -1192,7 +1232,22 @@ export default function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-1">
-          {filtered.length === 0 ? (
+          {/* Needs Attention — not-yet-completed orders, pinned regardless of the
+              date filter above so one never silently drifts out of view. */}
+          {pinnedOrders.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 px-1 mb-1.5">
+                <span className="text-[11px] font-black tracking-widest text-red-500 uppercase whitespace-nowrap">⏳ Needs Attention — Not Completed</span>
+                <span className="text-[10px] font-bold text-red-300">({pinnedOrders.length})</span>
+                <div className="flex-1 h-px bg-red-200" />
+              </div>
+              <div className="space-y-2">
+                {pinnedOrders.map((order: any) => renderOrder(order, { pinned: true }))}
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 && pinnedOrders.length === 0 ? (
             <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
               <Package size={32} className="mx-auto mb-2 opacity-30" />
               <p className="text-sm">No orders match these filters</p>
@@ -1211,10 +1266,10 @@ export default function OrdersPage() {
                   </div>
                 </div>
               ))}
-              {filtered.length > visibleCount && (
+              {paged.length > visibleCount && (
                 <button onClick={() => setVisibleCount(c => c + 30)}
                   className="w-full border-2 border-dashed border-gray-200 text-gray-500 hover:border-brand-300 hover:text-brand-600 font-bold text-xs py-3 rounded-xl transition-colors">
-                  ▾ Load more ({filtered.length - visibleCount} older orders)
+                  ▾ Load more ({paged.length - visibleCount} older orders)
                 </button>
               )}
             </>

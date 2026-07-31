@@ -495,6 +495,174 @@ export function computeBonusTier(amount: number, tiers: BonusTier[]): BonusTier 
   return matches.reduce((best, t) => (t.minAmount > best.minAmount ? t : best));
 }
 
+// ── Unlock Deals (stored in csl_settings under unlockDeals key) ──────────────
+// Admin-configurable "spend $X, unlock product Y at $Z" promo — any single
+// product, any spend threshold, any special price, multiple rules at once.
+// Mirrors bundleTiers/bonusTiers exactly. The special price is ALWAYS
+// re-verified server-side at checkout (see processOrder.ts) — never trusted
+// from the client, since this promo type is a deliberate deep-discount target.
+
+export interface UnlockDeal {
+  id: string;
+  productId: string;
+  productName: string;
+  productBrand?: string;
+  productImage?: string | null;
+  productSlug?: string;
+  regularPrice: number; // display-only snapshot; real price is re-verified from the catalog at checkout
+  minSpend: number; // rest-of-cart subtotal required to unlock, e.g. 50
+  specialPrice: number; // unlocked price, e.g. 1
+  // Total number of ORDERS (across all customers) that may redeem this deal —
+  // null/0 = unlimited. NOT a per-order quantity: exactly 1 unit of the
+  // product is ever discounted within a single order, no matter how many are
+  // in the cart (anh Sơn, 30/07 — a customer buying 2 at $1 each was the bug
+  // this replaced; "Max Qty" was misread as a per-order limit).
+  maxRedemptions: number | null;
+  usageCount: number; // orders that have redeemed this deal so far
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+async function dbLoadUnlockDeals(): Promise<UnlockDeal[]> {
+  const settings = await dbGetSettings();
+  const deals = ((settings as any).unlockDeals as UnlockDeal[] | undefined) ?? [];
+  // Back-compat for deals created before the maxQty -> maxRedemptions rename
+  return deals.map((d) => ({
+    ...d,
+    maxRedemptions: (d as any).maxRedemptions ?? null,
+    usageCount: d.usageCount ?? 0,
+  }));
+}
+
+async function dbSaveUnlockDeals(deals: UnlockDeal[]): Promise<void> {
+  await dbSaveSettings({ unlockDeals: deals } as any);
+}
+
+export async function dbGetAllUnlockDeals(): Promise<UnlockDeal[]> {
+  const deals = await dbLoadUnlockDeals();
+  return [...deals].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
+// Active AND not yet exhausted — a maxed-out deal simply stops appearing
+// anywhere on the site (badge, cart, checkout), same as if it were inactive.
+export async function dbGetActiveUnlockDeals(): Promise<UnlockDeal[]> {
+  return (await dbGetAllUnlockDeals()).filter(
+    (d) => d.active && (d.maxRedemptions == null || d.maxRedemptions <= 0 || d.usageCount < d.maxRedemptions),
+  );
+}
+
+export async function dbCreateUnlockDeal(fields: Omit<UnlockDeal, "id" | "createdAt" | "usageCount">): Promise<UnlockDeal> {
+  const deals = await dbLoadUnlockDeals();
+  const deal: UnlockDeal = { id: `unlock${Date.now()}`, createdAt: new Date().toISOString(), usageCount: 0, ...fields };
+  deals.push(deal);
+  await dbSaveUnlockDeals(deals);
+  return deal;
+}
+
+export async function dbUpdateUnlockDeal(id: string, fields: Partial<UnlockDeal>): Promise<UnlockDeal | undefined> {
+  const deals = await dbLoadUnlockDeals();
+  const idx = deals.findIndex((d) => d.id === id);
+  if (idx === -1) return undefined;
+  deals[idx] = { ...deals[idx], ...fields };
+  await dbSaveUnlockDeals(deals);
+  return deals[idx];
+}
+
+export async function dbDeleteUnlockDeal(id: string): Promise<boolean> {
+  const deals = await dbLoadUnlockDeals();
+  const idx = deals.findIndex((d) => d.id === id);
+  if (idx === -1) return false;
+  deals.splice(idx, 1);
+  await dbSaveUnlockDeals(deals);
+  return true;
+}
+
+// Called once a real order (not a validate-only precheck) actually redeems
+// a deal — advances usageCount toward maxRedemptions.
+export async function dbIncrementUnlockDealUsage(id: string): Promise<void> {
+  const deals = await dbLoadUnlockDeals();
+  const idx = deals.findIndex((d) => d.id === id);
+  if (idx === -1) return;
+  deals[idx] = { ...deals[idx], usageCount: (deals[idx].usageCount ?? 0) + 1 };
+  await dbSaveUnlockDeals(deals);
+}
+
+// ── Promo Banners (stored in csl_settings under promoBanners key) ────────────
+// Admin-configurable banners chained in between category strips on the
+// mobile /products "All" tab. Mobile-only (single image, no per-device
+// targeting) and no view/click tracking — anh Sơn, 30/07: kept deliberately
+// minimal. Eligibility (active + within date range + has an image) is
+// evaluated at read time so an expired banner disappears on its own without
+// anyone having to remember to turn it off.
+
+export interface PromoBanner {
+  id: string;
+  name: string;
+  active: boolean;
+  priority: number; // higher = shown first when multiple banners share a position
+  positionCategory: string; // matches Category.value — banner renders right after that category's strip
+  image?: string;
+  destType: "product" | "url";
+  destValue: string; // product slug path ("/products/slug") or a raw URL/path
+  startDate?: string; // ISO date (yyyy-mm-dd) — omitted = no start restriction
+  endDate?: string;
+  createdAt: string;
+}
+
+async function dbLoadPromoBanners(): Promise<PromoBanner[]> {
+  const settings = await dbGetSettings();
+  return ((settings as any).promoBanners as PromoBanner[] | undefined) ?? [];
+}
+
+async function dbSavePromoBanners(banners: PromoBanner[]): Promise<void> {
+  await dbSaveSettings({ promoBanners: banners } as any);
+}
+
+export async function dbGetAllPromoBanners(): Promise<PromoBanner[]> {
+  const banners = await dbLoadPromoBanners();
+  return [...banners].sort((a, b) => b.priority - a.priority);
+}
+
+// Active, has an image, and today falls inside [startDate, endDate] (either
+// bound may be open-ended) — the exact set of rules that decide whether a
+// banner is actually rendered anywhere on the site.
+export async function dbGetActivePromoBanners(): Promise<PromoBanner[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  return (await dbGetAllPromoBanners()).filter((b) => {
+    if (!b.active || !b.image) return false;
+    if (b.startDate && b.startDate > today) return false;
+    if (b.endDate && b.endDate < today) return false;
+    return true;
+  });
+}
+
+export async function dbCreatePromoBanner(fields: Omit<PromoBanner, "id" | "createdAt">): Promise<PromoBanner> {
+  const banners = await dbLoadPromoBanners();
+  const banner: PromoBanner = { id: `promo${Date.now()}`, createdAt: new Date().toISOString(), ...fields };
+  banners.push(banner);
+  await dbSavePromoBanners(banners);
+  return banner;
+}
+
+export async function dbUpdatePromoBanner(id: string, fields: Partial<PromoBanner>): Promise<PromoBanner | undefined> {
+  const banners = await dbLoadPromoBanners();
+  const idx = banners.findIndex((b) => b.id === id);
+  if (idx === -1) return undefined;
+  banners[idx] = { ...banners[idx], ...fields };
+  await dbSavePromoBanners(banners);
+  return banners[idx];
+}
+
+export async function dbDeletePromoBanner(id: string): Promise<boolean> {
+  const banners = await dbLoadPromoBanners();
+  const idx = banners.findIndex((b) => b.id === id);
+  if (idx === -1) return false;
+  banners.splice(idx, 1);
+  await dbSavePromoBanners(banners);
+  return true;
+}
+
 // ── Flash Deals (stored in csl_settings row id=1 under flashDeals key) ───────
 
 import type { MockFlashDeal } from "../app/api/_mock/store";
@@ -661,10 +829,11 @@ export interface Category {
   id: string;       // e.g. "cat_whiskey"
   value: string;    // e.g. "whiskey" — matches product.category string
   label: string;    // e.g. "Whiskey"
-  emoji: string;    // e.g. "🥃"
+  emoji: string;    // e.g. "🥃" — fallback when no custom iconUrl is set
   sortOrder: number;
   active: boolean;
   imageUrl?: string; // admin-uploaded card photo (overrides the default artwork)
+  iconUrl?: string;  // admin-uploaded custom icon (overrides emoji in pills/carousels)
 }
 
 const DEFAULT_CATEGORIES: Category[] = [

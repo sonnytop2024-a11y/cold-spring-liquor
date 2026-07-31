@@ -25,6 +25,7 @@ export async function GET() {
       value: cat.value,
       label: cat.label,
       emoji: cat.emoji,
+      iconUrl: cat.iconUrl,
       products: withImage.filter(p => p.category === cat.value),
     }))
     .filter(s => s.products.length > 0);

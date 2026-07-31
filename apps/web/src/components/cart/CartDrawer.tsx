@@ -36,8 +36,10 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
   }, [open]);
 
   const [bundleTiers, setBundleTiers] = useState<{ id: string; minQty: number; discountPct: number; active?: boolean }[]>([]);
+  const [unlockDeals, setUnlockDeals] = useState<{ id: string; productId: string; minSpend: number; specialPrice: number; active?: boolean; sortOrder?: number }[]>([]);
   useEffect(() => {
     fetch("/api/deals/bundle-tiers").then(r => r.json()).then(setBundleTiers).catch(() => {});
+    fetch("/api/deals/unlock-deals").then(r => r.json()).then(setUnlockDeals).catch(() => {});
   }, []);
 
   // Clear stale rewards if user no longer has enough points
@@ -53,13 +55,14 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
     return () => document.body.classList.remove("cart-open");
   }, [open]);
 
-  const { subtotal, flashSavings, bundleDiscount, bundleQty } = useMemo(() => calcDiscounts(
-    items.map(i => ({ price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
+  const { subtotal, flashSavings, bundleDiscount, bundleQty, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
+    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
     bundleTiers,
-  ), [items, bundleTiers]);
+    unlockDeals,
+  ), [items, bundleTiers, unlockDeals]);
   const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
-  const { tax, total } = calcCartTotals(subtotal, couponDiscount + bundleDiscount, rewardsDiscount, giftCardAmount);
+  const { tax, total } = calcCartTotals(subtotal, couponDiscount + bundleDiscount + unlockDiscount, rewardsDiscount, giftCardAmount);
   const pointsEarned = calcPointsEarned(subtotal);
 
   const { data: storeCfg } = useQuery({
@@ -153,8 +156,18 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
                   ⚡ Flash Sale savings: -{formatCurrency(flashSavings)}
                 </div>
               )}
+              {unlockDiscount > 0 && (
+                <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 text-xs text-teal-700 font-medium">
+                  🔓 Unlocked Deal savings: -{formatCurrency(unlockDiscount)}
+                </div>
+              )}
 
-              {items.map(({ product, quantity }) => (
+              {items.map(({ product, quantity }) => {
+                const unlocked = unlockApplied[product.id];
+                const otherDealActive = !unlocked && unlockDeals.some(d => d.productId === product.id && d.active !== false);
+                const effectivePrice = product.salePrice ?? product.price;
+                const lineTotal = effectivePrice * quantity - (unlocked ? (effectivePrice - unlocked.specialPrice) * unlocked.qty : 0);
+                return (
                 <div key={product.id} className="flex gap-3">
                   <Link href={`/products/${product.slug}`} onClick={closeForNav} className="relative w-16 h-16 bg-gray-50 rounded-lg overflow-hidden shrink-0">
                     <Image src={product.imageUrl || categoryPlaceholder(product.category)} alt={product.name} fill sizes="64px" className="object-contain p-1" />
@@ -169,7 +182,13 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
                     {product.couponExcluded && couponCode && (
                       <p className="text-[10px] text-gray-400 italic">Coupon not applicable</p>
                     )}
-                    <p className="text-sm font-bold text-brand-600 mt-0.5">{formatCurrency((product.salePrice ?? product.price) * quantity)}</p>
+                    {otherDealActive && (
+                      <p className="text-[10px] text-teal-600 italic">Only 1 Unlocked Deal per order</p>
+                    )}
+                    <div className="flex items-baseline gap-1.5 mt-0.5">
+                      <p className="text-sm font-bold text-brand-600">{formatCurrency(lineTotal)}</p>
+                      {unlocked && <p className="text-xs text-gray-400 line-through">{formatCurrency(effectivePrice * quantity)}</p>}
+                    </div>
                     <div className="flex items-center gap-2 mt-1.5">
                       <button onClick={() => updateQuantity(product.id, quantity - 1)} className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100">
                         <Minus size={12} />
@@ -186,7 +205,8 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
                   </div>
                   <button onClick={() => removeItem(product.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                 </div>
-              ))}
+                );
+              })}
 
               {/* Add-on suggestions when below minimum — scrolls with the item list so
                   cart items always get full, un-cramped space; this is supplementary,
@@ -242,6 +262,12 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
                 <div className="flex justify-between text-blue-600 font-medium">
                   <span>Bundle discount</span>
                   <span>-{formatCurrency(bundleDiscount)}</span>
+                </div>
+              )}
+              {unlockDiscount > 0 && (
+                <div className="flex justify-between text-teal-600 font-medium">
+                  <span>🔓 Unlocked Deal</span>
+                  <span>-{formatCurrency(unlockDiscount)}</span>
                 </div>
               )}
               {couponDiscount > 0 && (

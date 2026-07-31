@@ -7,6 +7,7 @@ import {
   Check, Navigation, Phone, Package, MapPin, Clock, ChevronRight,
   LogIn, Loader2, Wifi, WifiOff, History, Bell,
   Star, CheckCircle, X, Camera, ShieldCheck, Pen, RotateCcw, AlertTriangle,
+  MessageCircle, Send,
 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -880,12 +881,139 @@ function DeliveryVerificationModal({
 }
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
+// ─── In-app chat with the customer (per order, no phone numbers) ─────────────
+// Messages live on the order blob (order.chat) — the dashboard already polls
+// orders every 5s while online, so incoming customer messages ride that.
+function DriverChatModal({ order, onClose, onRefresh }: { order: any; onClose: () => void; onRefresh: () => void }) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  // Local copy so our own sends appear instantly; re-synced whenever the
+  // parent's 5s polling brings a fresher thread.
+  const [chat, setChat] = useState<any>(order.chat ?? { messages: [] });
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const incoming = order.chat?.messages?.length ?? 0;
+    const local = chat.messages?.length ?? 0;
+    if (incoming > local) setChat(order.chat);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.chat]);
+
+  // Mark read on open and whenever new customer messages arrive
+  useEffect(() => {
+    fetch(`/api/orders/${order.id}/chat`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "driver" }),
+    }).catch(() => {});
+  }, [order.id, chat.messages?.length]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    });
+  }, [chat.messages?.length]);
+
+  async function handleSend() {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/orders/${order.id}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: "driver", text: t }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Could not send");
+      setChat(json.chat);
+      setText("");
+      onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not send");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const messages: any[] = chat.messages ?? [];
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-gray-100 flex flex-col">
+      <div className="bg-brand-500 text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0">
+        <div>
+          <p className="font-black text-base leading-tight flex items-center gap-2">
+            <MessageCircle size={16} /> Chat with Customer
+          </p>
+          <p className="text-white/80 text-xs">Order #{order.orderNumber} · {order.customerName}</p>
+        </div>
+        <button onClick={onClose} className="text-white/80 hover:text-white p-1">
+          <X size={22} />
+        </button>
+      </div>
+
+      <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-2">
+        {messages.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-8">
+            No messages yet — ask about gate codes, apartment number, or where to meet.
+          </p>
+        ) : (
+          messages.map((m: any) => (
+            <div key={m.id} className={`flex ${m.from === "driver" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 ${
+                m.from === "driver"
+                  ? "bg-brand-500 text-white rounded-br-md"
+                  : "bg-white border text-gray-800 rounded-bl-md"
+              }`}>
+                <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>
+                <p className={`text-[10px] mt-0.5 ${m.from === "driver" ? "text-white/70" : "text-gray-400"}`}>
+                  {m.from === "customer" ? "Customer · " : ""}
+                  {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {error && <p className="px-4 pb-1 text-xs text-red-500">{error}</p>}
+      <div className="flex items-end gap-2 p-3 bg-white border-t shrink-0 pb-[max(12px,env(safe-area-inset-bottom))]">
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          rows={1}
+          maxLength={500}
+          placeholder="Message the customer…"
+          className="flex-1 resize-none border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 max-h-24"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!text.trim() || sending}
+          className="shrink-0 w-11 h-11 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white flex items-center justify-center"
+          aria-label="Send message"
+        >
+          {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driverId: string; driverLoc: { lat: number; lng: number } | null; onRefresh: () => void }) {
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [showVerification, setShowVerification] = useState(
     order.status === "driver_arrived"
   );
+
+  // Unread customer chat messages (for the badge on the Chat button)
+  const chatUnread = (order.chat?.messages ?? []).filter(
+    (m: any) => m.from === "customer" && (!order.chat?.driverReadAt || m.at > order.chat.driverReadAt)
+  ).length;
 
   // Auto-open verification modal whenever order is at driver_arrived
   useEffect(() => {
@@ -1135,16 +1263,21 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
             </button>
           )}
           {order.customerPhone && ["driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(order.status) && (
-            <>
-              <a href={`tel:${order.customerPhone}`}
-                className="flex items-center gap-1.5 border text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
-                <Phone size={13} /> Call
-              </a>
-              <a href={`sms:${order.customerPhone}`}
-                className="flex items-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
-                💬 Text
-              </a>
-            </>
+            <a href={`tel:${order.customerPhone}`}
+              className="flex items-center gap-1.5 border text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
+              <Phone size={13} /> Call
+            </a>
+          )}
+          {["confirmed","preparing","driver_assigned","driver_at_store","out_for_delivery","driver_arriving","driver_arrived"].includes(order.status) && (
+            <button onClick={() => setShowChat(true)}
+              className="relative flex items-center gap-1.5 border border-brand-200 text-brand-600 hover:bg-brand-50 font-semibold py-2.5 px-3 rounded-lg text-xs">
+              <MessageCircle size={13} /> Chat
+              {chatUnread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
+                  {chatUnread}
+                </span>
+              )}
+            </button>
           )}
 
           {/* Normal action button (not for driver_arrived) */}
@@ -1186,6 +1319,10 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
           onFailed={handleVerificationFailed}
           onClose={() => setShowVerification(false)}
         />
+      )}
+
+      {showChat && (
+        <DriverChatModal order={order} onClose={() => setShowChat(false)} onRefresh={onRefresh} />
       )}
     </>
   );

@@ -55,6 +55,7 @@ export interface AllTabCategory {
   value: string;
   label: string;
   emoji: string;
+  iconUrl?: string;
   products: Product[];
 }
 

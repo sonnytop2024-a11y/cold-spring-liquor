@@ -13,6 +13,7 @@ interface Category {
   sortOrder: number;
   active: boolean;
   imageUrl?: string;
+  iconUrl?: string;
 }
 
 const EMOJI_SUGGESTIONS = ["🥃","🍸","🌵","🍹","🌿","🍷","🍾","🍺","🥂","🧃","🥤","🌸","💎","📦","⭐","🔥","✨","🎯","🏆","🍊"];
@@ -24,22 +25,89 @@ const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fmgbfzhosuqefsthyu
 // same path CategoryShowcase reads, so the admin thumbnail mirrors the live tile.
 const defaultCatImg = (value: string) => `${SUPA}/storage/v1/object/public/csl-images/categories/${value}.webp`;
 
-function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
+function EmojiPicker({ value, onChange, iconUrl, onIconChange }: {
+  value: string; onChange: (e: string) => void;
+  /** Custom uploaded icon — overrides the emoji everywhere it's rendered on the site */
+  iconUrl?: string; onIconChange?: (url: string) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Flip upward when there isn't enough room below — on a long category list
+  // the dropdown otherwise opens under the fixed mobile bottom nav and the
+  // "Upload your own icon" row ends up hidden off-screen behind it.
+  function toggleOpen() {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const DROPDOWN_HEIGHT = 230;
+      setOpenUp(window.innerHeight - rect.bottom < DROPDOWN_HEIGHT);
+    }
+    setOpen(v => !v);
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`${API}/admin/upload?folder=icons`, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || "Upload failed");
+      onIconChange?.(json.url);
+      setOpen(false);
+    } catch {
+      // picker has no error slot of its own — the row/form's save button will
+      // surface a stale value if this silently fails, good enough for now
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   return (
     <div className="relative">
-      <button type="button" onClick={() => setOpen(v => !v)}
-        className="w-10 h-10 flex items-center justify-center text-xl border border-gray-300 rounded-lg hover:bg-gray-50">
-        {value || "📦"}
+      {onIconChange && (
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleUpload} />
+      )}
+      <button ref={triggerRef} type="button" onClick={toggleOpen}
+        className="w-10 h-10 flex items-center justify-center text-xl border border-gray-300 rounded-lg hover:bg-gray-50 overflow-hidden shrink-0">
+        {iconUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={iconUrl} alt="" className="w-full h-full object-contain p-1" />
+        ) : (
+          value || "📦"
+        )}
       </button>
       {open && (
-        <div className="absolute top-11 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-2 grid grid-cols-5 gap-1 w-44">
-          {EMOJI_SUGGESTIONS.map(e => (
-            <button key={e} type="button" onClick={() => { onChange(e); setOpen(false); }}
-              className={`text-xl p-1.5 rounded-lg hover:bg-orange-50 ${value === e ? "bg-orange-100" : ""}`}>
-              {e}
-            </button>
-          ))}
+        <div className={`absolute ${openUp ? "bottom-11" : "top-11"} left-0 z-[60] bg-white border border-gray-200 rounded-xl shadow-lg p-2 w-48`}>
+          <div className="grid grid-cols-5 gap-1 mb-1">
+            {EMOJI_SUGGESTIONS.map(e => (
+              <button key={e} type="button" onClick={() => { onChange(e); onIconChange?.(""); setOpen(false); }}
+                className={`text-xl p-1.5 rounded-lg hover:bg-orange-50 ${value === e && !iconUrl ? "bg-orange-100" : ""}`}>
+                {e}
+              </button>
+            ))}
+          </div>
+          {onIconChange && (
+            <div className="border-t border-gray-100 pt-2 mt-1 flex items-center justify-between gap-2">
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 hover:text-orange-700 disabled:opacity-50">
+                {uploading ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
+                {iconUrl ? "Change icon" : "Upload your own icon"}
+              </button>
+              {iconUrl && (
+                <button type="button" onClick={() => onIconChange("")}
+                  className="text-[11px] text-gray-400 hover:text-red-500 underline shrink-0">
+                  Remove
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -51,6 +119,7 @@ function AddForm({ onClose }: { onClose: () => void }) {
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [emoji, setEmoji] = useState("📦");
+  const [iconUrl, setIconUrl] = useState("");
   const [error, setError] = useState("");
   const [autoValue, setAutoValue] = useState(true);
 
@@ -59,7 +128,7 @@ function AddForm({ onClose }: { onClose: () => void }) {
       const res = await fetch(`${API}/admin/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label, value, emoji }),
+        body: JSON.stringify({ label, value, emoji, iconUrl }),
       });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed"); }
       return res.json();
@@ -77,7 +146,7 @@ function AddForm({ onClose }: { onClose: () => void }) {
     <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm mb-4">
       <h3 className="font-bold text-gray-800 mb-4">Add New Category</h3>
       <div className="flex gap-3 flex-wrap items-end">
-        <EmojiPicker value={emoji} onChange={setEmoji} />
+        <EmojiPicker value={emoji} onChange={setEmoji} iconUrl={iconUrl} onIconChange={setIconUrl} />
         <div className="flex-1 min-w-[160px]">
           <label className="block text-xs font-medium text-gray-500 mb-1">Display Name *</label>
           <input value={label} onChange={e => handleLabelChange(e.target.value)}
@@ -113,6 +182,7 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(cat.label);
   const [emoji, setEmoji] = useState(cat.emoji);
+  const [iconUrl, setIconUrl] = useState(cat.iconUrl ?? "");
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
@@ -174,16 +244,16 @@ function CategoryRow({ cat, onMoveUp, onMoveDown, isFirst, isLast }: {
   if (editing) {
     return (
       <div className="flex items-center gap-3 py-3 px-4 bg-orange-50 border border-orange-200 rounded-xl mb-2">
-        <EmojiPicker value={emoji} onChange={setEmoji} />
+        <EmojiPicker value={emoji} onChange={setEmoji} iconUrl={iconUrl} onIconChange={setIconUrl} />
         <input value={label} onChange={e => setLabel(e.target.value)}
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           placeholder="Display Name" />
         <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">{cat.value}</span>
-        <button onClick={() => patch.mutate({ label, emoji })} disabled={!label || patch.isPending}
+        <button onClick={() => patch.mutate({ label, emoji, iconUrl })} disabled={!label || patch.isPending}
           className="text-green-600 hover:text-green-700 p-1.5 rounded-lg hover:bg-green-50">
           <Check size={16} />
         </button>
-        <button onClick={() => { setEditing(false); setLabel(cat.label); setEmoji(cat.emoji); }}
+        <button onClick={() => { setEditing(false); setLabel(cat.label); setEmoji(cat.emoji); setIconUrl(cat.iconUrl ?? ""); }}
           className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100">
           <X size={16} />
         </button>
@@ -365,7 +435,7 @@ export default function CategoriesPage() {
             />
           ))}
           <p className="text-xs text-gray-400 text-center mt-4">
-            Tap the photo to upload/change a category image · ↑↓ to reorder · 👁 to show/hide
+            Tap the photo to upload/change a category image · ✏️ to rename, change the emoji, or upload your own icon · ↑↓ to reorder · 👁 to show/hide
           </p>
         </div>
       )}

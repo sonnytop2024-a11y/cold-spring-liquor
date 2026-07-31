@@ -92,6 +92,14 @@ export interface MockOrder {
   estimatedDelivery: string | null;
   // Missed Order Phone Call Alert
   missedCallAlerts?: MissedCallAlert[];
+  // In-app customer ↔ driver chat (see /api/orders/[id]/chat)
+  chat?: OrderChat;
+}
+
+export interface OrderChat {
+  messages: { id: string; from: "customer" | "driver"; text: string; at: string }[];
+  customerReadAt?: string;
+  driverReadAt?: string;
 }
 
 export interface MissedCallAlert {

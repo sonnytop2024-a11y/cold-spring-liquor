@@ -13,6 +13,7 @@ interface Category {
   sortOrder: number;
   active: boolean;
   imageUrl?: string;
+  iconUrl?: string;
 }
 
 const EMOJI_OPTIONS = ["🥃","🍸","🌵","🍹","🌿","🍷","🍾","🍺","🥂","🧃","🥤","🌸","💎","📦","⭐","🔥","✨","🎯","🏆","🍊"];
@@ -23,22 +24,88 @@ const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fmgbfzhosuqefsthyu
 // Default artwork the website falls back to when no custom photo is set.
 const defaultCatImg = (value: string) => `${SUPA}/storage/v1/object/public/csl-images/categories/${value}.webp`;
 
-function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
+function EmojiPicker({ value, onChange, iconUrl, onIconChange }: {
+  value: string; onChange: (e: string) => void;
+  /** Custom uploaded icon — overrides the emoji everywhere it's rendered on the site */
+  iconUrl?: string; onIconChange?: (url: string) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Flip upward when there isn't enough room below — this panel slides in from
+  // the right and can be tall, so a row near the bottom would otherwise open
+  // the dropdown under the panel's edge or the page's fixed bottom nav.
+  function toggleOpen() {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const DROPDOWN_HEIGHT = 230;
+      setOpenUp(window.innerHeight - rect.bottom < DROPDOWN_HEIGHT);
+    }
+    setOpen(v => !v);
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`${API}/admin/upload?folder=icons`, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || "Upload failed");
+      onIconChange?.(json.url);
+      setOpen(false);
+    } catch {
+      // picker has no error slot of its own
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   return (
     <div className="relative">
-      <button type="button" onClick={() => setOpen(v => !v)}
-        className="w-9 h-9 flex items-center justify-center text-xl border border-gray-300 rounded-lg hover:bg-gray-50 shrink-0">
-        {value || "📦"}
+      {onIconChange && (
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleUpload} />
+      )}
+      <button ref={triggerRef} type="button" onClick={toggleOpen}
+        className="w-9 h-9 flex items-center justify-center text-xl border border-gray-300 rounded-lg hover:bg-gray-50 overflow-hidden shrink-0">
+        {iconUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={iconUrl} alt="" className="w-full h-full object-contain p-1" />
+        ) : (
+          value || "📦"
+        )}
       </button>
       {open && (
-        <div className="absolute top-10 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-2 grid grid-cols-5 gap-1 w-40">
-          {EMOJI_OPTIONS.map(e => (
-            <button key={e} type="button" onClick={() => { onChange(e); setOpen(false); }}
-              className={`text-lg p-1.5 rounded-lg hover:bg-orange-50 ${value === e ? "bg-orange-100" : ""}`}>
-              {e}
-            </button>
-          ))}
+        <div className={`absolute ${openUp ? "bottom-10" : "top-10"} left-0 z-[60] bg-white border border-gray-200 rounded-xl shadow-lg p-2 w-40`}>
+          <div className="grid grid-cols-5 gap-1 mb-1">
+            {EMOJI_OPTIONS.map(e => (
+              <button key={e} type="button" onClick={() => { onChange(e); onIconChange?.(""); setOpen(false); }}
+                className={`text-lg p-1.5 rounded-lg hover:bg-orange-50 ${value === e && !iconUrl ? "bg-orange-100" : ""}`}>
+                {e}
+              </button>
+            ))}
+          </div>
+          {onIconChange && (
+            <div className="border-t border-gray-100 pt-2 mt-1 flex items-center justify-between gap-2">
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 hover:text-orange-700 disabled:opacity-50">
+                {uploading ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
+                {iconUrl ? "Change icon" : "Upload your own icon"}
+              </button>
+              {iconUrl && (
+                <button type="button" onClick={() => onIconChange("")}
+                  className="text-[11px] text-gray-400 hover:text-red-500 underline shrink-0">
+                  Remove
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -50,6 +117,7 @@ function AddRow({ onClose }: { onClose: () => void }) {
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [emoji, setEmoji] = useState("📦");
+  const [iconUrl, setIconUrl] = useState("");
   const [error, setError] = useState("");
   const [autoValue, setAutoValue] = useState(true);
 
@@ -58,7 +126,7 @@ function AddRow({ onClose }: { onClose: () => void }) {
       const res = await fetch(`${API}/admin/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label, value, emoji }),
+        body: JSON.stringify({ label, value, emoji, iconUrl }),
       });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed"); }
       return res.json();
@@ -75,7 +143,7 @@ function AddRow({ onClose }: { onClose: () => void }) {
   return (
     <div className="border border-orange-200 bg-orange-50 rounded-xl p-3 mb-3">
       <div className="flex gap-2 flex-wrap items-end">
-        <EmojiPicker value={emoji} onChange={setEmoji} />
+        <EmojiPicker value={emoji} onChange={setEmoji} iconUrl={iconUrl} onIconChange={setIconUrl} />
         <div className="flex-1 min-w-[120px]">
           <label className="text-[10px] font-semibold text-gray-500 mb-0.5 block">NAME *</label>
           <input value={label} onChange={e => handleLabel(e.target.value)}
@@ -111,6 +179,7 @@ function CatRow({ cat, isFirst, isLast, onMove }: {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(cat.label);
   const [emoji, setEmoji] = useState(cat.emoji);
+  const [iconUrl, setIconUrl] = useState(cat.iconUrl ?? "");
   const [uploading, setUploading] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -166,13 +235,13 @@ function CatRow({ cat, isFirst, isLast, onMove }: {
   if (editing) {
     return (
       <div className="flex items-center gap-2 py-2 px-3 bg-blue-50 border border-blue-200 rounded-xl mb-1.5">
-        <EmojiPicker value={emoji} onChange={setEmoji} />
+        <EmojiPicker value={emoji} onChange={setEmoji} iconUrl={iconUrl} onIconChange={setIconUrl} />
         <input value={label} onChange={e => setLabel(e.target.value)}
           className="flex-1 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" autoFocus />
         <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded hidden sm:block">{cat.value}</span>
-        <button onClick={() => patch.mutate({ label, emoji })} disabled={!label}
+        <button onClick={() => patch.mutate({ label, emoji, iconUrl })} disabled={!label}
           className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg"><Check size={14} /></button>
-        <button onClick={() => { setEditing(false); setLabel(cat.label); setEmoji(cat.emoji); }}
+        <button onClick={() => { setEditing(false); setLabel(cat.label); setEmoji(cat.emoji); setIconUrl(cat.iconUrl ?? ""); }}
           className="text-gray-400 hover:bg-gray-100 p-1.5 rounded-lg"><X size={14} /></button>
       </div>
     );
