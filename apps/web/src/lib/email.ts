@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import type { MockOrder } from "../app/api/_mock/store";
+import { preorderDateLabel } from "./preorder";
 import { STORE_HOURS } from "./pickupWindows";
 
 let _resend: Resend | null = null;
@@ -109,6 +110,11 @@ function orderConfirmationHtml(order: MockOrder): string {
       ${isPickup ? "We're getting it ready for pick up — we'll email you the moment it's ready. 🛍️" : "We're getting it ready and will be on our way to you soon. 🚗"}
     </p>
 
+    ${order.preorderDate ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+    <tr><td style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:2px solid #b91c1c;border-radius:14px;padding:18px 24px;">
+      <p style="margin:0 0 4px;font-size:11px;color:#7f1d1d;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">📅 Pre-Order</p>
+      <p style="margin:0;font-size:16px;color:#991b1b;font-weight:800;">Your bottle will be ${isPickup ? "ready for pick up" : "delivered"} on ${preorderDateLabel(order.preorderDate)}</p>
+    </td></tr></table>` : ""}
     ${isPickup ? pickupInfoBlock(order) : eta ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
     <tr><td style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:2px solid #f97316;border-radius:14px;padding:18px 24px;">
       <p style="margin:0 0 4px;font-size:11px;color:#9a3412;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">📦 Estimated Delivery</p>

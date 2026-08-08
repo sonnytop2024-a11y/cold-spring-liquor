@@ -278,11 +278,13 @@ export function Header() {
               className="w-[52px] h-[52px] xs:w-[65px] xs:h-[65px] md:w-[80px] md:h-[80px] object-contain mt-2 xs:mt-3"
               priority
             />
-            <div className="hidden xs:flex flex-col">
-              <span className="font-heading text-base sm:text-xl font-black text-white tracking-tight group-hover:text-brand-400 transition-colors">
+            {/* Below xs (Samsung Fold cover, <360px) still show the store
+                name — just smaller, with the orange tagline hidden to fit. */}
+            <div className="flex flex-col">
+              <span className="font-heading text-sm xs:text-base sm:text-xl font-black text-white tracking-tight group-hover:text-brand-400 transition-colors whitespace-nowrap">
                 Cold Spring Liquor
               </span>
-              <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: "#f97316" }}>
+              <span className="hidden xs:block text-[9px] font-bold tracking-widest uppercase" style={{ color: "#f97316" }}>
                 FREE Delivery · No Tip Required
               </span>
               <span

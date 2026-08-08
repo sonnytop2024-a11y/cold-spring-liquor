@@ -31,6 +31,7 @@ const body = await req.json();
     bundleEligible: body.bundleEligible !== undefined ? Boolean(body.bundleEligible) : (existing?.bundleEligible ?? false),
     couponExcluded: body.couponExcluded !== undefined ? Boolean(body.couponExcluded) : (existing?.couponExcluded ?? false),
     pickupOnly: body.pickupOnly !== undefined ? Boolean(body.pickupOnly) : (existing?.pickupOnly ?? false),
+    availableFrom: body.availableFrom !== undefined ? (body.availableFrom || null) : (existing?.availableFrom ?? null),
     active: newQty > 0,
     rating: existing?.rating ?? 0,
     reviewCount: existing?.reviewCount ?? 0,

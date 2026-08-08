@@ -624,13 +624,14 @@ interface Product {
   bundleEligible: boolean;
   couponExcluded: boolean;
   pickupOnly: boolean;
+  availableFrom?: string | null;
 }
 
 const EMPTY: Omit<Product, "id" | "slug"> = {
   name: "", brand: "", category: "whiskey", price: 0, salePrice: null,
   volume: "750ml", abv: 40, country: "USA", stockQty: 0,
   inStock: false, featured: false, active: false, description: "", imageUrl: null, bundleEligible: false,
-  couponExcluded: false, pickupOnly: false,
+  couponExcluded: false, pickupOnly: false, availableFrom: null,
 };
 
 const PAGE_SIZE = 50;
@@ -716,6 +717,7 @@ function ProductModal({ product, onClose, onSave, saving, categories }: ProductM
     bundleEligible: product?.bundleEligible ?? EMPTY.bundleEligible,
     couponExcluded: product?.couponExcluded ?? EMPTY.couponExcluded,
     pickupOnly: product?.pickupOnly ?? EMPTY.pickupOnly,
+    availableFrom: product?.availableFrom ?? EMPTY.availableFrom,
     active: product?.active ?? EMPTY.active,
     description: product?.description ?? EMPTY.description,
     imageUrl: product?.imageUrl ?? EMPTY.imageUrl,
@@ -1076,6 +1078,26 @@ function ProductModal({ product, onClose, onSave, saving, categories }: ProductM
                 form.featured ? "translate-x-5" : "translate-x-0"
               }`} />
             </button>
+          </div>
+
+          {/* Pre-Order — available from a future date */}
+          <div className="rounded-xl border px-4 py-3 bg-red-50 border-red-200">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-red-800">📅 Pre-Order — Available From</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  {form.availableFrom
+                    ? "Khách thấy badge PRE-ORDER và đặt trước — nhận hàng từ ngày này. Tới ngày tự thành sản phẩm thường."
+                    : "Để trống = bán thường. Chọn ngày TƯƠNG LAI = khách pre-order tới ngày đó."}
+                </p>
+              </div>
+              <input
+                type="date"
+                value={form.availableFrom ?? ""}
+                onChange={e => set("availableFrom", e.target.value || null)}
+                className="border border-red-300 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white shrink-0"
+              />
+            </div>
           </div>
 
           {/* Bundle Sale eligibility */}

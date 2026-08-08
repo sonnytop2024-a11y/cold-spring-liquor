@@ -22,6 +22,8 @@ export interface Product {
   pickupOnly?: boolean;
   /** Pre-computed server-side: white-bg single bottle → can stand on the All-tab shelf disc */
   platformOk?: boolean;
+  /** yyyy-mm-dd — future date = sold as PRE-ORDER until then (see lib/preorder.ts) */
+  availableFrom?: string;
 }
 
 export interface CartItem {

@@ -37,15 +37,22 @@ async function fetchFlashDeals() {
    image border (flood fill), so white areas inside labels survive. Photos
    without a white background come back unchanged (null → original URL is
    used). Runs once per URL per session; falls back to the original image on
-   any error (CORS, decode, …). */
+   any error (CORS, decode, …).
+
+   CLEAR-GLASS bottles (Patron Silver, gin, …) are the trap: the white
+   background shows THROUGH the glass, the flood fill eats into the bottle
+   body and leaves jagged white shreds (anh Sơn, 04/08: "sửa ngay"). When the
+   fill intrudes into the central bottle zone we return "tile" instead — the
+   card then shows the untouched photo on a clean white rounded tile. */
 const BG_WHITE_MIN = 232;   // r,g,b all above this count as background white
 const BG_MAX_SIDE  = 480;   // image area renders ≤170px tall, 480px covers 2x retina
-const bgRemovalCache = new Map<string, Promise<string | null>>();
+type BgResult = string | "tile" | null;
+const bgRemovalCache = new Map<string, Promise<BgResult>>();
 
-function removeWhiteBg(url: string): Promise<string | null> {
+function removeWhiteBg(url: string): Promise<BgResult> {
   const cached = bgRemovalCache.get(url);
   if (cached) return cached;
-  const job = new Promise<string | null>((resolve) => {
+  const job = new Promise<BgResult>((resolve) => {
     const img = new window.Image();
     img.crossOrigin = "anonymous";
     img.onerror = () => resolve(null);
@@ -83,6 +90,86 @@ function removeWhiteBg(url: string): Promise<string | null> {
         // No meaningful white background (dark/scene/transparent photo) — keep original
         if (pending.length < w * h * 0.02) return resolve(null);
 
+        // Clear-glass check: how much of the central bottle zone did the fill
+        // reach? An opaque bottle blocks the fill (≈0 intrusion); see-through
+        // glass lets it flood inside → a hard binary erase would butcher the
+        // bottle (the jagged Patron Silver, anh Sơn 04/08).
+        const cx0 = Math.round(w * 0.32), cx1 = Math.round(w * 0.68);
+        const cy0 = Math.round(h * 0.30), cy1 = Math.round(h * 0.82);
+        let centerCleared = 0;
+        for (let y = cy0; y < cy1; y++)
+          for (let x = cx0; x < cx1; x++)
+            if (visited[y * w + x]) centerCleared++;
+        const centerArea = Math.max(1, (cx1 - cx0) * (cy1 - cy0));
+
+        if (centerCleared / centerArea > 0.02) {
+          // CLEAR GLASS — smooth luminance keying instead of a binary cut
+          // (anh Sơn 04/08: vẫn muốn xóa nền cho "sang", không dùng ô trắng).
+          // 1) Hard-erase only the PURE-white region connected to the border
+          //    (the studio backdrop, ~250-255) so there is zero halo outside.
+          const STRICT = 246;
+          const isPure = (p: number) => d[p * 4] > STRICT && d[p * 4 + 1] > STRICT && d[p * 4 + 2] > STRICT;
+          const pure = new Uint8Array(w * h);
+          const pq: number[] = [];
+          for (let x = 0; x < w; x++) { pq.push(x, (h - 1) * w + x); }
+          for (let y = 0; y < h; y++) { pq.push(y * w, y * w + w - 1); }
+          const ppending: number[] = [];
+          for (const p of pq) if (!pure[p] && isPure(p)) { pure[p] = 1; ppending.push(p); }
+          let ph = 0;
+          while (ph < ppending.length) {
+            const p = ppending[ph++];
+            const x = p % w, y = (p / w) | 0;
+            if (x > 0 && !pure[p - 1] && isPure(p - 1)) { pure[p - 1] = 1; ppending.push(p - 1); }
+            if (x < w - 1 && !pure[p + 1] && isPure(p + 1)) { pure[p + 1] = 1; ppending.push(p + 1); }
+            if (y > 0 && !pure[p - w] && isPure(p - w)) { pure[p - w] = 1; ppending.push(p - w); }
+            if (y < h - 1 && !pure[p + w] && isPure(p + w)) { pure[p + w] = 1; ppending.push(p + w); }
+          }
+          // Backdrop isn't pure white → keying would leave a grey halo; use
+          // the clean white tile as the safe fallback.
+          if (ppending.length < w * h * 0.02) return resolve("tile");
+          for (const p of ppending) d[p * 4 + 3] = 0;
+
+          // 2) Feather the silhouette: pixels touching the erased backdrop
+          //    fade by whiteness so there is no bright fringe around the
+          //    bottle — but NOTHING inside the bottle is touched.
+          for (let p = 0; p < w * h; p++) {
+            if (pure[p]) continue;
+            const x = p % w, y = (p / w) | 0;
+            const touches =
+              (x > 0 && pure[p - 1]) || (x < w - 1 && pure[p + 1]) ||
+              (y > 0 && pure[p - w]) || (y < h - 1 && pure[p + w]);
+            if (!touches) continue;
+            const i = p * 4;
+            const m = Math.min(d[i], d[i + 1], d[i + 2]);
+            if (m > 210) d[i + 3] = Math.min(d[i + 3], Math.round(((255 - m) / 45) * 255));
+          }
+
+          // 3) Interior whites (backdrop seen THROUGH the glass): recolor to
+          //    solid smoked glass instead of playing with transparency — a
+          //    smooth lerp toward a cool smoke tone, so the bottle body stays
+          //    fully visible and clean (no translucent blotches; anh Sơn
+          //    04/08: bottle must read clearly). Dark text, gold, cork and
+          //    the green neck all sit below the whiteness gate → untouched.
+          const SR = 82, SG = 85, SB = 94; // smoke glass tone
+          // Wide ramp (160→255): JPEG noise clusters straddling a narrow gate
+          // showed up as jagged two-tone patches — a broad smoothstep melts
+          // every light grey into the smoke gradually, no visible boundary.
+          for (let p = 0; p < w * h; p++) {
+            if (pure[p]) continue;
+            const i = p * 4;
+            const m = Math.min(d[i], d[i + 1], d[i + 2]);
+            if (m > 160) {
+              let t = (m - 160) / 95;
+              t = t * t * (3 - 2 * t); // smoothstep
+              d[i]     = Math.round(d[i]     + (SR - d[i])     * t);
+              d[i + 1] = Math.round(d[i + 1] + (SG - d[i + 1]) * t);
+              d[i + 2] = Math.round(d[i + 2] + (SB - d[i + 2]) * t);
+            }
+          }
+          ctx.putImageData(id, 0, 0);
+          return resolve(canvas.toDataURL("image/png"));
+        }
+
         for (const p of pending) d[p * 4 + 3] = 0;
 
         // Feather: bright pixels touching the cleared region get partial alpha
@@ -115,13 +202,29 @@ function removeWhiteBg(url: string): Promise<string | null> {
    object-contain inside an absolutely-positioned box guarantees the product
    always fits the frame — never cropped, never overflowing. */
 function BottleImg({ url, alt }: { url: string; alt: string }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [result, setResult] = useState<BgResult | "pending">("pending");
   useEffect(() => {
     let alive = true;
-    setSrc(null);
-    removeWhiteBg(url).then((res) => { if (alive) setSrc(res ?? url); });
+    setResult("pending");
+    removeWhiteBg(url).then((res) => { if (alive) setResult(res); });
     return () => { alive = false; };
   }, [url]);
+
+  // Clear-glass bottle on a white photo: show the untouched photo on a clean
+  // white tile instead of a shredded background-removal attempt.
+  if (result === "tile") {
+    return (
+      <div
+        className="absolute inset-2 rounded-[12px] bg-white flex items-center justify-center"
+        style={{ boxShadow: "0 8px 14px rgba(0,0,0,.5)" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={alt} className="w-full h-full object-contain p-1.5" loading="lazy" />
+      </div>
+    );
+  }
+
+  const src = result === "pending" ? null : result ?? url;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

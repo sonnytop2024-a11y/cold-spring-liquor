@@ -9,7 +9,6 @@ import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { ReorderModal, type ReorderDraft } from "@/components/account/AccountDashboard";
 import { STORE_HOURS } from "@/lib/pickupWindows";
-import { DeliveryPhotoCard } from "@/components/tracking/DeliveryPhotoCard";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Order Received",
@@ -126,13 +125,21 @@ export default function OrderDetailPage() {
   const isReadyForPickup = order.status === "ready_for_pickup";
   const isFailed = ["failed_delivery", "cancelled"].includes(order.status);
 
-  // Mask street number from address for privacy in history
-  function maskStreet(street: string): string {
-    // Keep the street name but remove the house/unit number
-    return street.replace(/^\d+[-\s]?(\w+\s)?/, "").trim() || street;
-  }
-
   const addr = order.deliveryAddress;
+
+  // "Visa •••• 4242" — backfilled from Stripe by the order API; falls back
+  // to a generic label when the digits aren't available.
+  function paymentLabel(): string {
+    if (order.paymentMethod === "paypal") return "🅿️ PayPal";
+    if (order.paymentMethod === "gift_card") return "🎁 Gift Card";
+    if (order.cardLast4) {
+      const brand = order.cardBrand
+        ? order.cardBrand.charAt(0).toUpperCase() + order.cardBrand.slice(1)
+        : "Card";
+      return `💳 ${brand} •••• ${order.cardLast4}`;
+    }
+    return "💳 Card";
+  }
 
   return (
     <div className="container-main py-8 max-w-2xl mx-auto">
@@ -292,23 +299,14 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Delivery address */}
+      {/* Delivery address — always the full address (anh Sơn, 31/07) */}
       {addr && (
         <div className="bg-white border rounded-xl mb-4 px-5 py-4">
           <p className="font-semibold text-sm text-gray-700 mb-2">Delivery Address</p>
-          {isDelivered ? (
-            // In history, mask the street number for privacy
-            <div className="text-sm text-gray-600">
-              <p>{maskStreet(addr.street)}</p>
-              <p>{addr.city}, {addr.state} {addr.zip}</p>
-            </div>
-          ) : (
-            // Active orders: show full address
-            <div className="text-sm text-gray-600">
-              <p>{addr.street}</p>
-              <p>{addr.city}, {addr.state} {addr.zip}</p>
-            </div>
-          )}
+          <div className="text-sm text-gray-600">
+            <p>{addr.street}</p>
+            <p>{addr.city}, {addr.state} {addr.zip}</p>
+          </div>
         </div>
       )}
 
@@ -316,7 +314,10 @@ export default function OrderDetailPage() {
       {order.paymentMethod && (
         <div className="bg-white border rounded-xl mb-4 px-5 py-4">
           <p className="font-semibold text-sm text-gray-700 mb-1">Payment</p>
-          <p className="text-sm text-gray-600 capitalize">{order.paymentMethod}</p>
+          <p className="text-sm text-gray-600">{paymentLabel()}</p>
+          {Number(order.giftCardAmount) > 0 && order.paymentMethod !== "gift_card" && (
+            <p className="text-sm text-green-600 mt-0.5">🎁 Gift Card applied: -{formatCurrency(order.giftCardAmount)}</p>
+          )}
         </div>
       )}
 
@@ -346,12 +347,6 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Delivery placement photo — where the driver left the order */}
-      {order.status === "delivered" && order.deliveryProof && (
-        <div className="mb-4">
-          <DeliveryPhotoCard photoUrl={order.deliveryProof} deliveredAt={order.statusTimestamps?.delivered} />
-        </div>
-      )}
 
       {/* Reorder button */}
       {isDelivered && order.items?.length > 0 && (

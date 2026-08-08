@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
 import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
+import { isPreorderActive } from "@/lib/preorder";
 import { fetchProductBySlug } from "@/lib/api/products";
 
 // Product name in a fixed 2-line-height box. Long names shrink (14px → 9px,
@@ -208,7 +209,10 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
 
   function handleAdd(e: React.MouseEvent) {
     e.preventDefault();
-    addItem(product);
+    if (!addItem(product)) {
+      alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first.");
+      return;
+    }
     triggerPop();
     if (compact) { pokeStepper(); return; }
     setJustAdded(true);
@@ -219,7 +223,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
     e.preventDefault();
     if (compact) pokeStepper();
     if (qty >= product.stockQty) return;
-    addItem(product);
+    if (!addItem(product)) { alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first."); return; }
     triggerPop();
   }
 
@@ -345,6 +349,34 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
             title="Pickup Only"
           >
             <Store size={compact ? 7 : 8} strokeWidth={2.5} />{compact ? "" : " Pickup Only"}
+          </span>
+        )}
+
+        {/* PRE-ORDER pill — deep-red luxury tone (anh Sơn, 08/08: đỏ đô, no
+            date on the card; the date lives on the detail page). Same 7px
+            scale/slot system as Pickup Only; stacks below whichever badges
+            are already occupying the top-left corner. */}
+        {isPreorderActive(product.availableFrom) && (
+          <span
+            className={`absolute z-10 leading-none rounded-full flex items-center text-white shadow-sm font-semibold ${
+              compact
+                ? `left-1 text-[6px] px-1 py-[2.5px] tracking-wide ${discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-[18px]" : "top-1"}`
+                : `left-2 text-[7px] pl-1.5 pr-1.5 py-[3px] tracking-wide ${
+                    (discountPct > 0 || (product.bundleEligible && !product.salePrice)) && product.pickupOnly
+                      ? "top-16"
+                      : discountPct > 0 || (product.bundleEligible && !product.salePrice) || product.pickupOnly
+                        ? "top-9"
+                        : "top-2"
+                  }`
+            }`}
+            style={{
+              background: "linear-gradient(135deg,#7f1d1d,#b91c1c)",
+              WebkitTextSizeAdjust: "100%",
+              textSizeAdjust: "100%",
+            } as React.CSSProperties}
+            title={`Pre-Order — available ${product.availableFrom}`}
+          >
+            PRE-ORDER
           </span>
         )}
 

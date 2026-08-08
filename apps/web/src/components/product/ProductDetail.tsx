@@ -9,6 +9,7 @@ import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { formatCurrency } from "@/lib/utils";
 import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
+import { isPreorderActive, preorderDateLabel } from "@/lib/preorder";
 
 function useBtnPop(): [boolean, () => void] {
   const [popping, setPopping] = useState(false);
@@ -90,6 +91,7 @@ export function ProductDetail({ slug }: { slug: string }) {
   const effectiveProduct = flashDeal
     ? { ...product!, salePrice: flashDeal.salePrice }
     : product;
+  const isPreorder = isPreorderActive(effectiveProduct?.availableFrom);
 
   if (isLoading) {
     return (
@@ -268,24 +270,42 @@ export function ProductDetail({ slug }: { slug: string }) {
               )}
             </div>
 
+            {/* Pre-Order banner — deep-red theme per the approved preview
+                (anh Sơn, 08/08): date called out here, Buy Now hidden, the
+                cart CTA becomes "Pre-Order Now". */}
+            {isPreorder && (
+              <div className="mb-2.5 sm:mb-4 rounded-[10px] sm:rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-3.5 py-3 sm:px-4 sm:py-3.5">
+                <p className="flex items-center gap-1.5 text-[12px] sm:text-sm font-extrabold text-red-800">📅 PRE-ORDER</p>
+                <p className="mt-1 text-[11.5px] sm:text-[13px] leading-relaxed text-gray-700">
+                  This bottle will be available <b>{preorderDateLabel(effectiveProduct!.availableFrom!)}</b>.<br />
+                  Order now to reserve yours — pick up in store or get it delivered on that day.
+                </p>
+              </div>
+            )}
+
             {/* CTAs */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3">
+            <div className={`${isPreorder ? "flex" : "grid grid-cols-2"} sm:flex sm:flex-row gap-2 sm:gap-3`}>
               <button
-                onClick={() => { triggerCart(); addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined }); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold text-[13px] sm:text-base py-2.5 sm:py-3.5 rounded-[9px] sm:rounded-xl transition-all ${cartPop ? "scale-95 shadow-[0_0_20px_4px_rgba(249,115,22,0.45)]" : "shadow-none"}`}
-                style={{ transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease" }}
+                onClick={() => { if (!addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined })) { alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first."); return; } triggerCart(); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 text-white font-semibold text-[13px] sm:text-base py-2.5 sm:py-3.5 rounded-[9px] sm:rounded-xl transition-all ${isPreorder ? "" : "bg-brand-500 hover:bg-brand-600"} ${cartPop ? "scale-95 shadow-[0_0_20px_4px_rgba(249,115,22,0.45)]" : "shadow-none"}`}
+                style={{
+                  transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease",
+                  ...(isPreorder ? { background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" } : {}),
+                }}
               >
                 <ShoppingCart className={`w-[15px] h-[15px] sm:w-[18px] sm:h-[18px] ${cartPop ? "animate-bounce" : ""}`} />
-                Add to Cart
+                {isPreorder ? "Pre-Order Now" : "Add to Cart"}
               </button>
-              <button
-                onClick={() => { triggerBuy(); addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined }); window.location.href = "/checkout"; }}
-                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold text-[13px] sm:text-base py-2.5 sm:py-3.5 rounded-[9px] sm:rounded-xl transition-all ${buyPop ? "scale-95 shadow-[0_0_20px_4px_rgba(255,255,255,0.18)]" : "shadow-none"}`}
-                style={{ transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease" }}
-              >
-                <Zap className={`w-[15px] h-[15px] sm:w-[18px] sm:h-[18px] ${buyPop ? "animate-pulse" : ""}`} />
-                Buy Now
-              </button>
+              {!isPreorder && (
+                <button
+                  onClick={() => { if (!addItem(effectiveProduct!, qty, { referenceImageUrl: refPhotoUrl ?? undefined, verificationNote: verificationNote.trim() || undefined })) { alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first."); return; } triggerBuy(); window.location.href = "/checkout"; }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold text-[13px] sm:text-base py-2.5 sm:py-3.5 rounded-[9px] sm:rounded-xl transition-all ${buyPop ? "scale-95 shadow-[0_0_20px_4px_rgba(255,255,255,0.18)]" : "shadow-none"}`}
+                  style={{ transition: "transform 0.15s cubic-bezier(.36,.07,.19,.97), box-shadow 0.25s ease" }}
+                >
+                  <Zap className={`w-[15px] h-[15px] sm:w-[18px] sm:h-[18px] ${buyPop ? "animate-pulse" : ""}`} />
+                  Buy Now
+                </button>
+              )}
             </div>
 
             {/* Missing Product Image Assistance — only for products with no photo */}

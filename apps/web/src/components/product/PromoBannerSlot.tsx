@@ -15,9 +15,10 @@ interface PromoBanner {
 }
 
 // Admin-managed banner chained in right after a category strip on the
-// mobile "All" tab. Fixed 140px height (never height:auto) so the slot
-// never shifts layout while the image loads — see admin's Promo Banners
-// tab for the eligibility rules (active + date range + has an image).
+// mobile "All" tab. The slot is a fixed 45:17 box (matching the processed
+// upload ratio) so it reserves space before the image loads — never
+// height:auto, never a layout shift. See admin's Promo Banners tab for
+// the eligibility rules (active + date range + has an image).
 // No view/click tracking (anh Sơn, 30/07: kept deliberately out of scope).
 const ROTATE_MS = 5000;
 const FADE_MS = 700;
@@ -56,7 +57,11 @@ export function PromoBannerSlot({ positionCategory }: { positionCategory: string
   if (list.length === 0) return null;
   const active = list[idx];
 
-  const CLASSES = "block relative w-full h-[140px] rounded-2xl overflow-hidden shadow-md bg-gray-100";
+  // aspect-[45/17] = the exact 900×340 ratio every promo upload is processed
+  // to — the frame always matches the image, so nothing gets cropped on
+  // narrow screens (Samsung Fold cover ~344px cut the banner edges with the
+  // old fixed 140px height), and the reserved box still prevents layout shift.
+  const CLASSES = "block relative w-full aspect-[45/17] rounded-2xl overflow-hidden shadow-md bg-gray-100";
 
   // All banners for this slot are stacked on top of each other, each with
   // its own opacity — the outgoing one fades out while the next fades in at

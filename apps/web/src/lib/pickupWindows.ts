@@ -74,8 +74,10 @@ export function isPickupDayOpen(daysAhead: number, now: Date = new Date()): bool
 }
 
 // Generate valid windows for `daysAhead` days from now (0 = today).
-export function getPickupWindows(daysAhead: number, now: Date = new Date()): PickupSlot[] {
-  if (daysAhead < 0 || daysAhead > MAX_PICKUP_DAYS_AHEAD) return [];
+// maxDaysAhead: pre-orders schedule pickup around a future release date, so
+// callers may extend the normal 7-day cap (see CheckoutForm/processOrder).
+export function getPickupWindows(daysAhead: number, now: Date = new Date(), maxDaysAhead: number = MAX_PICKUP_DAYS_AHEAD): PickupSlot[] {
+  if (daysAhead < 0 || daysAhead > maxDaysAhead) return [];
   if (!isPickupDayOpen(daysAhead, now)) return [];
 
   const c = centralNow(now);
@@ -112,14 +114,15 @@ export function getPickupWindows(daysAhead: number, now: Date = new Date()): Pic
 export function validatePickupWindow(
   win: { start?: string; end?: string } | undefined | null,
   now: Date = new Date(),
+  maxDaysAhead: number = MAX_PICKUP_DAYS_AHEAD,
 ): string | null {
   if (!win?.start || !win?.end) return "Please select a pickup time window.";
   const start = new Date(win.start);
   const end = new Date(win.end);
   if (isNaN(start.getTime()) || isNaN(end.getTime())) return "Invalid pickup time window.";
   if (end.getTime() <= now.getTime()) return "The selected pickup window has already passed. Please choose another time.";
-  if (start.getTime() > now.getTime() + (MAX_PICKUP_DAYS_AHEAD + 1) * 86400000) {
-    return `Pickup can be scheduled at most ${MAX_PICKUP_DAYS_AHEAD} days in advance.`;
+  if (start.getTime() > now.getTime() + (maxDaysAhead + 1) * 86400000) {
+    return `Pickup can be scheduled at most ${maxDaysAhead} days in advance.`;
   }
   const c = new Date(start.toLocaleString("en-US", { timeZone: TZ }));
   if (c.getDay() === 0) return "We are closed on Sunday. Please choose another day.";

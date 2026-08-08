@@ -8,7 +8,8 @@ import { sendOrderConfirmation } from "./email";
 import { verifySessionToken } from "./session";
 import { estimateDeliveryFromStoreAsync } from "./deliveryEstimate";
 import { calcDiscounts } from "./discountRules";
-import { validatePickupWindow, calcPickupDiscount } from "./pickupWindows";
+import { validatePickupWindow, calcPickupDiscount, MAX_PICKUP_DAYS_AHEAD } from "./pickupWindows";
+import { isPreorderActive, preorderDateLabel, daysUntilCT } from "./preorder";
 import { scheduleMissedCallCheck } from "./missedCallAlert";
 import type { MockOrder } from "../app/api/_mock/store";
 
@@ -97,6 +98,7 @@ export async function processOrder(
       bundleEligible: product?.bundleEligible ?? false,
       couponExcluded: product?.couponExcluded ?? false,
       pickupOnly: product?.pickupOnly ?? false,
+      availableFrom: product?.availableFrom ?? null,
       quantity: i.quantity,
       // Snapshot display fields so order history / emails / reorder can show
       // the product even if it's later edited or removed from the catalog
@@ -124,6 +126,17 @@ export async function processOrder(
   if (outOfStockItems.length > 0) {
     const list = outOfStockItems.map(i => `${i.name} (only ${i.stockQty} left)`).join(", ");
     return { error: `Not enough stock for: ${list}. Please update your cart and try again.`, status: 422 };
+  }
+
+  // Pre-Order (anh Sơn, 08/08): an order is either ALL pre-order bottles
+  // sharing one release date, or all normal items — never mixed. The order
+  // is stamped with the release date for admin/emails/tracking.
+  const preorderItems = enrichedItems.filter(i => isPreorderActive(i.availableFrom));
+  const preorderDate = preorderItems.length
+    ? preorderItems.map(i => i.availableFrom as string).sort().pop()!
+    : undefined;
+  if (preorderItems.length > 0 && preorderItems.length < enrichedItems.length) {
+    return { error: "Pre-order bottles must be ordered separately from regular items. Please place two orders.", status: 422 };
   }
 
   // Unlock Deals ("spend $X, unlock product Y at $Z"): the price for a
@@ -211,8 +224,15 @@ export async function processOrder(
   }
 
   if (isPickup) {
-    const winError = validatePickupWindow(body.pickupWindow);
+    const pickupCapDays = preorderDate ? daysUntilCT(preorderDate) + MAX_PICKUP_DAYS_AHEAD : MAX_PICKUP_DAYS_AHEAD;
+    const winError = validatePickupWindow(body.pickupWindow, new Date(), pickupCapDays);
     if (winError) return { error: winError, status: 422 };
+    if (preorderDate && body.pickupWindow?.start) {
+      const slotDateCT = new Date(body.pickupWindow.start).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+      if (slotDateCT < preorderDate) {
+        return { error: `This is a pre-order — pickup is available from ${preorderDateLabel(preorderDate)}.`, status: 422 };
+      }
+    }
   } else {
     // Admin kill-switch: no drivers available → Pick Up only
     if (settings.deliveryEnabled === false) {
@@ -302,9 +322,12 @@ export async function processOrder(
     // same-day ETA is set only after admin/driver accepts (confirmed status)
     // next-morning / before-opening ETA is a fixed future time — set now so customer knows when to expect
     // pickup: ETA = start of the chosen pickup window
+    // pre-order delivery: no ETA — fulfilled on preorderDate
     estimatedDelivery: isPickup
       ? body.pickupWindow.start
+      : preorderDate ? null
       : timing.type === "next-morning" || timing.isStoreClosed ? timing.estimatedDelivery.toISOString() : null,
+    preorderDate,
   };
 
   await dbCreateOrder(order);

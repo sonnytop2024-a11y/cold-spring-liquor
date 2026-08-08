@@ -1006,6 +1006,11 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  // True from the moment the driver submits the verification until the order
+  // leaves the list — the PATCH carries base64 signature+photo (slow) and the
+  // list polls every 5s, so without this the card flashes back to "Begin
+  // Delivery Verification" after completing (anh Sơn, 31/07: "cảm giác bị giựt").
+  const [finishing, setFinishing] = useState(false);
   const [showVerification, setShowVerification] = useState(
     order.status === "driver_arrived"
   );
@@ -1017,14 +1022,21 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
 
   // Auto-open verification modal whenever order is at driver_arrived
   useEffect(() => {
-    if (order.status === "driver_arrived") {
+    if (order.status === "driver_arrived" && !finishing) {
       setShowVerification(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.status]);
 
   const action = DRIVER_ACTIONS[order.status];
+  // Once the delivery is finished the driver no longer needs the customer's
+  // street address — mask it down to city/state (anh Sơn, 31/07: privacy che
+  // bên driver, customer history shows the full address instead).
+  const done = ["delivered", "failed_delivery"].includes(order.status);
   const address = order.deliveryAddress
-    ? `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
+    ? done
+      ? `${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
+      : `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
     : "Address unavailable";
   const itemCount = order.items?.reduce((a: number, i: any) => a + i.quantity, 0) ?? 0;
   const { miles, minutes, loading: distLoading, unavailable: distUnavailable } = useDriverDistance(driverLoc, order.deliveryAddress);
@@ -1062,6 +1074,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
     };
   }) {
     setShowVerification(false);
+    setFinishing(true);
     setLoading(true);
     try {
       await updateStatus(order.id, "delivered", {
@@ -1073,6 +1086,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
     } catch (err) {
       alert(`Failed to save delivery: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`);
       setLoading(false);
+      setFinishing(false);
       setShowVerification(true);
       return;
     }
@@ -1085,6 +1099,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
     confirmations: { ageVerified: boolean; idChecked: boolean; nameMatched: boolean; handedToCustomer: boolean; customerDob: string; customerAge: number }
   ) {
     setShowVerification(false);
+    setFinishing(true);
     setLoading(true);
     await updateStatus(order.id, "failed_delivery", {
       failReason: reason,
@@ -1161,9 +1176,9 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
           </div>
         </div>
 
-        {/* Metrics */}
+        {/* Metrics — distance is meaningless once the delivery is done */}
         <div className="px-4 pb-2 flex items-center gap-2.5 text-xs text-gray-500">
-          {distUnavailable ? (
+          {done ? null : distUnavailable ? (
             <span className="text-red-500 font-medium">Unable to calculate distance</span>
           ) : distLoading || !driverLoc ? (
             <span className="text-gray-400 italic flex items-center gap-1">
@@ -1177,7 +1192,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
             </>
           ) : null}
           {itemCount > 0 && <>
-            <span className="text-gray-300">·</span>
+            {!done && <span className="text-gray-300">·</span>}
             <span>{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
           </>}
         </div>
@@ -1242,7 +1257,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
         )}
 
         {/* Arrived: wait timer + verification prompt */}
-        {isArrived && (
+        {isArrived && !finishing && (
           <div className="mx-4 mb-3 space-y-2">
             {order.waitTimerStart && (
               <WaitCountdown waitTimerStart={order.waitTimerStart} />
@@ -1250,6 +1265,18 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800">
               <p className="font-bold mb-1">🔔 You've arrived at the delivery location</p>
               <p>Complete all required verification steps before marking this order as delivered.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Verification submitted — hold a calm saving state until the order
+            leaves the active list (upload of signature+photo can take a few s) */}
+        {finishing && (
+          <div className="mx-4 mb-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3.5 flex items-center gap-3">
+            <Loader2 size={18} className="animate-spin text-green-600 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-green-800">Verification complete — saving delivery…</p>
+              <p className="text-xs text-green-700 mt-0.5">One moment, this order will close automatically.</p>
             </div>
           </div>
         )}
@@ -1291,7 +1318,7 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
           )}
 
           {/* Arrived: open verification flow */}
-          {isArrived && (
+          {isArrived && !finishing && (
             <button
               onClick={() => setShowVerification(true)}
               disabled={loading}

@@ -10,6 +10,7 @@ import { ReorderModal, type ReorderDraft } from "@/components/account/AccountDas
 import { ItemThumb } from "@/components/shared/orderDisplay";
 import { DeliveryPhotoCard } from "@/components/tracking/DeliveryPhotoCard";
 import { OrderChat } from "@/components/tracking/OrderChat";
+import { preorderDateLabel } from "@/lib/preorder";
 
 const STEPS = [
   {
@@ -356,6 +357,16 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
           <WaitTimer waitTimerStart={order.waitTimerStart} />
         )}
 
+        {/* Pre-Order: fulfilled on the release date, not today */}
+        {order.preorderDate && !isDelivered && !isFailed && (
+          <div className="mt-3 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
+            <p className="text-[13px] font-extrabold text-red-800">📅 PRE-ORDER</p>
+            <p className="text-xs text-gray-700 mt-0.5">
+              Your bottle will be {isPickupOrder ? "ready for pick up" : "delivered"} on <b>{preorderDateLabel(order.preorderDate)}</b>.
+            </p>
+          </div>
+        )}
+
         {/* ID reminder when delivery is active */}
         {ACTIVE_STATUSES.includes(order.status) && (
           <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700 font-medium">
@@ -387,8 +398,10 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
         )}
       </div>
 
-      {/* In-app chat with the assigned driver (delivery orders only) */}
-      {!isPickupOrder && order.driverId && !isFailed && (
+      {/* In-app chat with the assigned driver — active deliveries only.
+          Completed orders hide it entirely (anh Sơn, 31/07: "ẩn luôn, không
+          cần" — no read-only view); admin keeps the full history. */}
+      {!isPickupOrder && order.driverId && !isFailed && !isDelivered && order.status !== "refunded" && (
         <div className="px-6 pt-4">
           <OrderChat order={order} />
         </div>

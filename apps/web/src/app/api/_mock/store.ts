@@ -94,6 +94,11 @@ export interface MockOrder {
   missedCallAlerts?: MissedCallAlert[];
   // In-app customer ↔ driver chat (see /api/orders/[id]/chat)
   chat?: OrderChat;
+  // Card brand + last4, lazily backfilled from Stripe on first order-detail view
+  cardLast4?: string;
+  cardBrand?: string;
+  /** yyyy-mm-dd — order contains pre-order items available from this date */
+  preorderDate?: string;
 }
 
 export interface OrderChat {
@@ -122,6 +127,8 @@ export interface MockProduct {
   couponExcluded?: boolean;
   // Orderable via Pick Up In Store only — blocked for Delivery
   pickupOnly?: boolean;
+  /** yyyy-mm-dd — future date = sold as PRE-ORDER until then */
+  availableFrom?: string | null;
   /** Pre-computed server-side: white-bg single bottle → can stand on the All-tab shelf disc */
   platformOk?: boolean;
 }

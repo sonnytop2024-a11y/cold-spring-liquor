@@ -224,3 +224,15 @@ input[type="date"]::-webkit-date-and-time-value {
   content-visibility: auto;
   contain-intrinsic-size: auto 290px;
 }
+
+/* ── scrollbar-hide: used by every horizontal strip (category pills, All-tab
+   carousels, filter chips). iOS auto-hides overlay scrollbars anyway, but
+   Samsung/Android Chrome shows a long grey bar while swiping — this class
+   was referenced everywhere yet never actually defined until now. ── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

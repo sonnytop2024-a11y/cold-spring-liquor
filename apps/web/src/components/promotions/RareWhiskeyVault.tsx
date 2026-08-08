@@ -17,6 +17,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
+import { isPreorderActive } from "@/lib/preorder";
 import { useCartStore } from "@/store/cartStore";
 import type { Product } from "@/types";
 
@@ -416,8 +417,11 @@ function InfoCell({
 
   const handleAdd = () => {
     if (soldOut || state !== "idle") return;
+    if (!addItem(item.product, qty)) {
+      alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first.");
+      return;
+    }
     setState("adding");
-    addItem(item.product, qty);
     setTimeout(() => {
       setState("added");
       onAdded(item, qty);
@@ -425,7 +429,14 @@ function InfoCell({
     }, 350);
   };
 
-  const label = soldOut ? "Sold Out" : state === "adding" ? "Adding…" : state === "added" ? "✓ Added" : "Add to Cart";
+  // Pre-order bottles in the vault get the deep-red Pre-Order treatment
+  // (anh Sơn, 08/08: rare drops like Weller 12 will live here)
+  const preorder = isPreorderActive(item.product.availableFrom);
+  const label = soldOut ? "Sold Out"
+    : state === "adding" ? "Adding…"
+    : state === "added" ? "✓ Added"
+    : preorder ? "Pre-Order"
+    : "Add to Cart";
 
   return (
     <div className="info-cell">
@@ -473,8 +484,9 @@ function InfoCell({
         className="add-to-cart"
         type="button"
         disabled={soldOut || state !== "idle"}
-        aria-label={soldOut ? "Sold out" : `Add ${item.name} to cart`}
+        aria-label={soldOut ? "Sold out" : preorder ? `Pre-order ${item.name}` : `Add ${item.name} to cart`}
         onClick={handleAdd}
+        style={preorder && !soldOut ? { background: "linear-gradient(135deg,#7f1d1d,#b91c1c)", borderColor: "#b91c1c", color: "#fff" } : undefined}
       >
         {label}
       </button>

@@ -13,6 +13,7 @@ import { formatCurrency, MIN_ORDER, calcPointsValue } from "@/lib/utils";
 import { formatPhoneUS } from "@/lib/phoneUtils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, calcPickupDiscount, PICKUP_DISCOUNT_LABEL, type PickupSlot } from "@/lib/pickupWindows";
+import { isPreorderActive, preorderDateLabel, daysUntilCT } from "@/lib/preorder";
 import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
@@ -523,6 +524,19 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   // Delivery address
   const [delivery, setDelivery] = useState<AddrForm>(BLANK_ADDR);
 
+  // Pre-Order: latest release date among the cart's pre-order items — pickup
+  // days start there and delivery is scheduled for that date (anh Sơn, 08/08)
+  const preorderFrom = useMemo(() => {
+    let max: string | null = null;
+    for (const it of items) {
+      const f = it.product.availableFrom;
+      if (isPreorderActive(f) && (!max || f! > max)) max = f!;
+    }
+    return max;
+  }, [items]);
+  const minPickupDay = preorderFrom ? daysUntilCT(preorderFrom) : 0;
+  const maxPickupDay = minPickupDay + MAX_PICKUP_DAYS_AHEAD;
+
   // Pick Up In Store — date + time window (dropdowns)
   const [pickupDay, setPickupDay] = useState(0); // days ahead: 0=today … 7
   const [pickupSlot, setPickupSlot] = useState<PickupSlot | null>(null);
@@ -530,20 +544,20 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const pickupDays = useMemo(() => {
     if (!isPickup) return [] as { d: number; label: string }[];
     const days: { d: number; label: string }[] = [];
-    for (let d = 0; d <= MAX_PICKUP_DAYS_AHEAD; d++) {
-      if (isPickupDayOpen(d) && getPickupWindows(d).length > 0) {
+    for (let d = minPickupDay; d <= maxPickupDay; d++) {
+      if (isPickupDayOpen(d) && getPickupWindows(d, new Date(), maxPickupDay).length > 0) {
         days.push({ d, label: pickupDateLabel(d) });
       }
     }
     return days;
-  }, [isPickup]);
+  }, [isPickup, minPickupDay, maxPickupDay]);
   // Default to the first available day
   useEffect(() => {
     if (isPickup && pickupDays.length > 0 && !pickupDays.some(x => x.d === pickupDay)) {
       setPickupDay(pickupDays[0].d);
     }
   }, [isPickup, pickupDays, pickupDay]);
-  const pickupSlots = useMemo(() => (isPickup ? getPickupWindows(pickupDay) : []), [isPickup, pickupDay]);
+  const pickupSlots = useMemo(() => (isPickup ? getPickupWindows(pickupDay, new Date(), maxPickupDay) : []), [isPickup, pickupDay, maxPickupDay]);
   // Auto-select the first window of the chosen day
   useEffect(() => {
     if (isPickup && pickupSlots.length > 0 && !pickupSlots.some(sl => sl.start === pickupSlot?.start)) {
@@ -1304,6 +1318,14 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           </div>
         )}
         <p className="text-xs text-gray-400 mt-3">Service area: Leander · Cedar Park · Liberty Hill, TX (within 10 miles)</p>
+        {preorderFrom && (
+          <div className="mt-3 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
+            <p className="text-[13px] font-extrabold text-red-800">📅 PRE-ORDER</p>
+            <p className="text-xs text-gray-700 mt-0.5">
+              This order will be delivered on <b>{preorderDateLabel(preorderFrom)}</b> — the day your bottle becomes available.
+            </p>
+          </div>
+        )}
       </div>
       ) : (
       <>
@@ -1332,7 +1354,16 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           <Clock size={14} className="text-gray-400" />
           <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Pick Up Time Window</h2>
         </div>
-        <p className="text-xs text-gray-400 mb-4">First available time is 30 minutes from now.</p>
+        {preorderFrom ? (
+          <div className="mb-4 mt-1 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
+            <p className="text-[13px] font-extrabold text-red-800">📅 PRE-ORDER</p>
+            <p className="text-xs text-gray-700 mt-0.5">
+              Your bottle is available from <b>{preorderDateLabel(preorderFrom)}</b> — pickup dates start that day.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400 mb-4">First available time is 30 minutes from now.</p>
+        )}
 
         {pickupDays.length === 0 ? (
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">

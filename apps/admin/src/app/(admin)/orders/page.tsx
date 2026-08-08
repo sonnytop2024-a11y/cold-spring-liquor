@@ -182,6 +182,11 @@ function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
         <div className="px-5 py-4 space-y-4 text-sm">
           <div className="flex flex-wrap gap-2">
             <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>{String(order.status).replace(/_/g, " ")}</span>
+            {order.preorderDate && (
+              <span className="text-xs px-2.5 py-1 rounded-full font-bold text-white" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                📅 PRE-ORDER · {new Date(order.preorderDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            )}
             {isPickup
               ? <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-orange-100 text-orange-700">🏬 Pick Up In Store</span>
               : <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-green-100 text-green-700">🚚 {order.deliveryType === "next-morning" ? "Next Morning" : "Same-Day"}</span>}
@@ -719,6 +724,11 @@ export default function OrdersPage() {
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>
                 {STATUS_LABELS[order.status] ?? order.status}
               </span>
+              {order.preorderDate && (
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-bold text-white border border-red-800" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                  📅 PRE-ORDER · {new Date(order.preorderDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+              )}
               {isPickupOrder ? (
                 <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-orange-100 text-orange-700 border border-orange-200">
                   🏬 Pick Up In Store

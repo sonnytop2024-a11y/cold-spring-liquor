@@ -75,6 +75,7 @@ const body = await req.json();
     bundleEligible: Boolean(body.bundleEligible),
     couponExcluded: Boolean(body.couponExcluded),
     pickupOnly: Boolean(body.pickupOnly),
+    availableFrom: body.availableFrom || null,
     active: stockQty > 0,
     rating: 0,
     reviewCount: 0,

@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { ProductFilters } from "@/components/product/ProductFilters";
-import { ProductSearch } from "@/components/product/ProductSearch";
 import { CategoryPills } from "@/components/product/CategoryPills";
 
 type SearchParams = Record<string, string | undefined>;
@@ -10,19 +9,9 @@ export default function ProductsPage({ searchParams }: { searchParams: SearchPar
   return (
     <div className="bg-white min-h-screen">
       <div className="container-main py-6">
-        <div className="mb-5">
-          <h1 className="text-2xl sm:text-4xl font-heading font-bold text-gray-900 leading-tight">
-            You Pick and We Deliver to You
-          </h1>
-          <p className="mt-1.5 text-sm sm:text-base font-bold text-orange-500 tracking-wide">
-            🚚 FREE DELIVERY • NO TIP REQUIRED
-          </p>
-        </div>
-
-        {/* Search bar */}
-        <Suspense>
-          <ProductSearch />
-        </Suspense>
+        {/* No page title / tagline / second search bar here — the sticky
+            header right above already carries all three (anh Sơn, 04/08:
+            "bị trùng"). Straight into the filter chips. */}
 
         {/* Category pills — horizontal scroll on mobile, wraps on desktop */}
         <Suspense>
