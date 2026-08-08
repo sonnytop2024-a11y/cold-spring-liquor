@@ -13,7 +13,7 @@ import { formatCurrency, MIN_ORDER, calcPointsValue } from "@/lib/utils";
 import { formatPhoneUS } from "@/lib/phoneUtils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, calcPickupDiscount, PICKUP_DISCOUNT_LABEL, type PickupSlot } from "@/lib/pickupWindows";
-import { isPreorderActive, preorderDateLabel } from "@/lib/preorder";
+import { isPreorderActive, preorderDateLabel, preorderDateShort } from "@/lib/preorder";
 import { useRefreshCartProducts } from "@/hooks/useRefreshCartProducts";
 import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
 import Link from "next/link";
@@ -1651,7 +1651,7 @@ interface ReviewData {
   deliveryAddress: { street: string; city: string; state: string; zip: string };
   billingAddress: { street: string; city: string; state: string; zip: string };
   sameBilling: boolean;
-  items: { product: { id: string; name: string; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null }; quantity: number }[];
+  items: { product: { id: string; name: string; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null; availableFrom?: string }; quantity: number }[];
   subtotal: number;
   flashSavings: number;
   bundleDiscount: number;
@@ -1857,6 +1857,11 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-700 leading-snug">{product.name}</p>
+                      {isPreorderActive(product.availableFrom) && (
+                        <span className="inline-block mt-0.5 text-[9px] text-white px-1.5 py-0.5 rounded-full font-bold" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                          PRE-ORDER · {preorderDateShort(product.availableFrom!)}
+                        </span>
+                      )}
                       <div className="mt-1.5 inline-flex items-center gap-1 border border-gray-200 rounded-full bg-gray-50">
                         <button type="button" onClick={() => updateQuantity(product.id, quantity - 1)}
                           disabled={paying || quantity <= 1}

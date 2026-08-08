@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2, MapPin, Mail, Phone, CreditCard, ChevronLeft } 
 import { useState, useEffect, useRef } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
+import { isPreorderActive, preorderDateShort } from "@/lib/preorder";
 import { WhyCustomersTrustUs } from "./WhyCustomersTrustUs";
 
 interface ReviewData {
@@ -14,7 +15,7 @@ interface ReviewData {
   deliveryAddress: { street: string; city: string; state: string; zip: string };
   billingAddress: { street: string; city: string; state: string; zip: string };
   sameBilling: boolean;
-  items: { product: { id: string; name: string; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null }; quantity: number }[];
+  items: { product: { id: string; name: string; price: number; salePrice?: number | null; imageUrl?: string | null; category?: string | null; availableFrom?: string }; quantity: number }[];
   subtotal: number;
   flashSavings: number;
   bundleDiscount: number;
@@ -172,7 +173,14 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onCustomerN
             {rd.items.map(({ product: p, quantity }) => (
               <div key={p.id} className="flex items-center gap-3 text-sm">
                 <ItemThumb imageUrl={p.imageUrl} category={p.category} name={p.name} size={40} />
-                <span className="text-gray-700 flex-1 pr-2 leading-snug">{p.name} <span className="text-gray-400">×{quantity}</span></span>
+                <span className="text-gray-700 flex-1 pr-2 leading-snug">
+                  {p.name} <span className="text-gray-400">×{quantity}</span>
+                  {isPreorderActive(p.availableFrom) && (
+                    <span className="ml-1 inline-block text-[9px] text-white px-1.5 py-0.5 rounded-full font-bold align-middle" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                      PRE-ORDER · {preorderDateShort(p.availableFrom!)}
+                    </span>
+                  )}
+                </span>
                 <span className="font-medium text-gray-900 whitespace-nowrap shrink-0">{formatCurrency((p.salePrice ?? p.price) * quantity)}</span>
               </div>
             ))}
