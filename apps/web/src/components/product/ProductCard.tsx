@@ -358,10 +358,10 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
             are already occupying the top-left corner. */}
         {isPreorderActive(product.availableFrom) && (
           <span
-            className={`absolute z-10 leading-none rounded-full flex items-center text-white shadow-sm font-semibold ${
+            className={`absolute z-10 leading-none rounded-full flex items-center text-white font-bold ${
               compact
-                ? `left-1 text-[6px] px-1 py-[2.5px] tracking-wide ${discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-[18px]" : "top-1"}`
-                : `left-2 text-[7px] pl-1.5 pr-1.5 py-[3px] tracking-wide ${
+                ? `left-1 text-[6px] px-1 py-[2.5px] ${discountPct > 0 || (product.bundleEligible && !product.salePrice) ? "top-[23px]" : "top-1"}`
+                : `left-2 text-[7px] pl-1.5 pr-1.5 py-[3px] ${
                     (discountPct > 0 || (product.bundleEligible && !product.salePrice)) && product.pickupOnly
                       ? "top-16"
                       : discountPct > 0 || (product.bundleEligible && !product.salePrice) || product.pickupOnly
@@ -370,7 +370,12 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
                   }`
             }`}
             style={{
-              background: "linear-gradient(135deg,#7f1d1d,#b91c1c)",
+              // Luxury wine-label look (anh Sơn 08/08): thin gold trim +
+              // gloss highlight over the deep-red body
+              background: "linear-gradient(160deg,#991b1b 0%,#7f1d1d 55%,#5f1414 100%)",
+              border: "1px solid rgba(212,175,55,.9)",
+              boxShadow: "0 2px 6px rgba(95,20,20,.5), inset 0 1px 0 rgba(255,255,255,.28)",
+              letterSpacing: "0.07em",
               WebkitTextSizeAdjust: "100%",
               textSizeAdjust: "100%",
             } as React.CSSProperties}
