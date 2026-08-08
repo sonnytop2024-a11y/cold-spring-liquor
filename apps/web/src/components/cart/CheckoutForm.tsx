@@ -541,6 +541,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     () => items.some(it => !isPreorderActive(it.product.availableFrom)),
     [items],
   );
+  // Cart is ONLY pre-order bottles → no pickup time window at all (anh Sơn,
+  // 09/08): the store notifies the customer when the bottle arrives.
+  const preorderOnly = preorderDates.length > 0 && !hasAvailableItems;
 
   // Pick Up In Store — date + time window (dropdowns)
   const [pickupDay, setPickupDay] = useState(0); // days ahead: 0=today … 7
@@ -565,10 +568,14 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   const pickupSlots = useMemo(() => (isPickup ? getPickupWindows(pickupDay) : []), [isPickup, pickupDay]);
   // Auto-select the first window of the chosen day
   useEffect(() => {
+    if (isPickup && preorderOnly) {
+      if (pickupSlot) setPickupSlot(null);
+      return;
+    }
     if (isPickup && pickupSlots.length > 0 && !pickupSlots.some(sl => sl.start === pickupSlot?.start)) {
       setPickupSlot(pickupSlots[0]);
     }
-  }, [isPickup, pickupSlots, pickupSlot]);
+  }, [isPickup, pickupSlots, pickupSlot, preorderOnly]);
 
 
 
@@ -791,7 +798,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     if (!email.includes("@")) e.email = "Valid email required";
     if (phone.replace(/\D/g, "").length < 10) e.phone = "Phone number required";
     if (isPickup) {
-      if (!pickupSlot) e.pickupSlot = "Please select a pickup time window";
+      if (!pickupSlot && !preorderOnly) e.pickupSlot = "Please select a pickup time window";
     } else {
       if (!delivery.street.trim()) e.street = "Street address required";
       else if (!/^\d+\s/.test(delivery.street.trim())) e.street = "Please include your house/building number (e.g. 1221 Sonny Dr)";
@@ -811,7 +818,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
         referenceImageUrl: i.referenceImageUrl, verificationNote: i.verificationNote,
       })),
       ...(isPickup
-        ? { orderType: "pickup", pickupWindow: pickupSlot, deliveryAddress: null, billingAddress: null, billingAddressSameAsDelivery: false }
+        ? { orderType: "pickup", pickupWindow: preorderOnly ? null : pickupSlot, deliveryAddress: null, billingAddress: null, billingAddressSameAsDelivery: false }
         : { orderType: "delivery", deliveryAddress: delivery, billingAddress: delivery, billingAddressSameAsDelivery: true }),
       customerName: name,
       customerEmail: email,
@@ -1001,7 +1008,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             {isPickup ? (
               <>
                 <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wide mb-1">🏬 Pick Up In Store</h3>
-                <p className="text-sm text-gray-800 font-medium">{pickupSlot ? `${pickupSlot.dateLabel} · ${pickupSlot.label}` : ""}</p>
+                <p className="text-sm text-gray-800 font-medium">{pickupSlot ? `${pickupSlot.dateLabel} · ${pickupSlot.label}` : preorderOnly ? "We'll notify you when your pre-order is ready" : ""}</p>
                 <p className="text-sm text-gray-500">{STORE_INFO.street}, {STORE_INFO.city}, {STORE_INFO.state} {STORE_INFO.zip}</p>
                 <StoreHoursList />
               </>
@@ -1127,7 +1134,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           items, subtotal, flashSavings, bundleDiscount, bundlePct, unlockDiscount,
           promoCode, promoDiscount, rewardsDiscount, rewardsPointsToRedeem,
           giftCardAmount: effectiveGiftCard, tax,
-          pickup: isPickup && pickupSlot ? { dateLabel: pickupSlot.dateLabel, label: pickupSlot.label } : null,
+          pickup: isPickup ? (pickupSlot ? { dateLabel: pickupSlot.dateLabel, label: pickupSlot.label } : preorderOnly ? { dateLabel: "Pre-Order", label: "we'll notify you when it's ready" } : null) : null,
           pickupDiscount,
         }}
         onSuccess={(order) => {
@@ -1189,7 +1196,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             rewardsPointsToRedeem,
             giftCardAmount: effectiveGiftCard,
             tax,
-            pickup: isPickup && pickupSlot ? { dateLabel: pickupSlot.dateLabel, label: pickupSlot.label } : null,
+            pickup: isPickup ? (pickupSlot ? { dateLabel: pickupSlot.dateLabel, label: pickupSlot.label } : preorderOnly ? { dateLabel: "Pre-Order", label: "we'll notify you when it's ready" } : null) : null,
             pickupDiscount,
           }}
           onSuccess={(order) => {
@@ -1361,19 +1368,23 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           <Clock size={14} className="text-gray-400" />
           <h2 className="font-bold text-sm text-gray-800 uppercase tracking-wide">Pick Up Time Window</h2>
         </div>
-        <p className="text-xs text-gray-400 mb-4">First available time is 30 minutes from now.</p>
+        {!preorderOnly && <p className="text-xs text-gray-400 mb-4">First available time is 30 minutes from now.</p>}
         {preorderFrom && (
-          <div className="mb-4 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
+          <div className="mb-4 mt-1 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
             <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
             <p className="text-xs text-gray-700 mt-0.5">
-              {preorderDates.length === 1
-                ? <>{hasAvailableItems && "This pickup time applies to your available items. "}Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
-                : <>{hasAvailableItems && "This pickup time applies to your available items. "}Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
+              {preorderOnly
+                ? (preorderDates.length === 1
+                    ? <>Your pre-order is expected on <b>{preorderDateLabel(preorderDates[0])}</b>. We&apos;ll notify you when it is ready for pickup.</>
+                    : <>Each pre-order bottle shows its own expected date. We&apos;ll notify you when each one is ready for pickup.</>)
+                : (preorderDates.length === 1
+                    ? <>{hasAvailableItems && "This pickup time applies to your available items. "}Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                    : <>{hasAvailableItems && "This pickup time applies to your available items. "}Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>)}
             </p>
           </div>
         )}
 
-        {pickupDays.length === 0 ? (
+        {preorderOnly ? null : pickupDays.length === 0 ? (
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
             No pickup windows available right now — please check back tomorrow. (We're closed on Sunday.)
           </div>

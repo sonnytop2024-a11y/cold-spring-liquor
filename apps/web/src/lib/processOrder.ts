@@ -135,6 +135,9 @@ export async function processOrder(
   const preorderDate = preorderItems.length
     ? preorderItems.map(i => i.availableFrom as string).sort().pop()!
     : undefined;
+  // Every item is a pre-order → a pickup order needs NO time window; the
+  // store notifies the customer when the bottles arrive (anh Sơn, 09/08).
+  const preorderOnly = preorderItems.length > 0 && preorderItems.length === enrichedItems.length;
 
   // Unlock Deals ("spend $X, unlock product Y at $Z"): the price for a
   // deal-tagged product is NEVER trusted from the client — force it to the
@@ -220,7 +223,7 @@ export async function processOrder(
     return { error: `Minimum order is $${minOrder}. Please add more items to your cart.`, status: 422 };
   }
 
-  if (isPickup) {
+  if (isPickup && !preorderOnly) {
     const winError = validatePickupWindow(body.pickupWindow);
     if (winError) return { error: winError, status: 422 };
   } else {
@@ -299,7 +302,7 @@ export async function processOrder(
     deliveryFee: 0,
     deliveryType: timing.type,
     orderType: isPickup ? "pickup" : "delivery",
-    pickupWindow: isPickup ? body.pickupWindow : undefined,
+    pickupWindow: isPickup ? (body.pickupWindow ?? undefined) : undefined,
     pickupDiscount: isPickup ? pickupDiscount : undefined,
     deliveryAddress: isPickup ? null : deliveryAddress,
     billingAddress: isPickup ? (billingAddress ?? null) : (billingAddressSameAsDelivery ? deliveryAddress : (billingAddress ?? deliveryAddress)),
@@ -320,7 +323,7 @@ export async function processOrder(
     // next-morning / before-opening ETA is a fixed future time — set now so customer knows when to expect
     // pickup: ETA = start of the chosen pickup window
     estimatedDelivery: isPickup
-      ? body.pickupWindow.start
+      ? (body.pickupWindow?.start ?? null)
       : timing.type === "next-morning" || timing.isStoreClosed ? timing.estimatedDelivery.toISOString() : null,
     // Display-only: available items ship normally, the store notifies the
     // customer for pickup when the pre-order bottle arrives (anh Sơn, 09/08)
