@@ -1857,12 +1857,8 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-700 leading-snug">{product.name}</p>
-                      {isPreorderActive(product.availableFrom) && (
-                        <span className="inline-block mt-0.5 text-[9px] text-white px-1.5 py-0.5 rounded-full font-bold" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
-                          PRE-ORDER · {preorderDateShort(product.availableFrom!)}
-                        </span>
-                      )}
-                      <div className="mt-1.5 inline-flex items-center gap-1 border border-gray-200 rounded-full bg-gray-50">
+                      <div className="mt-1.5 flex items-center gap-2">
+                      <div className="inline-flex items-center gap-1 border border-gray-200 rounded-full bg-gray-50">
                         <button type="button" onClick={() => updateQuantity(product.id, quantity - 1)}
                           disabled={paying || quantity <= 1}
                           aria-label={`Decrease quantity of ${product.name}`}
@@ -1876,6 +1872,12 @@ function StripePaymentForm({ clientSecret, orderPayload, total, minOrder, review
                           className="w-7 h-7 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                           <Plus size={13} />
                         </button>
+                      </div>
+                      {isPreorderActive(product.availableFrom) && (
+                        <span className="text-[9px] text-white px-2 py-1 rounded-full font-bold shrink-0" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                          PRE-ORDER
+                        </span>
+                      )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">

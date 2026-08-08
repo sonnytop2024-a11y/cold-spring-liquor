@@ -4,7 +4,7 @@ import { AlertTriangle, Loader2, MapPin, Mail, Phone, CreditCard, ChevronLeft } 
 import { useState, useEffect, useRef } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
-import { isPreorderActive, preorderDateShort } from "@/lib/preorder";
+import { isPreorderActive } from "@/lib/preorder";
 import { WhyCustomersTrustUs } from "./WhyCustomersTrustUs";
 
 interface ReviewData {
@@ -177,7 +177,7 @@ export function PayPalPaymentForm({ total, orderPayload, reviewData, onCustomerN
                   {p.name} <span className="text-gray-400">×{quantity}</span>
                   {isPreorderActive(p.availableFrom) && (
                     <span className="ml-1 inline-block text-[9px] text-white px-1.5 py-0.5 rounded-full font-bold align-middle" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
-                      PRE-ORDER · {preorderDateShort(p.availableFrom!)}
+                      PRE-ORDER
                     </span>
                   )}
                 </span>
