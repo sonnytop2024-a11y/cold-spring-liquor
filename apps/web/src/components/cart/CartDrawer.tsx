@@ -261,13 +261,17 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
               {(() => {
                 const dates = [...new Set(items.map(i => i.product.availableFrom).filter(f => isPreorderActive(f)))] as string[];
                 if (dates.length === 0) return null;
+                // "Your available items…" only makes sense when the cart MIXES
+                // available + pre-order products (anh Sơn, 09/08)
+                const hasAvailable = items.some(i => !isPreorderActive(i.product.availableFrom));
+                const lead = hasAvailable ? "Your available items will be delivered or prepared for pickup as usual. " : "";
                 return (
                   <div className="rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-3 py-2.5 mb-1">
                     <p className="text-[12px] font-extrabold text-red-800">⏳ PRE-ORDER IN CART</p>
                     <p className="text-[11px] text-gray-700 mt-0.5 leading-snug">
                       {dates.length === 1
-                        ? <>Your available items will be delivered or prepared for pickup as usual. Your pre-order item is expected on <b>{preorderDateLabel(dates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
-                        : <>Your available items will be delivered or prepared for pickup as usual. Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
+                        ? <>{lead}Your pre-order item is expected on <b>{preorderDateLabel(dates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                        : <>{lead}Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
                     </p>
                   </div>
                 );

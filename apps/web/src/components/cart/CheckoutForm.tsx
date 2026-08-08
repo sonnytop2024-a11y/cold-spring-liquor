@@ -536,6 +536,11 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     [items],
   );
   const preorderFrom = preorderDates[preorderDates.length - 1] ?? null;
+  // Mixed cart? The "Your available items…" lead only appears when true.
+  const hasAvailableItems = useMemo(
+    () => items.some(it => !isPreorderActive(it.product.availableFrom)),
+    [items],
+  );
 
   // Pick Up In Store — date + time window (dropdowns)
   const [pickupDay, setPickupDay] = useState(0); // days ahead: 0=today … 7
@@ -1323,8 +1328,8 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
             <p className="text-xs text-gray-700 mt-0.5">
               {preorderDates.length === 1
-                ? <>Your available items will be delivered based on your selection. Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
-                : <>Your available items will be delivered based on your selection. Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
+                ? <>{hasAvailableItems && "Your available items will be delivered based on your selection. "}Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                : <>{hasAvailableItems && "Your available items will be delivered based on your selection. "}Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
             </p>
           </div>
         )}
@@ -1362,8 +1367,8 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
             <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
             <p className="text-xs text-gray-700 mt-0.5">
               {preorderDates.length === 1
-                ? <>This pickup time applies to your available items. Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
-                : <>This pickup time applies to your available items. Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
+                ? <>{hasAvailableItems && "This pickup time applies to your available items. "}Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                : <>{hasAvailableItems && "This pickup time applies to your available items. "}Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
             </p>
           </div>
         )}

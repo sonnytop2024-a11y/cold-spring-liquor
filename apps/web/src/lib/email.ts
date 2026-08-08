@@ -116,10 +116,11 @@ function orderConfirmationHtml(order: MockOrder): string {
       <p style="margin:0 0 4px;font-size:11px;color:#7f1d1d;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">⏳ Pre-Order</p>
       <p style="margin:0;font-size:14px;color:#991b1b;font-weight:700;">${(() => {
         const dates = [...new Set((order.items ?? []).map((it) => it.availableFrom).filter(Boolean))] as string[];
-        const lead = `Your available items will be ${isPickup ? "prepared for pickup as scheduled" : "delivered as usual"}.`;
+        const hasAvailable = (order.items ?? []).some((it) => !it.availableFrom);
+        const lead = hasAvailable ? `Your available items will be ${isPickup ? "prepared for pickup as scheduled" : "delivered as usual"}. ` : "";
         return dates.length > 1
-          ? `${lead} Each pre-order bottle has its own expected date (listed below) — we'll notify you when each one is ready for pickup.`
-          : `${lead} Your pre-order item is expected on <b>${preorderDateLabel(dates[0] ?? order.preorderDate!)}</b> — we'll notify you when it is ready for pickup.`;
+          ? `${lead}Each pre-order bottle has its own expected date (listed below) — we'll notify you when each one is ready for pickup.`
+          : `${lead}Your pre-order item is expected on <b>${preorderDateLabel(dates[0] ?? order.preorderDate!)}</b> — we'll notify you when it is ready for pickup.`;
       })()}</p>
     </td></tr></table>` : ""}
     ${isPickup ? pickupInfoBlock(order) : eta ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
