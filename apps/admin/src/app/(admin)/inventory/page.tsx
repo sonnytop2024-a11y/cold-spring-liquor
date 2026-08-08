@@ -1084,7 +1084,7 @@ function ProductModal({ product, onClose, onSave, saving, categories }: ProductM
           <div className="rounded-xl border px-4 py-3 bg-red-50 border-red-200">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-red-800">📅 Pre-Order — Available From</p>
+                <p className="text-sm font-semibold text-red-800">⏳ Pre-Order — Available From</p>
                 <p className="text-xs text-red-600 mt-0.5">
                   {form.availableFrom
                     ? "Khách thấy badge PRE-ORDER và đặt trước — nhận hàng từ ngày này. Tới ngày tự thành sản phẩm thường."

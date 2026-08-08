@@ -360,9 +360,9 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
         {/* Pre-Order: fulfilled on the release date, not today */}
         {order.preorderDate && !isDelivered && !isFailed && (
           <div className="mt-3 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
-            <p className="text-[13px] font-extrabold text-red-800">📅 PRE-ORDER</p>
+            <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
             <p className="text-xs text-gray-700 mt-0.5">
-              Your bottle will be {isPickupOrder ? "ready for pick up" : "delivered"} on <b>{preorderDateLabel(order.preorderDate)}</b>.
+              Your available items are on the normal schedule above. Your pre-order item is expected on <b>{preorderDateLabel(order.preorderDate)}</b> — we&apos;ll notify you when it is ready for pickup.
             </p>
           </div>
         )}

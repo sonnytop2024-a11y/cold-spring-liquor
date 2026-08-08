@@ -27,6 +27,8 @@ export interface MockOrder {
     productId: string; name: string; price: number; quantity: number;
     // Missing Product Image Assistance — customer-supplied when the product has no photo
     referenceImageUrl?: string; verificationNote?: string;
+    /** Item was a PRE-ORDER at purchase time — expected in stock on this date */
+    availableFrom?: string;
   }>;
   subtotal: number;
   bundleDiscount: number;

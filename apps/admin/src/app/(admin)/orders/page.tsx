@@ -184,7 +184,7 @@ function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
             <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>{String(order.status).replace(/_/g, " ")}</span>
             {order.preorderDate && (
               <span className="text-xs px-2.5 py-1 rounded-full font-bold text-white" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
-                📅 PRE-ORDER · {new Date(order.preorderDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                ⏳ PRE-ORDER · {new Date(order.preorderDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               </span>
             )}
             {isPickup
@@ -220,7 +220,14 @@ function DetailModal({ order, onClose }: { order: any; onClose: () => void }) {
             <div className="space-y-1.5">
               {order.items?.map((it: any, i: number) => (
                 <div key={i} className="flex justify-between gap-3">
-                  <span className="text-gray-700">{it.name} <span className="text-gray-400">×{it.quantity}</span></span>
+                  <span className="text-gray-700">
+                    {it.name} <span className="text-gray-400">×{it.quantity}</span>
+                    {it.availableFrom && (
+                      <span className="ml-1.5 text-[9px] font-bold text-white px-1.5 py-0.5 rounded-full align-middle" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                        PRE-ORDER · {new Date(it.availableFrom + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </span>
                   <span className="font-medium shrink-0">{money(it.price * it.quantity)}</span>
                 </div>
               ))}
@@ -592,7 +599,7 @@ export default function OrdersPage() {
     { key: "week", label: "This Week" },
     { key: "month", label: "This Month" },
     { key: "lastmonth", label: "Last Month" },
-    { key: "custom", label: "📅 Custom" },
+    { key: "custom", label: "⏳ Custom" },
     { key: "all", label: "All Orders" },
   ];
   const TYPE_FILTERS = [
@@ -726,7 +733,7 @@ export default function OrdersPage() {
               </span>
               {order.preorderDate && (
                 <span className="text-xs px-2.5 py-0.5 rounded-full font-bold text-white border border-red-800" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
-                  📅 PRE-ORDER · {new Date(order.preorderDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  ⏳ PRE-ORDER · {new Date(order.preorderDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </span>
               )}
               {isPickupOrder ? (
@@ -883,7 +890,14 @@ export default function OrdersPage() {
               <div className="space-y-1">
                 {order.items?.map((item: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span>{item.name} ×{item.quantity}</span>
+                    <span>
+                      {item.name} ×{item.quantity}
+                      {item.availableFrom && (
+                        <span className="ml-1.5 text-[9px] font-bold text-white px-1.5 py-0.5 rounded-full align-middle" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                          PRE-ORDER · {new Date(item.availableFrom + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </span>
                     <span className="text-gray-600">${(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}

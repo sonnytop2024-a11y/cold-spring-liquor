@@ -112,8 +112,8 @@ function orderConfirmationHtml(order: MockOrder): string {
 
     ${order.preorderDate ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
     <tr><td style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:2px solid #b91c1c;border-radius:14px;padding:18px 24px;">
-      <p style="margin:0 0 4px;font-size:11px;color:#7f1d1d;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">📅 Pre-Order</p>
-      <p style="margin:0;font-size:16px;color:#991b1b;font-weight:800;">Your bottle will be ${isPickup ? "ready for pick up" : "delivered"} on ${preorderDateLabel(order.preorderDate)}</p>
+      <p style="margin:0 0 4px;font-size:11px;color:#7f1d1d;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">⏳ Pre-Order</p>
+      <p style="margin:0;font-size:14px;color:#991b1b;font-weight:700;">Your available items will be ${isPickup ? "prepared for pickup as scheduled" : "delivered as usual"}. Your pre-order item is expected on <b>${preorderDateLabel(order.preorderDate)}</b> — we'll notify you when it is ready for pickup.</p>
     </td></tr></table>` : ""}
     ${isPickup ? pickupInfoBlock(order) : eta ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
     <tr><td style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:2px solid #f97316;border-radius:14px;padding:18px 24px;">

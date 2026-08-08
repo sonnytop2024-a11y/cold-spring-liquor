@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Product, CartItem } from "@/types";
-import { isPreorderActive } from "@/lib/preorder";
 
 export interface AppliedGiftCard {
   code: string;
@@ -21,7 +20,7 @@ interface CartState {
   giftCardAmount: number;
   rewardsPointsToRedeem: number;
 
-  /** Returns false when blocked: pre-order bottles must be ordered separately from normal items */
+  /** Always returns true (kept boolean for caller compatibility) */
   addItem: (product: Product, quantity?: number, extras?: { referenceImageUrl?: string; verificationNote?: string }) => boolean;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
@@ -54,17 +53,9 @@ export const useCartStore = create<CartState>()(
       rewardsPointsToRedeem: 0,
 
       addItem: (product, quantity = 1, extras) => {
-        // Pre-order rule (anh Sơn, 08/08): a pre-order bottle checks out as
-        // its own separate order — never mixed with normal items, and never
-        // mixed with a pre-order for a DIFFERENT release date.
-        const current = useCartStore.getState().items;
-        const newFrom = isPreorderActive(product.availableFrom) ? product.availableFrom : null;
-        const clash = current.some((i) => {
-          const itemFrom = isPreorderActive(i.product.availableFrom) ? i.product.availableFrom : null;
-          return i.product.id !== product.id && itemFrom !== newFrom;
-        });
-        if (clash) return false;
-
+        // Pre-order bottles mix freely with regular items (anh Sơn, 09/08 —
+        // the earlier separate-order rule was dropped): one cart, one
+        // payment, the whole order is fulfilled on the release date.
         set((state) => {
           const cap = product.stockQty ?? Infinity;
           const existing = state.items.find((i) => i.product.id === product.id);

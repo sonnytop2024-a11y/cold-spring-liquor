@@ -1239,7 +1239,12 @@ function OrderCard({ order, driverId, driverLoc, onRefresh }: { order: any; driv
           <div className="mx-4 mb-2 bg-gray-50 rounded-lg p-2.5 space-y-1">
             {order.items.map((item: any, i: number) => (
               <div key={i} className="flex justify-between text-xs text-gray-600">
-                <span>🍷 {item.name} ×{item.quantity}</span>
+                <span>
+                  🍷 {item.name} ×{item.quantity}
+                  {item.availableFrom && (
+                    <span className="ml-1 text-[9px] font-bold text-red-700">⏳ PRE-ORDER — store handles, do NOT deliver</span>
+                  )}
+                </span>
                 <span>${(item.price * item.quantity).toFixed(2)}</span>
               </div>
             ))}

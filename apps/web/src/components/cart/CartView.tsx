@@ -6,6 +6,7 @@ import { Trash2, Plus, Minus, Tag, Gift, Star, Truck } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
+import { isPreorderActive, preorderDateShort } from "@/lib/preorder";
 import {
   formatCurrency,
   calcCartTotals,
@@ -181,6 +182,11 @@ export function CartView() {
                 </Link>
                 {product.pickupOnly && (
                   <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold shrink-0">PICKUP ONLY</span>
+                )}
+                {isPreorderActive(product.availableFrom) && (
+                  <span className="text-[9px] text-white px-1 py-0.5 rounded font-bold shrink-0" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                    PRE-ORDER · {preorderDateShort(product.availableFrom!)}
+                  </span>
                 )}
               </div>
               <p className="text-sm text-gray-500">{product.brand} · {product.volume}</p>

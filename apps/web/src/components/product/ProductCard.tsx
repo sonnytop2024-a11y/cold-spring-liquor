@@ -209,10 +209,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
 
   function handleAdd(e: React.MouseEvent) {
     e.preventDefault();
-    if (!addItem(product)) {
-      alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first.");
-      return;
-    }
+    addItem(product);
     triggerPop();
     if (compact) { pokeStepper(); return; }
     setJustAdded(true);
@@ -223,7 +220,7 @@ function ProductCardImpl({ product, priority = false, compact = false }: Product
     e.preventDefault();
     if (compact) pokeStepper();
     if (qty >= product.stockQty) return;
-    if (!addItem(product)) { alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first."); return; }
+    addItem(product);
     triggerPop();
   }
 

@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/authStore";
 import { formatCurrency, calcCartTotals, calcPointsEarned, calcPointsValue, MIN_ORDER } from "@/lib/utils";
 import { calcDiscounts } from "@/lib/discountRules";
 import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
+import { isPreorderActive, preorderDateShort, preorderDateLabel } from "@/lib/preorder";
 import type { Product } from "@/types";
 
 interface CartDrawerProps {
@@ -178,6 +179,11 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
                       {product.pickupOnly && (
                         <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold shrink-0">PICKUP ONLY</span>
                       )}
+                      {isPreorderActive(product.availableFrom) && (
+                        <span className="text-[9px] text-white px-1 py-0.5 rounded font-bold shrink-0" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                          PRE-ORDER · {preorderDateShort(product.availableFrom!)}
+                        </span>
+                      )}
                     </Link>
                     {product.couponExcluded && couponCode && (
                       <p className="text-[10px] text-gray-400 italic">Coupon not applicable</p>
@@ -250,6 +256,17 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
             </div>
 
             <div className="border-t px-5 py-4 space-y-2 text-sm">
+              {(() => {
+                const pre = items.map(i => i.product.availableFrom).filter(f => isPreorderActive(f)).sort().pop();
+                return pre ? (
+                  <div className="rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-3 py-2.5 mb-1">
+                    <p className="text-[12px] font-extrabold text-red-800">⏳ PRE-ORDER IN CART</p>
+                    <p className="text-[11px] text-gray-700 mt-0.5 leading-snug">
+                      Your available items will be delivered or prepared for pickup as usual. Your pre-order item is expected on <b>{preorderDateLabel(pre!)}</b> — we&apos;ll notify you when it is ready for pickup.
+                    </p>
+                  </div>
+                ) : null;
+              })()}
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotal)}</span>

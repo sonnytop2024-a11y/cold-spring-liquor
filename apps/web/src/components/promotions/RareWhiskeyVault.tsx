@@ -417,11 +417,8 @@ function InfoCell({
 
   const handleAdd = () => {
     if (soldOut || state !== "idle") return;
-    if (!addItem(item.product, qty)) {
-      alert("Pre-order bottles are ordered separately. Please complete or clear your current cart first.");
-      return;
-    }
     setState("adding");
+    addItem(item.product, qty);
     setTimeout(() => {
       setState("added");
       onAdded(item, qty);

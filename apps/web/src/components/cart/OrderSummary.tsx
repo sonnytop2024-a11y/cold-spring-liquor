@@ -7,6 +7,7 @@ import { useCheckoutStore } from "@/store/checkoutStore";
 import { calcDiscounts } from "@/lib/discountRules";
 import { formatCurrency, calcPointsValue } from "@/lib/utils";
 import { calcPickupDiscount, PICKUP_DISCOUNT_LABEL } from "@/lib/pickupWindows";
+import { isPreorderActive, preorderDateShort } from "@/lib/preorder";
 
 const TAX_RATE = 0.0825;
 
@@ -89,6 +90,11 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
                 <div className="flex-1 min-w-0">
                   <p className="text-gray-700 text-xs leading-snug line-clamp-2">{product.name}</p>
                   {hasFlash && <span className="text-[10px] text-red-600 font-bold">⚡ Flash Deal</span>}
+                  {isPreorderActive(product.availableFrom) && (
+                    <span className="inline-block text-[9px] text-white px-1 py-0.5 rounded font-bold mt-0.5" style={{ background: "linear-gradient(135deg,#7f1d1d,#b91c1c)" }}>
+                      PRE-ORDER · {preorderDateShort(product.availableFrom!)}
+                    </span>
+                  )}
                   {product.couponExcluded && promoCode && (
                     <p className="text-[10px] text-gray-400 italic">Coupon not applicable</p>
                   )}
