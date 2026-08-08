@@ -358,14 +358,20 @@ export function OrderTracker({ orderId, storePhone, storeTextPhone, storeAddress
         )}
 
         {/* Pre-Order: fulfilled on the release date, not today */}
-        {order.preorderDate && !isDelivered && !isFailed && (
-          <div className="mt-3 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
-            <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
-            <p className="text-xs text-gray-700 mt-0.5">
-              Your available items are on the normal schedule above. Your pre-order item is expected on <b>{preorderDateLabel(order.preorderDate)}</b> — we&apos;ll notify you when it is ready for pickup.
-            </p>
-          </div>
-        )}
+        {order.preorderDate && !isDelivered && !isFailed && (() => {
+          const dates = [...new Set((order.items ?? []).map((it: { availableFrom?: string }) => it.availableFrom).filter(Boolean))] as string[];
+          const single = dates.length <= 1 ? (dates[0] ?? order.preorderDate) : null;
+          return (
+            <div className="mt-3 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
+              <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
+              <p className="text-xs text-gray-700 mt-0.5">
+                {single
+                  ? <>Your available items are on the normal schedule above. Your pre-order item is expected on <b>{preorderDateLabel(single)}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                  : <>Your available items are on the normal schedule above. Each pre-order bottle has its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
+              </p>
+            </div>
+          );
+        })()}
 
         {/* ID reminder when delivery is active */}
         {ACTIVE_STATUSES.includes(order.status) && (

@@ -22,6 +22,8 @@ interface CartState {
 
   /** Always returns true (kept boolean for caller compatibility) */
   addItem: (product: Product, quantity?: number, extras?: { referenceImageUrl?: string; verificationNote?: string }) => boolean;
+  /** Merge fresh admin-editable fields (availableFrom, stock, …) into a cart item's product snapshot */
+  syncProductInfo: (productId: string, fields: Partial<Product>) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -85,6 +87,13 @@ export const useCartStore = create<CartState>()(
         });
         return true;
       },
+
+      syncProductInfo: (productId, fields) =>
+        set((state) => ({
+          items: state.items.map((i) =>
+            i.product.id === productId ? { ...i, product: { ...i.product, ...fields } } : i,
+          ),
+        })),
 
       removeItem: (productId) =>
         set((state) => ({

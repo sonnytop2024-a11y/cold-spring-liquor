@@ -11,6 +11,7 @@ import { formatCurrency, calcCartTotals, calcPointsEarned, calcPointsValue, MIN_
 import { calcDiscounts } from "@/lib/discountRules";
 import { categoryPlaceholder } from "@/lib/categoryPlaceholder";
 import { isPreorderActive, preorderDateShort, preorderDateLabel } from "@/lib/preorder";
+import { useRefreshCartProducts } from "@/hooks/useRefreshCartProducts";
 import type { Product } from "@/types";
 
 interface CartDrawerProps {
@@ -25,6 +26,7 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
+  useRefreshCartProducts(open);
   const closeForNav = onNavigate ?? onClose;
   const { items, updateQuantity, removeItem, addItem, couponCode, couponDiscount, giftCardAmount, rewardsPointsToRedeem, setRewardsRedeem } = useCartStore();
   const { user } = useAuthStore();
@@ -257,15 +259,18 @@ export function CartDrawer({ open, onClose, onNavigate }: CartDrawerProps) {
 
             <div className="border-t px-5 py-4 space-y-2 text-sm">
               {(() => {
-                const pre = items.map(i => i.product.availableFrom).filter(f => isPreorderActive(f)).sort().pop();
-                return pre ? (
+                const dates = [...new Set(items.map(i => i.product.availableFrom).filter(f => isPreorderActive(f)))] as string[];
+                if (dates.length === 0) return null;
+                return (
                   <div className="rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-3 py-2.5 mb-1">
                     <p className="text-[12px] font-extrabold text-red-800">⏳ PRE-ORDER IN CART</p>
                     <p className="text-[11px] text-gray-700 mt-0.5 leading-snug">
-                      Your available items will be delivered or prepared for pickup as usual. Your pre-order item is expected on <b>{preorderDateLabel(pre!)}</b> — we&apos;ll notify you when it is ready for pickup.
+                      {dates.length === 1
+                        ? <>Your available items will be delivered or prepared for pickup as usual. Your pre-order item is expected on <b>{preorderDateLabel(dates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                        : <>Your available items will be delivered or prepared for pickup as usual. Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
                     </p>
                   </div>
-                ) : null;
+                );
               })()}
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal</span>

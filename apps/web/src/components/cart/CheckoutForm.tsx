@@ -14,6 +14,7 @@ import { formatPhoneUS } from "@/lib/phoneUtils";
 import { getDeliveryTiming } from "@/lib/deliveryTiming";
 import { getPickupWindows, isPickupDayOpen, pickupDateLabel, MAX_PICKUP_DAYS_AHEAD, calcPickupDiscount, PICKUP_DISCOUNT_LABEL, type PickupSlot } from "@/lib/pickupWindows";
 import { isPreorderActive, preorderDateLabel } from "@/lib/preorder";
+import { useRefreshCartProducts } from "@/hooks/useRefreshCartProducts";
 import { StoreHoursList, ItemThumb } from "@/components/shared/orderDisplay";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
@@ -502,6 +503,8 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
     if (deliveryDisabled && mode === "delivery" && !fulfillmentLocked) setFulfillmentMode("pickup");
   }, [deliveryDisabled, mode, fulfillmentLocked, setFulfillmentMode]);
   const { items, clearCart, removeItem, rewardsPointsToRedeem, setRewardsRedeem, giftCards, giftCardCode, giftCardAmount, addGiftCard, removeGiftCard } = useCartStore();
+  // Pull fresh admin-editable product fields (pre-order date, stock) on mount
+  useRefreshCartProducts(true);
   const pickupOnlyConflictItems = items.filter(i => i.product.pickupOnly && !isPickup);
   const { user, isLoggedIn } = useAuthStore();
   const router = useRouter();
@@ -528,14 +531,11 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   // on the available-now items. Pre-order items never shift delivery or
   // pickup scheduling; the store notifies the customer for pickup when the
   // bottle actually arrives. preorderFrom is display-only.
-  const preorderFrom = useMemo(() => {
-    let max: string | null = null;
-    for (const it of items) {
-      const f = it.product.availableFrom;
-      if (isPreorderActive(f) && (!max || f! > max)) max = f!;
-    }
-    return max;
-  }, [items]);
+  const preorderDates = useMemo(
+    () => [...new Set(items.map(it => it.product.availableFrom).filter(f => isPreorderActive(f)))].sort() as string[],
+    [items],
+  );
+  const preorderFrom = preorderDates[preorderDates.length - 1] ?? null;
 
   // Pick Up In Store — date + time window (dropdowns)
   const [pickupDay, setPickupDay] = useState(0); // days ahead: 0=today … 7
@@ -1322,7 +1322,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           <div className="mt-3 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
             <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
             <p className="text-xs text-gray-700 mt-0.5">
-              Your available items will be delivered based on your selection. Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderFrom)}</b> — we&apos;ll notify you when it is ready for pickup.
+              {preorderDates.length === 1
+                ? <>Your available items will be delivered based on your selection. Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                : <>Your available items will be delivered based on your selection. Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
             </p>
           </div>
         )}
@@ -1359,7 +1361,9 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
           <div className="mb-4 rounded-xl border-[1.5px] border-red-700 bg-gradient-to-br from-red-50 to-red-100 px-4 py-3">
             <p className="text-[13px] font-extrabold text-red-800">⏳ PRE-ORDER IN THIS ORDER</p>
             <p className="text-xs text-gray-700 mt-0.5">
-              This pickup time applies to your available items. Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderFrom)}</b> — we&apos;ll notify you when it is ready for pickup.
+              {preorderDates.length === 1
+                ? <>This pickup time applies to your available items. Your pre-order item is expected to be available on <b>{preorderDateLabel(preorderDates[0])}</b> — we&apos;ll notify you when it is ready for pickup.</>
+                : <>This pickup time applies to your available items. Each pre-order bottle shows its own expected date — we&apos;ll notify you when each one is ready for pickup.</>}
             </p>
           </div>
         )}
