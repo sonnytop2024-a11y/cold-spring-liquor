@@ -346,6 +346,9 @@ export interface StoreSettings {
   heroWeather?: HeroWeatherSettings;
   heroShowcase?: HeroShowcaseSettings;
   heroDisplayMode?: HeroDisplayMode;
+  /** yyyy-mm-dd (America/Chicago) — guards the nightly pre-order date advance
+      from double-running if the cron fires twice or is triggered manually */
+  preorderLastAdvanceDate?: string;
 }
 
 interface StoreData {
