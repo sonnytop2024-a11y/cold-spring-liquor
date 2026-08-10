@@ -1596,7 +1596,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
       {/* Delivery timing (delivery only). After the 8:30 PM cutoff the
           StoreClosingBanner above the submit button takes over — no small
           amber note here, so the message isn't shown twice. */}
-      {!isPickup && timing.type === "same-day" && (
+      {!isPickup && !preorderOnly && timing.type === "same-day" && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
           <Clock size={15} className="shrink-0 text-green-600" />
           <span>{timing.message}</span>
