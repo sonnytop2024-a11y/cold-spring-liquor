@@ -1087,7 +1087,7 @@ function ProductModal({ product, onClose, onSave, saving, categories }: ProductM
                 <p className="text-sm font-semibold text-red-800">⏳ Pre-Order — Available From</p>
                 <p className="text-xs text-red-600 mt-0.5">
                   {form.availableFrom
-                    ? "Khách thấy badge PRE-ORDER và đặt trước — nhận hàng từ ngày này. Tới ngày tự thành sản phẩm thường."
+                    ? "Khách thấy badge PRE-ORDER và đặt trước — nhận hàng từ ngày này. Mỗi đêm tự cộng thêm 1 ngày cho tới khi anh bấm Remove."
                     : "Để trống = bán thường. Chọn ngày TƯƠNG LAI = khách pre-order tới ngày đó."}
                 </p>
               </div>
@@ -1098,6 +1098,18 @@ function ProductModal({ product, onClose, onSave, saving, categories }: ProductM
                 className="border border-red-300 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white shrink-0"
               />
             </div>
+            {/* Native date pickers (esp. iOS) have no "clear" affordance —
+                a dedicated button is the only reliable way to blank the
+                field on mobile (anh Sơn, 11/08). */}
+            {form.availableFrom && (
+              <button
+                type="button"
+                onClick={() => set("availableFrom", null)}
+                className="mt-2.5 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-red-700 border border-red-300 bg-white rounded-lg py-2 hover:bg-red-100"
+              >
+                <X size={13} /> Remove Pre-Order (back to available now)
+              </button>
+            )}
           </div>
 
           {/* Bundle Sale eligibility */}
