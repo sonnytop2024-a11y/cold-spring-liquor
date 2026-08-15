@@ -151,7 +151,6 @@ export async function processOrder(
   let anyDealUnlocked = false;
   let winningDealId: string | null = null;
   if (activeUnlockDeals.length > 0) {
-    const rawSubtotal = enrichedItems.reduce((s, i) => s + i.price * i.quantity, 0);
     // Only ONE Unlocked Deal may apply per order, and only for exactly ONE
     // unit — find every item that qualifies, then let the lowest-sortOrder
     // deal win (ties keep cart order, since Array.sort is stable). Extra
@@ -166,7 +165,17 @@ export async function processOrder(
       const ei = enrichedItems[idx];
       const deal = activeUnlockDeals.find(d => d.productId === ei.productId);
       if (!deal) continue;
-      const otherSubtotal = rawSubtotal - ei.price;
+      // Per-deal qualifying spend: everything EXCEPT items whose category is
+      // on this deal's exclusion list (anh Sơn, 11/08). Server is
+      // authoritative — mirrors discountRules.ts exactly.
+      const excluded = deal.excludedCategories ?? [];
+      let qualifyingSubtotal = 0;
+      for (const other of enrichedItems) {
+        if (other.category && excluded.includes(other.category)) continue;
+        qualifyingSubtotal += other.price * other.quantity;
+      }
+      const itemExcluded = !!ei.category && excluded.includes(ei.category);
+      const otherSubtotal = itemExcluded ? qualifyingSubtotal : qualifyingSubtotal - ei.price;
       if (otherSubtotal >= deal.minSpend) candidates.push({ idx, deal });
     }
     candidates.sort((a, b) => (a.deal.sortOrder ?? 0) - (b.deal.sortOrder ?? 0));

@@ -705,7 +705,7 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
 
   // Totals — delivery always FREE, minimum order $20
   const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
-    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
+    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity, category: i.product.category })),
     bundleTiers,
     unlockDeals,
   ), [items, bundleTiers, unlockDeals]);

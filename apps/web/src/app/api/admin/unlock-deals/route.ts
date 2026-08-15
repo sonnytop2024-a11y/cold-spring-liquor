@@ -7,7 +7,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { productId, productName, productBrand, productImage, productSlug, regularPrice, minSpend, specialPrice, maxRedemptions, active, sortOrder } = body;
+  const { productId, productName, productBrand, productImage, productSlug, regularPrice, minSpend, specialPrice, maxRedemptions, excludedCategories, active, sortOrder } = body;
 
   if (!productId || !productName) {
     return NextResponse.json({ error: "productId and productName required" }, { status: 400 });
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     minSpend: Number(minSpend),
     specialPrice: Number(specialPrice),
     maxRedemptions: Number(maxRedemptions) > 0 ? Number(maxRedemptions) : null,
+    excludedCategories: Array.isArray(excludedCategories) ? excludedCategories.filter((c: unknown) => typeof c === "string") : [],
     active: active !== false,
     sortOrder: Number(sortOrder) || 0,
   });

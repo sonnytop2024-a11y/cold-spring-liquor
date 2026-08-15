@@ -12,6 +12,7 @@ export interface DiscountItem {
   bundleEligible?: boolean;
   couponExcluded?: boolean;
   quantity: number;
+  category?: string;
 }
 
 export interface BundleTierLike {
@@ -26,6 +27,8 @@ export interface UnlockDealLike {
   specialPrice: number;
   active?: boolean;
   sortOrder?: number;
+  /** Category values that do NOT count toward this deal's spend threshold */
+  excludedCategories?: string[];
 }
 
 export interface DiscountBreakdown {
@@ -103,11 +106,24 @@ export function calcDiscounts(
     if (isFlash || !item.productId) continue;
     const deal = activeDeals.find(d => d.productId === item.productId);
     if (!deal) continue;
+    // Per-deal qualifying spend: everything EXCEPT items whose category is
+    // on this deal's exclusion list (anh Sơn, 11/08 — e.g. exclude "Hard To
+    // Find" so buying other rare bottles can't unlock a rare $1 deal; the
+    // customer has to spend the threshold on the rest of the store).
+    const excluded = deal.excludedCategories ?? [];
+    let qualifyingSubtotal = 0;
+    for (const it of items) {
+      if (it.category && excluded.includes(it.category)) continue;
+      const f = it.salePrice != null && it.salePrice < it.price;
+      qualifyingSubtotal += (f ? it.salePrice! : it.price) * it.quantity;
+    }
     // Only the ONE unit that would actually be discounted is excluded from
     // the qualifying spend — extra units of this same product still count
     // (a customer buying 2 at $11.99 with nothing else should still qualify
-    // off that 2nd unit, not get excluded entirely).
-    const otherSubtotal = subtotal - item.price;
+    // off that 2nd unit, not get excluded entirely). Skip the subtraction if
+    // this item's own category was already excluded above.
+    const itemExcluded = !!item.category && excluded.includes(item.category);
+    const otherSubtotal = itemExcluded ? qualifyingSubtotal : qualifyingSubtotal - item.price;
     if (otherSubtotal < deal.minSpend) continue;
     qualifying.push({ item, deal });
   }

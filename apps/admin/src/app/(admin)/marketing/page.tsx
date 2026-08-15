@@ -42,6 +42,8 @@ interface UnlockDeal {
   id: string; productId: string; productName: string; productBrand?: string;
   productImage?: string | null; productSlug?: string; regularPrice: number;
   minSpend: number; specialPrice: number; maxRedemptions: number | null; usageCount: number;
+  /** Category values EXCLUDED from the spend threshold — empty/undefined = all count */
+  excludedCategories?: string[];
   active: boolean; sortOrder: number; createdAt: string;
 }
 
@@ -536,7 +538,7 @@ function BundleTierModal({ tier, onClose, onSave }: { tier: Partial<BundleTier> 
 
 // ─── Unlock Deal Modal ────────────────────────────────────────────────────────
 
-const UD_EMPTY: Partial<UnlockDeal> = { minSpend: 50, specialPrice: 1, maxRedemptions: null, active: true, sortOrder: 1 };
+const UD_EMPTY: Partial<UnlockDeal> = { minSpend: 50, specialPrice: 1, maxRedemptions: null, excludedCategories: [], active: true, sortOrder: 1 };
 
 function UnlockDealModal({ deal, onClose, onSave }: { deal: Partial<UnlockDeal> | null; onClose: () => void; onSave: (d: any) => void }) {
   const isEdit = !!deal?.id;
@@ -548,6 +550,21 @@ function UnlockDealModal({ deal, onClose, onSave }: { deal: Partial<UnlockDeal> 
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
+
+  const { data: categories = [] } = useQuery<CategoryOption[]>({
+    queryKey: ["admin-categories-for-promo"],
+    queryFn: async () => {
+      const r = await fetch(`${API}/admin/categories`);
+      const json = await r.json();
+      return (Array.isArray(json) ? json : []).map((c: any) => ({ value: c.value, label: c.label }));
+    },
+  });
+  const excludedCats = form.excludedCategories ?? [];
+  function toggleExcludedCat(value: string) {
+    set("excludedCategories", excludedCats.includes(value)
+      ? excludedCats.filter(c => c !== value)
+      : [...excludedCats, value]);
+  }
 
   useEffect(() => {
     if (!showPicker) return;
@@ -729,6 +746,37 @@ function UnlockDealModal({ deal, onClose, onSave }: { deal: Partial<UnlockDeal> 
                   Total orders (across all customers) that may use this deal — not per order. {isEdit && form.usageCount != null ? `${form.usageCount} used so far.` : ""} Leave blank for unlimited.
                 </p>
                 <p className="text-[11px] text-gray-400">Within one order, exactly 1 bottle is ever discounted — no matter the cart quantity.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Exclude Categories From Threshold</label>
+                <p className="text-[11px] text-gray-400 mb-2">
+                  Spending in these categories does NOT count toward &quot;Spend at least&quot; — e.g. exclude Hard To Find so a customer can&apos;t unlock this by buying other rare bottles.
+                </p>
+                {categories.length === 0 ? (
+                  <p className="text-xs text-gray-400">No categories found.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map(c => {
+                      const isOn = excludedCats.includes(c.value);
+                      return (
+                        <button
+                          key={c.value}
+                          type="button"
+                          onClick={() => toggleExcludedCat(c.value)}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+                            isOn ? "bg-red-50 border-red-300 text-red-700" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                          }`}
+                        >
+                          {isOn ? "🚫 " : ""}{c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {excludedCats.length === 0 && (
+                  <p className="text-[11px] text-gray-400 mt-1.5">None selected — every category counts toward the threshold (default).</p>
+                )}
               </div>
 
               <label className="flex items-center gap-3 cursor-pointer">
@@ -1226,6 +1274,15 @@ function UnlockDealsTab() {
     queryFn: async () => { const r = await fetch(`${API}/admin/unlock-deals`); return r.json(); },
     refetchInterval: 30_000,
   });
+  const { data: categories = [] } = useQuery<CategoryOption[]>({
+    queryKey: ["admin-categories-for-promo"],
+    queryFn: async () => {
+      const r = await fetch(`${API}/admin/categories`);
+      const json = await r.json();
+      return (Array.isArray(json) ? json : []).map((c: any) => ({ value: c.value, label: c.label }));
+    },
+  });
+  const catLabel = (value: string) => categories.find(c => c.value === value)?.label ?? value;
 
   const createM = useMutation({
     mutationFn: async (data: any) => {
@@ -1309,6 +1366,9 @@ function UnlockDealsTab() {
                   {d.regularPrice > 0 && <span className="text-gray-400"> (reg. ${d.regularPrice.toFixed(2)})</span>}
                   {" · "}{d.usageCount ?? 0}{d.maxRedemptions != null ? ` / ${d.maxRedemptions}` : ""} used
                 </p>
+                {(d.excludedCategories?.length ?? 0) > 0 && (
+                  <p className="text-[11px] text-red-600 mt-1">🚫 Excludes: {d.excludedCategories!.map(catLabel).join(", ")}</p>
+                )}
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <button onClick={() => toggleM.mutate({ id: d.id, active: !d.active })}

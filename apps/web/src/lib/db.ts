@@ -519,6 +519,12 @@ export interface UnlockDeal {
   // this replaced; "Max Qty" was misread as a per-order limit).
   maxRedemptions: number | null;
   usageCount: number; // orders that have redeemed this deal so far
+  // Category values EXCLUDED from the "rest of cart" spend check (anh Sơn,
+  // 11/08) — e.g. exclude "Hard To Find" so a customer can't unlock a $1
+  // rare bottle just by buying other rare bottles; they have to spend the
+  // threshold on everything else. Empty/undefined = every category counts,
+  // same as before this field existed.
+  excludedCategories?: string[];
   active: boolean;
   sortOrder: number;
   createdAt: string;

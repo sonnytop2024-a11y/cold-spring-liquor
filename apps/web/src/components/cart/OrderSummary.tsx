@@ -40,7 +40,7 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
 
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
   const { subtotal, flashSavings, bundlePct, bundleDiscount, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
-    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity })),
+    items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity, category: i.product.category })),
     bundleTiers,
     unlockDeals,
   ), [items, bundleTiers, unlockDeals]);
