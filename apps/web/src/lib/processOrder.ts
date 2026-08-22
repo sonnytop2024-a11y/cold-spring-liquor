@@ -209,15 +209,16 @@ export async function processOrder(
   }
 
   const bundleTiers = store.getActiveBundleTiers();
-  const { subtotal, bundleDiscount } = calcDiscounts(enrichedItems, bundleTiers);
+  const { subtotal, bundleDiscount, pickupDiscountBase } = calcDiscounts(enrichedItems, bundleTiers);
   const safeBundleDiscount = Math.round(bundleDiscount * 100) / 100;
 
   const isPickup = body.orderType === "pickup";
   if (!isPickup && enrichedItems.some(i => i.pickupOnly)) {
     return { error: "Your cart contains a Pick Up Only item — please remove it or switch to Pick Up In Store.", status: 422 };
   }
-  // Pick Up In Store: automatic discount, tax computed on the discounted subtotal
-  const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
+  // Pick Up In Store: automatic discount — coupon-excluded items don't get it
+  // either (anh Sơn, 22/08), tax computed on the discounted subtotal
+  const pickupDiscount = isPickup ? calcPickupDiscount(pickupDiscountBase) : 0;
   const tax = Math.round((subtotal - pickupDiscount) * TAX_RATE * 100) / 100;
   const total = Math.round(Math.max(0, subtotal - safeBundleDiscount - couponDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax) * 100) / 100;
 

@@ -704,15 +704,16 @@ export function CheckoutForm({ mode: initialMode = "delivery" }: { mode?: "deliv
   }, []);
 
   // Totals — delivery always FREE, minimum order $20
-  const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
+  const { subtotal, flashSavings, bundlePct, bundleDiscount, promoBaseSubtotal, pickupDiscountBase, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
     items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity, category: i.product.category })),
     bundleTiers,
     unlockDeals,
   ), [items, bundleTiers, unlockDeals]);
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
   const rewardsDiscount = calcPointsValue(rewardsPointsToRedeem);
-  // Pick Up In Store: automatic discount, tax on the discounted subtotal
-  const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
+  // Pick Up In Store: automatic discount — coupon-excluded items don't get it
+  // either (anh Sơn, 22/08), tax on the discounted subtotal
+  const pickupDiscount = isPickup ? calcPickupDiscount(pickupDiscountBase) : 0;
   // Rounded to cents at each step — matches processOrder.ts server-side math exactly.
   // Without this, a rounded gift-card amount (capped to cents when applied) can leave
   // a sub-cent float residue in an unrounded total (e.g. $0.0025) that displays as

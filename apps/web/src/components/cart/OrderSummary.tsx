@@ -39,7 +39,7 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
   }, []);
 
   const totalQty = items.reduce((a, i) => a + i.quantity, 0);
-  const { subtotal, flashSavings, bundlePct, bundleDiscount, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
+  const { subtotal, flashSavings, bundlePct, bundleDiscount, pickupDiscountBase, unlockDiscount, unlockApplied } = useMemo(() => calcDiscounts(
     items.map(i => ({ productId: i.product.id, price: i.product.price, salePrice: i.product.salePrice, bundleEligible: i.product.bundleEligible, couponExcluded: i.product.couponExcluded, quantity: i.quantity, category: i.product.category })),
     bundleTiers,
     unlockDeals,
@@ -60,8 +60,9 @@ export function OrderSummary({ mode: initialMode = "delivery" }: { mode?: "deliv
   const deliveryDisabled = deliveryStatus?.deliveryEnabled === false;
   const showFree = deliveryStatus?.freeDelivery !== false;
   const showNoTip = deliveryStatus?.noTipRequired !== false;
-  // Pick Up In Store: automatic discount, tax on the discounted subtotal
-  const pickupDiscount = isPickup ? calcPickupDiscount(subtotal) : 0;
+  // Pick Up In Store: automatic discount — coupon-excluded items don't get it
+  // either (anh Sơn, 22/08), tax on the discounted subtotal
+  const pickupDiscount = isPickup ? calcPickupDiscount(pickupDiscountBase) : 0;
   const tax = (subtotal - pickupDiscount) * TAX_RATE;
   const total = Math.max(0, subtotal - bundleDiscount - unlockDiscount - promoDiscount - rewardsDiscount - giftCardAmount - pickupDiscount + tax);
   const totalSavings = flashSavings + bundleDiscount + unlockDiscount + promoDiscount + rewardsDiscount + giftCardAmount + pickupDiscount;

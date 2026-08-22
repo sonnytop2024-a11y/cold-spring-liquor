@@ -114,6 +114,7 @@ const UNLOCK_TAG_IMAGES: Record<string, string> = {
   "60-1": "/unlock-deal-tag-60.webp",
   "70-1": "/unlock-deal-tag-70.webp",
   "100-1": "/unlock-deal-tag-100.webp",
+  "250-1": "/unlock-deal-tag-250.webp",
 };
 function unlockTagImage(minSpend: number, specialPrice: number): string | null {
   return UNLOCK_TAG_IMAGES[`${minSpend}-${specialPrice}`] ?? null;

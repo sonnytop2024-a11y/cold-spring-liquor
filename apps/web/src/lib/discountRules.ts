@@ -46,6 +46,10 @@ export interface DiscountBreakdown {
   bundleDiscount: number;
   /** Subtotal of regular items (no flash, not bundle-eligible) — promo applies here */
   promoBaseSubtotal: number;
+  /** Subtotal excluding couponExcluded items — the automatic Pick Up 5% off
+      is computed off this, not the raw subtotal (anh Sơn, 22/08: coupon-
+      excluded products shouldn't get the automatic discount either) */
+  pickupDiscountBase: number;
   /** Total savings from active Unlock Deals matched in this cart */
   unlockDiscount: number;
   /** productId -> how many units unlocked and at what price, for per-item display */
@@ -62,12 +66,14 @@ export function calcDiscounts(
   let bundleQty = 0;
   let bundleSubtotal = 0;
   let promoBaseSubtotal = 0;
+  let pickupDiscountBase = 0;
 
   for (const item of items) {
     const isFlash = item.salePrice != null && item.salePrice < item.price;
     const effectivePrice = isFlash ? item.salePrice! : item.price;
 
     subtotal += effectivePrice * item.quantity;
+    if (!item.couponExcluded) pickupDiscountBase += effectivePrice * item.quantity;
 
     if (isFlash) {
       flashSavings += (item.price - item.salePrice!) * item.quantity;
@@ -139,7 +145,7 @@ export function calcDiscounts(
     }
   }
 
-  return { subtotal, flashSavings, bundleQty, bundleSubtotal, bundlePct, bundleDiscount, promoBaseSubtotal, unlockDiscount, unlockApplied };
+  return { subtotal, flashSavings, bundleQty, bundleSubtotal, bundlePct, bundleDiscount, promoBaseSubtotal, pickupDiscountBase, unlockDiscount, unlockApplied };
 }
 
 
