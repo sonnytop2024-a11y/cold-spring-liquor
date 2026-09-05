@@ -17,7 +17,12 @@ export async function scheduleDelayedWebhook(
 ): Promise<ScheduleResult> {
   const token = process.env.QSTASH_TOKEN;
   if (!token) return { scheduled: false, error: "QStash not configured" };
-  const base = process.env.QSTASH_URL ?? "https://qstash.upstash.io";
+  // `||` not `??` — on Vercel this var exists but is set to "" (empty
+  // string), which `??` does not treat as missing. Defensive fix: if
+  // QSTASH_TOKEN is ever configured while this stays blank, "" would
+  // produce a relative "/v2/publish/..." URL, which throws in a serverless
+  // fetch (no page origin to resolve against) instead of falling back.
+  const base = process.env.QSTASH_URL || "https://qstash.upstash.io";
 
   try {
     // QStash expects the raw destination URL appended after /v2/publish/ —
